@@ -1,0 +1,208 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: koreo-testing
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Function
+metadata:
+  name: empty
+  namespace: koreo-testing
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Function
+metadata:
+  name: input-validation-tests
+  namespace: koreo-testing
+spec:
+  inputValidators:
+    - type: Skip
+      message: number too small, must be over 5.
+      test: inputs.number < 5
+
+    - type: PermFail
+      message: optional number not equal to 3333.
+      test: has(inputs.optional_number) && inputs.optional_number != 3333
+
+    - type: Retry
+      message: number too large, must be under 13.
+      test: inputs.number > 13
+      delay: 90
+
+    - type: PermFail
+      message: number too small, must be over 1.
+      test: inputs.number < 1
+
+    - type: Retry
+      message: optional retry_number not equal to 1212.
+      test: has(inputs.optional_retry_number) && inputs.optional_retry_number != 1212
+      delay: 75
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Function
+metadata:
+  name: outcome-tests
+  namespace: koreo-testing
+spec:
+  outcome:
+    tests:
+      - type: Retry
+        message: number too large, must be under 13.
+        test: inputs.number > 13
+        delay: 90
+
+      - type: PermFail
+        message: optional number not equal to 3333.
+        test: has(inputs.optional_number) && inputs.optional_number != 3333
+
+      - type: Ok
+        test: has(inputs.output) && inputs.output == 11221122
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Function
+metadata:
+  name: outcome-ok-value
+  namespace: koreo-testing
+spec:
+  outcome:
+    okValue: "has(inputs.output) ? inputs.output: null"
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Function
+metadata:
+  name: materializers-base-nested
+  namespace: koreo-testing
+spec:
+  materializers:
+    base:
+      metadata:
+        namespace: inputs.metadata.namespace
+      spec:
+        name: inputs.person.name
+        age: inputs.person.age
+        children.*: |
+          { "name": inputs.person.name + ", Jr.", "age": inputs.person.age - 20 }
+
+  template:
+    apiVersion: tests.koreo.realkinetic.com/v1alpha8
+    kind: TestCase
+    metadata:
+      name: base-test
+    spec:
+      name: Name of Person
+      age: Age of Person
+      children:
+        - name: Name of Child
+          age: Age of Child
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Function
+metadata:
+  name: materializers-base-flat
+  namespace: koreo-testing
+spec:
+  materializers:
+    base:
+      "metadata.namespace": inputs.metadata.namespace
+      "spec.name": inputs.person.name
+      "spec.age": inputs.person.age
+      "spec.children.*": |
+        { "name": inputs.person.name + ", Jr.", "age": inputs.person.age - 20 }
+
+  template:
+    apiVersion: tests.koreo.realkinetic.com/v1alpha8
+    kind: TestCase
+    metadata:
+      name: base-test
+    spec:
+      name: Name of Person
+      age: Age of Person
+      children:
+        - name: Name of Child
+          age: Age of Child
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Function
+metadata:
+  name: materializers-on-create-nested
+  namespace: koreo-testing
+spec:
+  materializers:
+    onCreate:
+      metadata:
+        namespace: inputs.metadata.namespace
+      spec:
+        name: inputs.person.name
+        age: inputs.person.age
+        children.*: |
+          { "name": inputs.person.name + ", Jr.", "age": inputs.person.age - 20 }
+
+  template:
+    apiVersion: tests.koreo.realkinetic.com/v1alpha8
+    kind: TestCase
+    metadata:
+      name: base-test
+    spec:
+      name: Name of Person
+      age: Age of Person
+      children:
+        - name: Name of Child
+          age: Age of Child
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Function
+metadata:
+  name: materializers-on-create-flat
+  namespace: koreo-testing
+spec:
+  materializers:
+    onCreate:
+      "metadata.namespace": inputs.metadata.namespace
+      "spec.name": inputs.person.name
+      "spec.age": inputs.person.age
+      "spec.children.*": |
+        { "name": inputs.person.name + ", Jr.", "age": inputs.person.age - 20 }
+
+  template:
+    apiVersion: tests.koreo.realkinetic.com/v1alpha8
+    kind: TestCase
+    metadata:
+      name: base-test
+    spec:
+      name: Name of Person
+      age: Age of Person
+      children:
+        - name: Name of Child
+          age: Age of Child
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Function
+metadata:
+  name: gcp-folder.v1
+  namespace: koreo-testing
+  labels:
+    template.koreo.konfig.realkinetic.com/name: "gcp-folder"
+    template.koreo.realkinetic.com/version: "v1"
+    template.koreo.realkinetic.com/active: "true"
+    template.koreo.realkinetic.com/latest: "true"
+spec:
+  inputs: ["params", "parent_folder"]
+
+  outcome:
+    tests:
+      - type: Ok
+        test: resource.config_connect_ready()
+
+    okValue: |
+      {"folderId": resource.status.folderId, "ref": resource.self_ref() }
+
+  materializers:
+    base:
+      metadata: inputs.metadata
+      spec:
+        displayName: inputs.params.name
+        folderRef: inputs.parent_folder.ref.to_ref()
+
+  template:
+    apiVersion: resourcemanager.cnrm.cloud.google.com/v1beta1
+    kind: Folder

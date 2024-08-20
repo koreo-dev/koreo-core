@@ -1,0 +1,50 @@
+[project]
+name = "koreo"
+version = "0.1.0"
+description = "Type-safe and testable KRM Templates and Workflows."
+authors = [
+    {name = "Robert Kluin", email = "robert.kluin@realkinetic.com"},
+]
+
+dependencies = [
+    "cel-python>=0.1.5",
+    "kopf>=1.37.2",
+    "pykube>=0.15.0",
+    "jsonpath-ng>=1.6.1",
+    "PyYAML>=6.0.2",
+]
+
+requires-python = ">=3.12"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+
+[project.urls]
+Homepage = "https://realkinetic.com/konfig"
+
+[project.optional-dependencies]
+dev = [
+    "black>=24.8.0",
+    "pytest>=8.3.2",
+    "pytest-cov>=5.0.0",
+    "mypy>=1.11.1",
+]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = true
+
+[tool.pdm.build]
+includes = ["koreo/"]
+
+[tool.pytest.ini_options]
+pythonpath = "koreo"
+addopts = [
+  "-v",
+  "--import-mode=importlib",
+  "--cov=koreo",
+  "--cov-branch",
+  "--cov-report=term-missing",
+]
