@@ -7,11 +7,10 @@ authors = [
 ]
 
 dependencies = [
-    "cel-python>=0.1.5",
-    "kopf>=1.37.2",
-    "pykube>=0.15.0",
-    "jsonpath-ng>=1.6.1",
-    "PyYAML>=6.0.2",
+    "cel-python==0.1.5",
+    "kopf==1.37.2",
+    "jsonpath-ng==1.6.1",
+    "PyYAML==6.0.2",
 ]
 
 requires-python = ">=3.12"
