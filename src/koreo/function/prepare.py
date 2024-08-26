@@ -129,6 +129,7 @@ def _predicate_extractor(
 
     tests = f"{predicates}.filter(predicate, predicate.test)"
     compiled = cel_env.compile(tests)
+
     program = cel_env.program(compiled)
     program.logger.setLevel(logging.WARNING)
     return program

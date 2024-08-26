@@ -36,15 +36,12 @@ build-backend = "pdm.backend"
 [tool.pdm]
 distribution = true
 
-[tool.pdm.build]
-includes = ["koreo/"]
-
 [tool.pytest.ini_options]
-pythonpath = "koreo"
+pythonpath = "src"
 addopts = [
   "-v",
   "--import-mode=importlib",
-  "--cov=koreo",
+  "--cov=src",
   "--cov-branch",
   "--cov-report=term-missing",
 ]
