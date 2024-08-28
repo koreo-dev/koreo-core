@@ -8,12 +8,18 @@ kind: Function
 metadata:
   name: empty
   namespace: koreo-testing
+  labels:
+    function.koreo.konfig.realkinetic.com/name: empty
+    function.koreo.konfig.realkinetic.com/version: v1
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
 metadata:
   name: input-validation-tests
   namespace: koreo-testing
+  labels:
+    function.koreo.konfig.realkinetic.com/name: input-validation-tests
+    function.koreo.konfig.realkinetic.com/version: v1
 spec:
   inputValidators:
     - type: Skip
@@ -43,6 +49,9 @@ kind: Function
 metadata:
   name: outcome-tests
   namespace: koreo-testing
+  labels:
+    function.koreo.konfig.realkinetic.com/name: outcome-tests
+    function.koreo.konfig.realkinetic.com/version: v1
 spec:
   outcome:
     tests:
@@ -63,6 +72,9 @@ kind: Function
 metadata:
   name: outcome-ok-value
   namespace: koreo-testing
+  labels:
+    function.koreo.konfig.realkinetic.com/name: outcome-ok-value
+    function.koreo.konfig.realkinetic.com/version: v1
 spec:
   outcome:
     okValue: "has(inputs.output) ? inputs.output: null"
@@ -72,6 +84,9 @@ kind: Function
 metadata:
   name: materializers-base-nested
   namespace: koreo-testing
+  labels:
+    function.koreo.konfig.realkinetic.com/name: materializers-base-nested
+    function.koreo.konfig.realkinetic.com/version: v1
 spec:
   materializers:
     base:
@@ -100,6 +115,9 @@ kind: Function
 metadata:
   name: materializers-base-flat
   namespace: koreo-testing
+  labels:
+    function.koreo.konfig.realkinetic.com/name: materializers-base-flat
+    function.koreo.konfig.realkinetic.com/version: v1
 spec:
   materializers:
     base:
@@ -126,6 +144,9 @@ kind: Function
 metadata:
   name: materializers-on-create-nested
   namespace: koreo-testing
+  labels:
+    function.koreo.konfig.realkinetic.com/name: materializers-on-create-nested
+    function.koreo.konfig.realkinetic.com/version: v1
 spec:
   materializers:
     onCreate:
@@ -154,6 +175,9 @@ kind: Function
 metadata:
   name: materializers-on-create-flat
   namespace: koreo-testing
+  labels:
+    function.koreo.konfig.realkinetic.com/name: materializers-on-create-flat
+    function.koreo.konfig.realkinetic.com/version: v1
 spec:
   materializers:
     onCreate:
@@ -181,13 +205,9 @@ metadata:
   name: gcp-folder.v1
   namespace: koreo-testing
   labels:
-    template.koreo.konfig.realkinetic.com/name: "gcp-folder"
-    template.koreo.realkinetic.com/version: "v1"
-    template.koreo.realkinetic.com/active: "true"
-    template.koreo.realkinetic.com/latest: "true"
+    function.koreo.konfig.realkinetic.com/name: gcp-folder
+    function.koreo.konfig.realkinetic.com/version: v1
 spec:
-  inputs: ["params", "parent_folder"]
-
   outcome:
     tests:
       - type: Ok
