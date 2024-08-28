@@ -11,6 +11,7 @@ dependencies = [
     "kopf==1.37.2",
     "jsonpath-ng==1.6.1",
     "PyYAML==6.0.2",
+    "kr8s==0.17.2",
 ]
 
 requires-python = ">=3.12"
