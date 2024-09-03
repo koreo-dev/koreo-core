@@ -9,8 +9,9 @@ metadata:
   name: empty
   namespace: koreo-testing
   labels:
-    function.koreo.konfig.realkinetic.com/name: empty
-    function.koreo.konfig.realkinetic.com/version: v1
+    koreo.realkinetic.com/name: empty
+    koreo.realkinetic.com/version: v1
+    koreo.realkinetic.com/bump: "13"
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -18,8 +19,8 @@ metadata:
   name: input-validation-tests
   namespace: koreo-testing
   labels:
-    function.koreo.konfig.realkinetic.com/name: input-validation-tests
-    function.koreo.konfig.realkinetic.com/version: v1
+    koreo.realkinetic.com/name: input-validation-tests
+    koreo.realkinetic.com/version: v1
 spec:
   inputValidators:
     - type: Skip
@@ -50,8 +51,8 @@ metadata:
   name: outcome-tests
   namespace: koreo-testing
   labels:
-    function.koreo.konfig.realkinetic.com/name: outcome-tests
-    function.koreo.konfig.realkinetic.com/version: v1
+    koreo.realkinetic.com/name: outcome-tests
+    koreo.realkinetic.com/version: v1
 spec:
   outcome:
     tests:
@@ -73,8 +74,9 @@ metadata:
   name: outcome-ok-value
   namespace: koreo-testing
   labels:
-    function.koreo.konfig.realkinetic.com/name: outcome-ok-value
-    function.koreo.konfig.realkinetic.com/version: v1
+    koreo.realkinetic.com/name: outcome-ok-value
+    koreo.realkinetic.com/version: v1
+    koreo.realkinetic.com/bump: "4"
 spec:
   outcome:
     okValue: "has(inputs.output) ? inputs.output: null"
@@ -85,8 +87,9 @@ metadata:
   name: materializers-base-nested
   namespace: koreo-testing
   labels:
-    function.koreo.konfig.realkinetic.com/name: materializers-base-nested
-    function.koreo.konfig.realkinetic.com/version: v1
+    koreo.realkinetic.com/name: materializers-base-nested
+    koreo.realkinetic.com/version: v1
+    koreo.realkinetic.com/bump: "12"
 spec:
   materializers:
     base:
@@ -116,8 +119,8 @@ metadata:
   name: materializers-base-flat
   namespace: koreo-testing
   labels:
-    function.koreo.konfig.realkinetic.com/name: materializers-base-flat
-    function.koreo.konfig.realkinetic.com/version: v1
+    koreo.realkinetic.com/name: materializers-base-flat
+    koreo.realkinetic.com/version: v1
 spec:
   materializers:
     base:
@@ -145,8 +148,8 @@ metadata:
   name: materializers-on-create-nested
   namespace: koreo-testing
   labels:
-    function.koreo.konfig.realkinetic.com/name: materializers-on-create-nested
-    function.koreo.konfig.realkinetic.com/version: v1
+    koreo.realkinetic.com/name: materializers-on-create-nested
+    koreo.realkinetic.com/version: v1
 spec:
   materializers:
     onCreate:
@@ -176,8 +179,8 @@ metadata:
   name: materializers-on-create-flat
   namespace: koreo-testing
   labels:
-    function.koreo.konfig.realkinetic.com/name: materializers-on-create-flat
-    function.koreo.konfig.realkinetic.com/version: v1
+    koreo.realkinetic.com/name: materializers-on-create-flat
+    koreo.realkinetic.com/version: v1
 spec:
   materializers:
     onCreate:
@@ -205,8 +208,8 @@ metadata:
   name: gcp-folder.v1
   namespace: koreo-testing
   labels:
-    function.koreo.konfig.realkinetic.com/name: gcp-folder
-    function.koreo.konfig.realkinetic.com/version: v1
+    koreo.realkinetic.com/name: gcp-folder
+    koreo.realkinetic.com/version: v1
 spec:
   outcome:
     tests:
@@ -226,3 +229,38 @@ spec:
   template:
     apiVersion: resourcemanager.cnrm.cloud.google.com/v1beta1
     kind: Folder
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Function
+metadata:
+  name: dummy-test
+  namespace: koreo-testing
+  labels:
+    koreo.realkinetic.com/name: dummy-test
+    koreo.realkinetic.com/version: v1
+spec:
+  materializers:
+    base:
+      "metadata.name": string("a-name")
+      "metadata.namespace": string("koreo-testing")
+      spec:
+        intKey: 99
+        strKey: string("A string!")
+
+  template:
+    apiVersion: koreo.realkinetic.com/v1alpha8
+    kind: TestDummy
+    metadata:
+      labels:
+        testing.realkinetic.com/key: value
+    spec:
+      intKey: 7
+      strKey: "yay"
+      listKey:
+        - name: first
+          value: 1
+        - name: second
+          value: 2
+      mapKey:
+        name: some
+        value: 1

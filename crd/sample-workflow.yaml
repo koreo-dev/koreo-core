@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: koreo-testing
+---
+apiVersion: konfig.realkinetic.com/v1alpha8
+kind: Domain
+metadata:
+  name: fully-built-trigger
+  namespace: koreo-testing
+  labels:
+    koreo.realkinetic.com/bumper: "1"
+spec:
+  domainName: Testing
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Workflow
+metadata:
+  name: fully-built
+  namespace: koreo-testing
+  labels:
+    koreo.realkinetic.com/name: fully-built
+    koreo.realkinetic.com/version: v1
+    koreo.realkinetic.com/bump: "2"
+spec:
+  crdRef:
+    apiGroup: konfig.realkinetic.com
+    version: v1alpha8
+    kind: Domain
+
+  steps:
+    - label: empty
+      functionRef:
+        name: empty
+        version: v1
+    - label: ok-value
+      functionRef:
+        name: outcome-ok-value
+        version: v1
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Workflow
+metadata:
+  name: fully-built-2
+  namespace: koreo-testing
+  labels:
+    koreo.realkinetic.com/name: fully-built
+    koreo.realkinetic.com/version: v1
+    koreo.realkinetic.com/bump: "2"
+spec:
+  crdRef:
+    apiGroup: konfig.realkinetic.com
+    version: v1alpha8
+    kind: Domain
+
+  steps:
+    - label: empty
+      functionRef:
+        name: empty
+        version: v1
+    - label: ok-value
+      functionRef:
+        name: outcome-ok-value
+        version: v1
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Workflow
+metadata:
+  name: dummy-test-1
+  namespace: koreo-testing
+  labels:
+    koreo.realkinetic.com/name: dummy-test-1
+    koreo.realkinetic.com/version: v1
+spec:
+  crdRef:
+    apiGroup: konfig.realkinetic.com
+    version: v1alpha8
+    kind: Domain
+
+  steps:
+    - label: ok-value
+      functionRef:
+        name: dummy-test
+        version: v1

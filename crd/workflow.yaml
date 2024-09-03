@@ -1,0 +1,63 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: workflows.koreo.realkinetic.com
+spec:
+  scope: Namespaced
+  group: koreo.realkinetic.com
+  names:
+    kind: Workflow
+    plural: workflows
+    singular: workflow
+  versions:
+    - name: v1alpha8
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                crdRef:
+                  nullable: false
+                  type: object
+                  properties:
+                    apiGroup:
+                      type: string
+                      nullable: false
+                    version:
+                      type: string
+                      nullable: false
+                    kind:
+                      type: string
+                      nullable: false
+                  required: [apiGroup, version, kind]
+
+                steps:
+                  nullable: true
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      label:
+                        type: string
+                        nullable: false
+                      functionRef:
+                        type: object
+                        nullable: false
+                        properties:
+                          name:
+                            type: string
+                            nullable: false
+                          version:
+                            type: string
+                            nullable: false
+                        required: [name, version]
+                    required: [label, functionRef]
+
+              required: [crdRef, steps]
+            status:
+              x-kubernetes-preserve-unknown-fields: true
+              type: object
