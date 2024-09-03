@@ -1,40 +1,72 @@
 from typing import Any, Callable
 import logging
 
+import asyncio
+
+from koreo.cache import get_spec_from_cache
+from koreo.workflow.prepare import prepare_workflow
+from koreo.workflow.structure import Workflow
+
+
+from .registry import get_function_workflows
 from . import structure
 
 import celpy
-import celpy.celtypes as celtypes
+
+# Try to reduce the incredibly verbose logging from celpy
+logging.getLogger("NameContainer").setLevel(logging.WARNING)
+logging.getLogger("Evaluator").setLevel(logging.WARNING)
+logging.getLogger("evaluation").setLevel(logging.WARNING)
+logging.getLogger("celtypes").setLevel(logging.WARNING)
+
+__tasks = set()
 
 
-def prepare_function(function: dict) -> structure.Function:
+async def prepare_function(cache_key: str, spec: dict) -> structure.Function:
     # NOTE: We can try `celpy.Environment(runner_class=celpy.CompiledRunner)`
     # We need to do a safety check to ensure there are no escapes / injections.
+    logging.info(f"Prepare function {cache_key}")
+
+    if not spec:
+        spec = {}
 
     env = celpy.Environment()
 
     input_validators = _predicate_extractor(
         cel_env=env,
-        predicate_spec=function.get("inputValidators"),
+        predicate_spec=spec.get("inputValidators"),
         encoder=_encode_validators,
     )
 
     materializers = _prepare_materializers(
-        cel_env=env, materializers=function.get("materializers")
+        cel_env=env, materializers=spec.get("materializers")
     )
 
-    outcome = _prepare_outcome(cel_env=env, outcome=function.get("outcome"))
+    outcome = _prepare_outcome(cel_env=env, outcome=spec.get("outcome"))
+
+    loop = asyncio.get_event_loop()
+    for workflow_key in get_function_workflows(function=cache_key):
+        workflow_task = loop.create_task(
+            prepare_workflow(
+                cache_key=workflow_key,
+                spec=get_spec_from_cache(
+                    resource_type=Workflow, cache_key=workflow_key
+                ),
+            )
+        )
+        __tasks.add(workflow_task)
+        workflow_task.add_done_callback(__tasks.discard)
 
     return structure.Function(
         input_validators=input_validators,
         materializers=materializers,
         outcome=outcome,
-        template=function.get("template"),
+        template=spec.get("template"),
     )
 
 
 def _prepare_materializers(
-    cel_env: celpy.Environment, materializers: dict
+    cel_env: celpy.Environment, materializers: dict | None
 ) -> structure.Materializers:
     if not materializers:
         return structure.Materializers(base=None, on_create=None)
@@ -54,7 +86,9 @@ def _prepare_materializers(
     )
 
 
-def _prepare_outcome(cel_env: celpy.Environment, outcome: dict) -> structure.Outcome:
+def _prepare_outcome(
+    cel_env: celpy.Environment, outcome: dict | None
+) -> structure.Outcome:
     if not outcome:
         return structure.Outcome(tests=None, ok_value=None)
 
@@ -98,6 +132,9 @@ def _template_extractor(
 
 def _encode_template(base: str, template_spec: dict | None) -> list[tuple[str, Any]]:
     output: list[tuple[str, Any]] = []
+
+    if not template_spec:
+        return []
 
     for field, expression in template_spec.items():
         safe_field = field.replace('"', "'")

@@ -18,14 +18,17 @@ with open("crd/sample-function.yaml", "r") as raw_yamls:
         _functions[key] = function_yaml
 
 
-class TestFunctionInputValidation(unittest.TestCase):
-    def test_no_validators(self):
-        prepared = prepare.prepare_function(_functions["empty"].get("spec", {}))
+class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
+    async def test_no_validators(self):
+        prepared = await prepare.prepare_function(
+            cache_key="empty", spec=_functions["empty"].get("spec", {})
+        )
         self.assertIsNone(prepared.input_validators)
 
-    def test_no_problems(self):
-        prepared = prepare.prepare_function(
-            _functions["input-validation-tests"].get("spec", {})
+    async def test_no_problems(self):
+        prepared = await prepare.prepare_function(
+            cache_key="input-validation-tests",
+            spec=_functions["input-validation-tests"].get("spec", {}),
         )
         result = prepared.input_validators.evaluate(
             {"inputs": celpy.json_to_cel({"number": 6, "optional_skip_number": 3333})}
@@ -33,9 +36,10 @@ class TestFunctionInputValidation(unittest.TestCase):
 
         self.assertFalse(result)
 
-    def test_skip(self):
-        prepared = prepare.prepare_function(
-            _functions["input-validation-tests"].get("spec", {})
+    async def test_skip(self):
+        prepared = await prepare.prepare_function(
+            cache_key="input-validation-tests",
+            spec=_functions["input-validation-tests"].get("spec", {}),
         )
         cel_result = prepared.input_validators.evaluate(
             {"inputs": celpy.json_to_cel({"number": 4})}
@@ -50,9 +54,10 @@ class TestFunctionInputValidation(unittest.TestCase):
         self.assertEqual("Skip", result.get("type"))
         self.assertIn("too small", result.get("message"))
 
-    def test_optional_perm_fail(self):
-        prepared = prepare.prepare_function(
-            _functions["input-validation-tests"].get("spec", {})
+    async def test_optional_perm_fail(self):
+        prepared = await prepare.prepare_function(
+            cache_key="input-validation-tests",
+            spec=_functions["input-validation-tests"].get("spec", {}),
         )
         cel_result = prepared.input_validators.evaluate(
             {"inputs": celpy.json_to_cel({"number": 8, "optional_number": 250})}
@@ -67,9 +72,10 @@ class TestFunctionInputValidation(unittest.TestCase):
         self.assertEqual("PermFail", result.get("type"))
         self.assertIn("not equal", result.get("message"))
 
-    def test_retry_delay(self):
-        prepared = prepare.prepare_function(
-            _functions["input-validation-tests"].get("spec", {})
+    async def test_retry_delay(self):
+        prepared = await prepare.prepare_function(
+            cache_key="input-validation-tests",
+            spec=_functions["input-validation-tests"].get("spec", {}),
         )
         cel_result = prepared.input_validators.evaluate(
             {"inputs": celpy.json_to_cel({"number": 15})}
@@ -85,9 +91,10 @@ class TestFunctionInputValidation(unittest.TestCase):
         self.assertEqual(90, result.get("delay"))
         self.assertIn("too large", result.get("message"))
 
-    def test_multiple_issues(self):
-        prepared = prepare.prepare_function(
-            _functions["input-validation-tests"].get("spec", {})
+    async def test_multiple_issues(self):
+        prepared = await prepare.prepare_function(
+            cache_key="input-validation-tests",
+            spec=_functions["input-validation-tests"].get("spec", {}),
         )
         result = prepared.input_validators.evaluate(
             {"inputs": celpy.json_to_cel({"number": 0, "optional_retry_number": 7})}
@@ -96,13 +103,17 @@ class TestFunctionInputValidation(unittest.TestCase):
         self.assertEqual(3, len(result))
 
 
-class TestFunctionOutcomeTests(unittest.TestCase):
-    def test_none_defined(self):
-        prepared = prepare.prepare_function(_functions["empty"].get("spec", {}))
+class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_none_defined(self):
+        prepared = await prepare.prepare_function(
+            cache_key="empty", spec=_functions["empty"].get("spec", {})
+        )
         self.assertIsNone(prepared.outcome.tests)
 
-    def test_optional_perm_fail(self):
-        prepared = prepare.prepare_function(_functions["outcome-tests"].get("spec", {}))
+    async def test_optional_perm_fail(self):
+        prepared = await prepare.prepare_function(
+            cache_key="outcome-tests", spec=_functions["outcome-tests"].get("spec", {})
+        )
         cel_result = prepared.outcome.tests.evaluate(
             {"inputs": celpy.json_to_cel({"number": 5, "optional_number": 250})}
         )
@@ -116,8 +127,10 @@ class TestFunctionOutcomeTests(unittest.TestCase):
         self.assertEqual("PermFail", result.get("type"))
         self.assertIn("not equal", result.get("message"))
 
-    def test_retry_delay(self):
-        prepared = prepare.prepare_function(_functions["outcome-tests"].get("spec", {}))
+    async def test_retry_delay(self):
+        prepared = await prepare.prepare_function(
+            cache_key="outcome-tests", spec=_functions["outcome-tests"].get("spec", {})
+        )
         cel_result = prepared.outcome.tests.evaluate(
             {"inputs": celpy.json_to_cel({"number": 15})}
         )
@@ -132,8 +145,10 @@ class TestFunctionOutcomeTests(unittest.TestCase):
         self.assertEqual(90, result.get("delay"))
         self.assertIn("too large", result.get("message"))
 
-    def test_multiple_issues(self):
-        prepared = prepare.prepare_function(_functions["outcome-tests"].get("spec", {}))
+    async def test_multiple_issues(self):
+        prepared = await prepare.prepare_function(
+            cache_key="outcome-tests", spec=_functions["outcome-tests"].get("spec", {})
+        )
         result = prepared.outcome.tests.evaluate(
             {
                 "inputs": celpy.json_to_cel(
@@ -144,8 +159,10 @@ class TestFunctionOutcomeTests(unittest.TestCase):
 
         self.assertEqual(2, len(result))
 
-    def test_ok(self):
-        prepared = prepare.prepare_function(_functions["outcome-tests"].get("spec", {}))
+    async def test_ok(self):
+        prepared = await prepare.prepare_function(
+            cache_key="outcome-tests", spec=_functions["outcome-tests"].get("spec", {})
+        )
         results = prepared.outcome.tests.evaluate(
             {
                 "inputs": celpy.json_to_cel(
@@ -161,14 +178,17 @@ class TestFunctionOutcomeTests(unittest.TestCase):
         self.assertEqual("Ok", result.get("type"))
 
 
-class TestFunctionOutcomeOkValue(unittest.TestCase):
-    def test_none_defined(self):
-        prepared = prepare.prepare_function(_functions["empty"].get("spec", {}))
+class TestFunctionOutcomeOkValue(unittest.IsolatedAsyncioTestCase):
+    async def test_none_defined(self):
+        prepared = await prepare.prepare_function(
+            cache_key="empty", spec=_functions["empty"].get("spec", {})
+        )
         self.assertIsNone(prepared.outcome.ok_value)
 
-    def test_value(self):
-        prepared = prepare.prepare_function(
-            _functions["outcome-ok-value"].get("spec", {})
+    async def test_value(self):
+        prepared = await prepare.prepare_function(
+            cache_key="outcome-ok-value",
+            spec=_functions["outcome-ok-value"].get("spec", {}),
         )
         cel_result = prepared.outcome.ok_value.evaluate(
             {"inputs": celpy.json_to_cel({"output": 19283746})}
@@ -178,9 +198,10 @@ class TestFunctionOutcomeOkValue(unittest.TestCase):
 
         self.assertEqual(result, 19283746)
 
-    def test_no_output(self):
-        prepared = prepare.prepare_function(
-            _functions["outcome-ok-value"].get("spec", {})
+    async def test_no_output(self):
+        prepared = await prepare.prepare_function(
+            cache_key="outcome-ok-value",
+            spec=_functions["outcome-ok-value"].get("spec", {}),
         )
         cel_result = prepared.outcome.ok_value.evaluate({})
 
@@ -189,14 +210,17 @@ class TestFunctionOutcomeOkValue(unittest.TestCase):
         self.assertIsNone(result)
 
 
-class TestFunctionMaterializerBase(unittest.TestCase):
-    def test_none_defined(self):
-        prepared = prepare.prepare_function(_functions["empty"].get("spec", {}))
+class TestFunctionMaterializerBase(unittest.IsolatedAsyncioTestCase):
+    async def test_none_defined(self):
+        prepared = await prepare.prepare_function(
+            cache_key="empty", spec=_functions["empty"].get("spec", {})
+        )
         self.assertIsNone(prepared.materializers.base)
 
-    def test_base(self):
-        prepared = prepare.prepare_function(
-            _functions["materializers-base-flat"].get("spec", {})
+    async def test_base(self):
+        prepared = await prepare.prepare_function(
+            cache_key="materializers-base-flat",
+            spec=_functions["materializers-base-flat"].get("spec", {}),
         )
         cel_result = prepared.materializers.base.evaluate(
             {
@@ -224,9 +248,10 @@ class TestFunctionMaterializerBase(unittest.TestCase):
         }
         self.assertDictEqual(output, result)
 
-    def test_nested_base(self):
-        prepared = prepare.prepare_function(
-            _functions["materializers-base-nested"].get("spec", {})
+    async def test_nested_base(self):
+        prepared = await prepare.prepare_function(
+            cache_key="materializers-base-nested",
+            spec=_functions["materializers-base-nested"].get("spec", {}),
         )
         cel_result = prepared.materializers.base.evaluate(
             {
@@ -256,14 +281,17 @@ class TestFunctionMaterializerBase(unittest.TestCase):
         self.assertDictEqual(output, result)
 
 
-class TestFunctionMaterializerOnCreate(unittest.TestCase):
-    def test_none_defined(self):
-        prepared = prepare.prepare_function(_functions["empty"].get("spec", {}))
+class TestFunctionMaterializerOnCreate(unittest.IsolatedAsyncioTestCase):
+    async def test_none_defined(self):
+        prepared = await prepare.prepare_function(
+            cache_key="empty", spec=_functions["empty"].get("spec", {})
+        )
         self.assertIsNone(prepared.materializers.on_create)
 
-    def test_flat(self):
-        prepared = prepare.prepare_function(
-            _functions["materializers-on-create-flat"].get("spec", {})
+    async def test_flat(self):
+        prepared = await prepare.prepare_function(
+            cache_key="materializers-on-create-flat",
+            spec=_functions["materializers-on-create-flat"].get("spec", {}),
         )
         cel_result = prepared.materializers.on_create.evaluate(
             {
@@ -291,9 +319,10 @@ class TestFunctionMaterializerOnCreate(unittest.TestCase):
         }
         self.assertDictEqual(output, result)
 
-    def test_nested(self):
-        prepared = prepare.prepare_function(
-            _functions["materializers-on-create-nested"].get("spec", {})
+    async def test_nested(self):
+        prepared = await prepare.prepare_function(
+            cache_key="materializers-on-create-nested",
+            spec=_functions["materializers-on-create-nested"].get("spec", {}),
         )
         cel_result = prepared.materializers.on_create.evaluate(
             {
