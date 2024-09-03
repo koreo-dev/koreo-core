@@ -12,6 +12,7 @@ dependencies = [
     "jsonpath-ng==1.6.1",
     "PyYAML==6.0.2",
     "kr8s==0.17.2",
+    "uvloop>=0.20.0",
 ]
 
 requires-python = ">=3.12"
