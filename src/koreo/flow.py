@@ -5,7 +5,7 @@ from typing import Annotated, Mapping, get_origin, get_type_hints, get_args
 
 
 from .result import DepSkip, Ok, Outcome, PermFail, Retry, Skip, combine
-from .workflow import ActionFn, Workflow
+from .workflow_old import ActionFn, Workflow
 
 
 UNWRAP_OK = "__unwrap_ok__"

@@ -6,7 +6,7 @@ from asyncio import TaskGroup, sleep
 
 from koreo.flow import UnwrapOk, _execute_step, flow_control
 from koreo.result import DepSkip, Ok, Outcome, PermFail, Retry
-from koreo.workflow import Workflow
+from koreo.workflow_old import Workflow
 
 
 ID_CHARS = string.ascii_letters + string.digits
