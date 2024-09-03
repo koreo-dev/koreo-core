@@ -51,8 +51,6 @@ async def maintain_cache(
                 asyncio=True,
             )
 
-            kr8s_api.watch
-
             watcher = kr8s_api.async_watch(
                 kind=resource_class, namespace=koreo_namespace
             )
