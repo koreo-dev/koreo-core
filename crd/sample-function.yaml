@@ -239,6 +239,12 @@ metadata:
     koreo.realkinetic.com/name: dummy-test
     koreo.realkinetic.com/version: v1
 spec:
+  managedResource:
+    crd:
+      apiVersion: koreo.realkinetic.com/v1alpha8
+      kind: TestDummy
+      plural: testdummies
+      namespaced: true
   materializers:
     base:
       "metadata.name": string("a-name")

@@ -43,42 +43,61 @@ async def reconcile_function(api: kr8s.Api, function: Function, inputs: dict):
                 field_expr = jsonpath_ng.parse(field_path)
                 field_expr.update_or_create(managed_resource, value)
 
-    # TODO: Adopt
+    # TODO: Add owners, if ManagedResource.behaviors.add-owner
 
     resource = None
     if managed_resource:
-        api_version = managed_resource.get("apiVersion")
-        kind = managed_resource.get("kind")
-
         computed_metadata = managed_resource.get("metadata", {})
 
         name = computed_metadata.get("name")
         namespace = computed_metadata.get("namespace")
 
-        logging.info(
-            f"RESOURCE: metadata={managed_resource}, kind={kind}, version={api_version}, namespaced={True if namespace else False}"
-        )
+        if function.managed_resource.crd:
+            api_version = function.managed_resource.crd.api_version
+            kind = function.managed_resource.crd.kind
+            plural = function.managed_resource.crd.plural
+            namespaced = function.managed_resource.crd.namespaced
+        else:
+            api_version = managed_resource.get("apiVersion")
+            kind = managed_resource.get("kind")
+            plural = None
+            namespaced = True if namespace else False
 
         if not (api_version and kind and name):
             logging.error("Missing critical managed resource fields!")
             raise Exception("FAILURE")
 
-        resource_api = kr8s.objects.new_class(
-            kind=kind,
+        resource_class = kr8s.objects.new_class(
             version=api_version,
-            namespaced=True if namespace else False,
+            kind=kind,
+            plural=plural,
+            namespaced=namespaced,
             asyncio=True,
         )
 
         try:
-            resource = await resource_api.get(
-                api=api,
-                name=name,
+            resource = await api.async_get(
+                resource_class,
+                name,
                 namespace=namespace,
             )
-        except kr8s.NotFoundError as err:
+        except kr8s.NotFoundError:
             resource = None
+        except kr8s.ServerError as err:
+            if err.response and err.response.status_code == 404:
+                resource = None
+            else:
+                logging.exception(
+                    f"ServerError loading {kind} resource {namespace}/{name}. ({type(err)}: {err})"
+                )
+                return Retry(
+                    message=f"Non-404 ServerError loading {kind} resource {namespace}/{name}. ({type(err)}: {err})",
+                    delay=30,
+                )
         except Exception as err:
+            logging.exception(
+                f"Failure loading {kind} resource {namespace}/{name}. ({type(err)}: {err})"
+            )
             return Retry(
                 message=f"Error loading {kind} resource {namespace}/{name}. ({type(err)}: {err})",
                 delay=30,
@@ -101,12 +120,8 @@ async def reconcile_function(api: kr8s.Api, function: Function, inputs: dict):
                         field_expr = jsonpath_ng.parse(field_path)
                         field_expr.update_or_create(managed_resource, value)
 
-            # **************************
-            # TODO: Create isn't working?
-            # **************************
-
             logging.info(f"Creating {kind}.{api_version} resource {namespace}/{name}.")
-            new_object = resource_api(
+            new_object = resource_class(
                 api=api, resource=managed_resource, namespace=namespace
             )
             await new_object.create()
@@ -117,12 +132,20 @@ async def reconcile_function(api: kr8s.Api, function: Function, inputs: dict):
             )
 
         # TODO: Should this only send fields with differences?
-        if not _validate_match(managed_resource, resource.to_dict()):
-            await resource.patch(managed_resource)
-            return Retry(
-                message=f"Updating {kind}.{api_version} resource {namespace}/{name} to match template.",
-                delay=30,
-            )
+        for resource_match in resource:
+            if not _validate_match(managed_resource, resource_match.raw):
+                logging.info(
+                    f"{kind}.{api_version}/{name} resource did not match spec, updating!"
+                )
+                await resource_match.patch(managed_resource)
+                return Retry(
+                    message=f"Updating {kind}.{api_version} resource {namespace}/{name} to match template.",
+                    delay=30,
+                )
+            else:
+                logging.info(
+                    f"{kind}.{api_version}/{name} resource matched spec, skipping!"
+                )
 
     if function.outcome.tests:
         outcome_test_results = json.loads(

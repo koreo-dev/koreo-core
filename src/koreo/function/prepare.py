@@ -30,6 +30,9 @@ async def prepare_function(cache_key: str, spec: dict) -> structure.Function:
     if not spec:
         spec = {}
 
+    managed_resource_spec = spec.get("managedResource")
+    managed_resource = _build_resource_settings(spec=managed_resource_spec)
+
     env = celpy.Environment()
 
     input_validators = _predicate_extractor(
@@ -58,11 +61,45 @@ async def prepare_function(cache_key: str, spec: dict) -> structure.Function:
         workflow_task.add_done_callback(__tasks.discard)
 
     return structure.Function(
+        managed_resource=managed_resource,
         input_validators=input_validators,
         materializers=materializers,
         outcome=outcome,
         template=spec.get("template"),
     )
+
+
+def _build_resource_settings(spec: dict | None):
+    if not spec:
+        return structure.ManagedResource(
+            crd=None,
+            behaviors=structure.ManagerBehavior(
+                virtual=False, load="name", update="patch", delete="destroy"
+            ),
+        )
+
+    crd_spec = spec.get("crd")
+    if not crd_spec:
+        crd = None
+    else:
+        kind = crd_spec.get("kind")
+        plural = crd_spec.get("plural")
+        crd = structure.ManagedCRD(
+            api_version=crd_spec.get("apiVersion"),
+            kind=crd_spec.get("kind"),
+            plural=plural if plural else f"{kind.lower()}s",
+            namespaced=crd_spec.get("namespaced", True),
+        )
+
+    behavior_spec = spec.get("behaviors", {})
+    behaviors = structure.ManagerBehavior(
+        virtual=behavior_spec.get("virtual", False),
+        load=behavior_spec.get("load", "name"),
+        update=behavior_spec.get("update", "patch"),
+        delete=behavior_spec.get("delete", "destroy"),
+    )
+
+    return structure.ManagedResource(crd=crd, behaviors=behaviors)
 
 
 def _prepare_materializers(

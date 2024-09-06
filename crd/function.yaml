@@ -20,6 +20,55 @@ spec:
             spec:
               type: object
               properties:
+                managedResource:
+                  type: object
+                  nullable: false
+                  properties:
+                    crd:
+                      type: object
+                      nullable: true
+                      properties:
+                        apiVersion:
+                          type: string
+                          nullable: false
+                        kind:
+                          type: string
+                          nullable: false
+                        plural:
+                          type: string
+                          nullable: true
+                        namespaced:
+                          type: boolean
+                          default: true
+                          nullable: false
+
+                    behaviors:
+                      type: object
+                      nullable: false
+                      properties:
+                        virtual:
+                          type: boolean
+                          default: false
+                          nullable: false
+
+                        load:
+                          type: string
+                          enum: [name, query]
+                          default: name
+                          nullable: false
+
+                        update:
+                          type: string
+                          enum: [patch, recreate]
+                          default: patch
+                          nullable: false
+
+                        delete:
+                          type: string
+                          enum: [destroy, abandon]
+                          default: destroy
+                          nullable: false
+
                 inputValidators:
                   nullable: true
                   type: array
