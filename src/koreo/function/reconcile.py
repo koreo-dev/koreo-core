@@ -170,7 +170,7 @@ async def reconcile_function(
                     {
                         "inputs": converted_inputs,
                         "resource": (
-                            celpy.json_to_cel(resource.raw) if resource else None
+                            celpy.json_to_cel(resource[0].raw) if resource else None
                         ),
                     }
                 )
