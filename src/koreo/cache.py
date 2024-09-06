@@ -1,6 +1,6 @@
 from collections import defaultdict
 import logging
-from typing import Callable, NamedTuple
+from typing import Awaitable, Callable, NamedTuple
 import re
 
 
@@ -16,7 +16,7 @@ def build_cache_key(name: str, version: str) -> str:
 
 
 def get_resource_from_cache[T](resource_type: type[T], cache_key: str) -> T | None:
-    cached = __CACHE[T.__name__].get(cache_key)
+    cached = __CACHE[resource_type.__name__].get(cache_key)
 
     if cached:
         return cached.resource
@@ -25,7 +25,7 @@ def get_resource_from_cache[T](resource_type: type[T], cache_key: str) -> T | No
 
 
 def get_spec_from_cache[T](resource_type: type[T], cache_key: str) -> dict | None:
-    cached = __CACHE[T.__name__].get(cache_key)
+    cached = __CACHE[resource_type.__name__].get(cache_key)
 
     if cached:
         return cached.spec
@@ -35,29 +35,68 @@ def get_spec_from_cache[T](resource_type: type[T], cache_key: str) -> dict | Non
 
 async def prepare_and_cache[
     T
-](preparer: Callable[[dict], T], metadata: dict, spec: dict) -> T:
+](
+    resource_class: type[T],
+    preparer: Callable[[str, dict], Awaitable[T]],
+    metadata: dict,
+    spec: dict,
+) -> T:
     resource_metadata = _extract_meta(metadata=metadata)
 
     cache_key = build_cache_key(
         name=resource_metadata.name, version=resource_metadata.version
     )
 
-    if not __CACHE.get(T.__name__):
-        __CACHE[T.__name__] = {}
+    resource_class_name = resource_class.__name__
 
-    cached = __CACHE[T.__name__].get(cache_key)
+    if not __CACHE.get(resource_class_name):
+        __CACHE[resource_class_name] = {}
+
+    cached = __CACHE[resource_class_name].get(cache_key)
 
     if cached and cached.resource_version == resource_metadata.resource_version:
         return cached.resource
 
-    logging.info("Before prepare")
-    prepared = await preparer(cache_key=cache_key, spec=spec)
-    logging.info("Post prepare")
+    prepared = await preparer(cache_key, spec)
 
-    __CACHE[T.__name__][cache_key] = __CachedResource[T](
+    __CACHE[resource_class_name][cache_key] = __CachedResource[T](
         spec=spec,
         resource=prepared,
         resource_version=resource_metadata.resource_version,
+    )
+    logging.debug(
+        f"Updating {resource_class_name} cache for {cache_key} ({resource_metadata.resource_version})."
+    )
+
+    return prepared
+
+
+async def reprepare_and_update_cache[
+    T
+](
+    resource_class: type[T],
+    preparer: Callable[[str, dict], Awaitable[T]],
+    cache_key: str,
+) -> (T | None):
+    resource_class_name = resource_class.__name__
+
+    if not __CACHE.get(resource_class_name):
+        return None
+
+    cached = __CACHE[resource_class_name].get(cache_key)
+    if not cached:
+        return None
+
+    prepared = await preparer(cache_key, cached.spec)
+
+    __CACHE[resource_class_name][cache_key] = __CachedResource[T](
+        spec=cached.spec,
+        resource=prepared,
+        resource_version=cached.resource_version,
+    )
+
+    logging.debug(
+        f"Repreparing {cache_key} ({cached.resource_version}) in {resource_class_name} cache."
     )
 
     return prepared

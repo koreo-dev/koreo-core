@@ -12,7 +12,9 @@ import kopf
 from controller import koreo_cache
 
 from koreo.function.prepare import prepare_function
+from koreo.function.structure import Function
 from koreo.workflow.prepare import prepare_workflow
+from koreo.workflow.structure import Workflow
 
 
 GROUP = "koreo.realkinetic.com"
@@ -20,8 +22,8 @@ VERSION = "v1alpha8"
 API_VERSION = f"{GROUP}/{VERSION}"
 
 KOREO_RESOURCES = [
-    ("functions", "Function", prepare_function),
-    ("workflows", "Workflow", prepare_workflow),
+    ("functions", "Function", Function, prepare_function),
+    ("workflows", "Workflow", Workflow, prepare_workflow),
 ]
 
 KOREO_NAMESPACE = os.environ.get("KOREO_NAMESPACE", "koreo-testing")
@@ -43,7 +45,7 @@ def main():
     # First load the Functions, then Workflows to ensure they're cached.
     # Then maintain the Function and Workflow caches in the background.
 
-    for plural_kind, kind_title, preparer in KOREO_RESOURCES:
+    for plural_kind, kind_title, resource_class, preparer in KOREO_RESOURCES:
         # Block until completion.
         load_task = loop.create_task(
             koreo_cache.load_cache(
@@ -51,6 +53,7 @@ def main():
                 api_version=API_VERSION,
                 plural_kind=plural_kind,
                 kind_title=kind_title,
+                resource_class=resource_class,
                 preparer=preparer,
             )
         )
@@ -66,6 +69,7 @@ def main():
                 api_version=API_VERSION,
                 plural_kind=plural_kind,
                 kind_title=kind_title,
+                resource_class=resource_class,
                 preparer=preparer,
             )
         )

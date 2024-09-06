@@ -3,7 +3,7 @@ import logging
 
 import asyncio
 
-from koreo.cache import get_spec_from_cache
+from koreo.cache import reprepare_and_update_cache
 from koreo.workflow.prepare import prepare_workflow
 from koreo.workflow.structure import Workflow
 
@@ -50,11 +50,10 @@ async def prepare_function(cache_key: str, spec: dict) -> structure.Function:
     loop = asyncio.get_event_loop()
     for workflow_key in get_function_workflows(function=cache_key):
         workflow_task = loop.create_task(
-            prepare_workflow(
+            reprepare_and_update_cache(
+                resource_class=Workflow,
+                preparer=prepare_workflow,
                 cache_key=workflow_key,
-                spec=get_spec_from_cache(
-                    resource_type=Workflow, cache_key=workflow_key
-                ),
             )
         )
         __tasks.add(workflow_task)

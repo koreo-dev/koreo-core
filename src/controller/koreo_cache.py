@@ -7,7 +7,12 @@ from koreo.cache import prepare_and_cache
 
 
 async def load_cache(
-    koreo_namespace: str, api_version: str, plural_kind: str, kind_title: str, preparer
+    koreo_namespace: str,
+    api_version: str,
+    plural_kind: str,
+    kind_title: str,
+    resource_class,
+    preparer,
 ):
     logging.info(f"Building initial {plural_kind}.{api_version} cache.")
 
@@ -24,6 +29,7 @@ async def load_cache(
     for resource in await resources:
         logging.debug(f"Caching {resource.name}.")
         await prepare_and_cache(
+            resource_class=resource_class,
             preparer=preparer,
             metadata=resource.metadata,
             spec=resource.raw.get("spec", {}),
@@ -33,7 +39,12 @@ async def load_cache(
 
 
 async def maintain_cache(
-    koreo_namespace: str, api_version: str, plural_kind: str, kind_title: str, preparer
+    koreo_namespace: str,
+    api_version: str,
+    plural_kind: str,
+    kind_title: str,
+    resource_class,
+    preparer,
 ):
     logging.debug(f"Maintaining {plural_kind}.{api_version} Cache.")
 
@@ -60,6 +71,7 @@ async def maintain_cache(
                     f"Updating {plural_kind}.{api_version} cache due to {event} for {resource.name}."
                 )
                 await prepare_and_cache(
+                    resource_class=resource_class,
                     preparer=preparer,
                     metadata=resource.metadata,
                     spec=resource.raw.get("spec"),
