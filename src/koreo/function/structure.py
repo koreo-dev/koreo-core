@@ -24,6 +24,7 @@ class ManagerBehavior(NamedTuple):
     virtual: bool
     # TODO: add-owner flag
     load: Literal["name", "label-query"]
+    create: bool
     update: Literal["patch", "recreate"]
     delete: Literal["destroy", "abandon"]
 

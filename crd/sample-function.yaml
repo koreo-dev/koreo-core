@@ -245,6 +245,8 @@ spec:
       kind: TestDummy
       plural: testdummies
       namespaced: true
+    behaviors:
+      update: recreate
   materializers:
     base:
       "metadata.name": string("a-name")

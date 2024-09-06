@@ -103,7 +103,7 @@ async def reconcile_function(api: kr8s.Api, function: Function, inputs: dict):
                 delay=30,
             )
 
-        if not resource:
+        if not resource and function.managed_resource.behaviors.create:
             if function.materializers.on_create:
                 on_create_overlay = json.loads(
                     json.dumps(
@@ -131,17 +131,24 @@ async def reconcile_function(api: kr8s.Api, function: Function, inputs: dict):
                 delay=30,
             )
 
-        # TODO: Should this only send fields with differences?
         for resource_match in resource:
             if not _validate_match(managed_resource, resource_match.raw):
                 logging.info(
                     f"{kind}.{api_version}/{name} resource did not match spec, updating!"
                 )
-                await resource_match.patch(managed_resource)
-                return Retry(
-                    message=f"Updating {kind}.{api_version} resource {namespace}/{name} to match template.",
-                    delay=30,
-                )
+                if function.managed_resource.behaviors.update == "patch":
+                    # TODO: Should this only send fields with differences?
+                    await resource_match.patch(managed_resource)
+                    return Retry(
+                        message=f"Updating {kind}.{api_version} resource {namespace}/{name} to match template.",
+                        delay=5,
+                    )
+                elif function.managed_resource.behaviors.update == "recreate":
+                    await resource_match.delete()
+                    return Retry(
+                        message=f"Deleting {kind}.{api_version} resource {namespace}/{name} to recreate.",
+                        delay=5,
+                    )
             else:
                 logging.info(
                     f"{kind}.{api_version}/{name} resource matched spec, skipping!"

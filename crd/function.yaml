@@ -57,9 +57,14 @@ spec:
                           default: name
                           nullable: false
 
+                        create:
+                          type: boolean
+                          default: true
+                          nullable: false
+
                         update:
                           type: string
-                          enum: [patch, recreate]
+                          enum: [patch, recreate, never]
                           default: patch
                           nullable: false
 

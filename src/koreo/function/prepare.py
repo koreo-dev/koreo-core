@@ -73,7 +73,11 @@ def _build_resource_settings(spec: dict | None):
         return structure.ManagedResource(
             crd=None,
             behaviors=structure.ManagerBehavior(
-                virtual=False, load="name", update="patch", delete="destroy"
+                virtual=False,
+                load="name",
+                create=True,
+                update="patch",
+                delete="destroy",
             ),
         )
 
@@ -94,6 +98,7 @@ def _build_resource_settings(spec: dict | None):
     behaviors = structure.ManagerBehavior(
         virtual=behavior_spec.get("virtual", False),
         load=behavior_spec.get("load", "name"),
+        create=behavior_spec.get("create", True),
         update=behavior_spec.get("update", "patch"),
         delete=behavior_spec.get("delete", "destroy"),
     )
