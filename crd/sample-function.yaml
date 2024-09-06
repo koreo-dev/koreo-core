@@ -247,9 +247,10 @@ spec:
       namespaced: true
     behaviors:
       update: recreate
+
   materializers:
     base:
-      "metadata.name": string("a-name")
+      "metadata.name": parent.metadata.name
       "metadata.namespace": string("koreo-testing")
       spec:
         intKey: 99

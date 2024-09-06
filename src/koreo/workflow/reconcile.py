@@ -9,7 +9,12 @@ from koreo import result
 from . import structure
 
 
-async def reconcile_workflow(api: kr8s.Api, workflow: structure.Workflow):
+async def reconcile_workflow(
+    api: kr8s.Api,
+    trigger_metadata: dict,
+    trigger_spec: dict,
+    workflow: structure.Workflow,
+):
     accumulated_outputs: dict[str, result.Outcome] = {}
 
     is_not_ok = False
@@ -20,7 +25,11 @@ async def reconcile_workflow(api: kr8s.Api, workflow: structure.Workflow):
             continue
 
         outcome = await reconcile_function(
-            api=api, function=step.function, inputs=accumulated_outputs
+            api=api,
+            function=step.function,
+            trigger_metadata=trigger_metadata,
+            trigger_spec=trigger_spec,
+            inputs=accumulated_outputs,
         )
         logging.info(f"{outcome}")
 

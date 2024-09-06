@@ -13,7 +13,9 @@ from ..result import DepSkip, Ok, Outcome, PermFail, Retry, Skip, combine, is_ok
 from .structure import Function
 
 
-async def reconcile_function(api: kr8s.Api, function: Function, inputs: dict):
+async def reconcile_function(
+    api: kr8s.Api, function: Function, trigger_metadata: dict, trigger_spec: dict, inputs: dict
+):
     converted_inputs = celpy.json_to_cel(inputs)
 
     if function.input_validators:
@@ -32,6 +34,10 @@ async def reconcile_function(api: kr8s.Api, function: Function, inputs: dict):
                 function.materializers.base.evaluate(
                     {
                         "inputs": converted_inputs,
+                        "parent": celpy.json_to_cel({
+                            "metadata": trigger_metadata,
+                            "spec": trigger_spec
+                        }),
                         "template": celpy.json_to_cel(managed_resource),
                     }
                 )

@@ -80,12 +80,22 @@ def start_controller(group: str, kind: str, version: str):
                 logging.error("Missing Workflow!")
                 return
             logging.info(f"Running Workflow {workflow_key}")
-            outcomes = await reconcile_workflow(api=kr8s_api, workflow=workflow)
+            outcomes = await reconcile_workflow(
+                api=kr8s_api,
+                trigger_metadata=dict(meta),
+                trigger_spec=dict(spec),
+                workflow=workflow,
+            )
             logging.info(f"Workflow {workflow_key} outcomes: {outcomes}")
 
         if outcomes:
-            outcome = combine(list(outcomes.values()))
-            if is_error(outcome):
-                raise_for_error(outcome)
+            error_outcomes = [
+                outcome for outcome in outcomes.values() if is_error(outcome)
+            ]
+            error_outcome = combine(error_outcomes)
+            if is_error(error_outcome):
+                raise_for_error(error_outcome)
+
+            return outcomes
 
         return True
