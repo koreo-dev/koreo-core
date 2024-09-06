@@ -14,7 +14,11 @@ from .structure import Function
 
 
 async def reconcile_function(
-    api: kr8s.Api, function: Function, trigger_metadata: dict, trigger_spec: dict, inputs: dict
+    api: kr8s.Api,
+    function: Function,
+    trigger_metadata: dict,
+    trigger_spec: dict,
+    inputs: dict,
 ):
     converted_inputs = celpy.json_to_cel(inputs)
 
@@ -34,10 +38,9 @@ async def reconcile_function(
                 function.materializers.base.evaluate(
                     {
                         "inputs": converted_inputs,
-                        "parent": celpy.json_to_cel({
-                            "metadata": trigger_metadata,
-                            "spec": trigger_spec
-                        }),
+                        "parent": celpy.json_to_cel(
+                            {"metadata": trigger_metadata, "spec": trigger_spec}
+                        ),
                         "template": celpy.json_to_cel(managed_resource),
                     }
                 )
@@ -184,7 +187,7 @@ async def reconcile_function(
         function.outcome.ok_value.evaluate(
             {
                 "inputs": converted_inputs,
-                "resource": celpy.json_to_cel(resource.raw) if resource else None,
+                "resource": celpy.json_to_cel(resource[0].raw) if resource else None,
             }
         )
     )
