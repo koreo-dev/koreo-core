@@ -4,6 +4,7 @@ import logging
 import kopf
 import kr8s
 
+from koreo.result import combine, is_error, raise_for_error
 
 from koreo.cache import get_resource_from_cache
 from koreo.workflow.reconcile import reconcile_workflow
@@ -70,6 +71,7 @@ def start_controller(group: str, kind: str, version: str):
 
         workflow_keys = get_custom_crd_workflows(custom_crd=key)
 
+        outcomes = None
         for workflow_key in workflow_keys:
             workflow = get_resource_from_cache(
                 resource_type=Workflow, cache_key=workflow_key
@@ -80,5 +82,10 @@ def start_controller(group: str, kind: str, version: str):
             logging.info(f"Running Workflow {workflow_key}")
             outcomes = await reconcile_workflow(api=kr8s_api, workflow=workflow)
             logging.info(f"Workflow {workflow_key} outcomes: {outcomes}")
+
+        if outcomes:
+            outcome = combine(list(outcomes.values()))
+            if is_error(outcome):
+                raise_for_error(outcome)
 
         return True
