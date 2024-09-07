@@ -46,14 +46,9 @@ spec:
                       type: object
                       nullable: false
                       properties:
-                        virtual:
-                          type: boolean
-                          default: false
-                          nullable: false
-
                         load:
                           type: string
-                          enum: [name, query]
+                          enum: [name, query, virtual]
                           default: name
                           nullable: false
 

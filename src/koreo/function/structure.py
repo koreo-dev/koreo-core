@@ -21,11 +21,9 @@ class ManagedCRD(NamedTuple):
 
 
 class ManagerBehavior(NamedTuple):
-    virtual: bool
-    # TODO: add-owner flag
-    load: Literal["name", "label-query"]
+    load: Literal["name", "label-query", "virtual"]
     create: bool
-    update: Literal["patch", "recreate"]
+    update: Literal["patch", "recreate", "never"]
     delete: Literal["destroy", "abandon"]
 
 
