@@ -21,12 +21,23 @@ async def reconcile_function(
     inputs: dict,
 ):
     converted_inputs = celpy.json_to_cel(inputs)
+    trigger_resource = celpy.json_to_cel(
+        {"metadata": trigger_metadata, "spec": trigger_spec}
+    )
 
     if function.input_validators:
         validation_results = json.loads(
-            json.dumps(function.input_validators.evaluate({"inputs": converted_inputs}))
+            json.dumps(
+                function.input_validators.evaluate(
+                    {
+                        "inputs": converted_inputs,
+                        "parent": trigger_resource,
+                    }
+                )
+            )
         )
         validation_outcome = _predicate_to_koreo_result(validation_results)
+
         if not is_ok(validation_outcome):
             return validation_outcome
 
@@ -38,9 +49,7 @@ async def reconcile_function(
                 function.materializers.base.evaluate(
                     {
                         "inputs": converted_inputs,
-                        "parent": celpy.json_to_cel(
-                            {"metadata": trigger_metadata, "spec": trigger_spec}
-                        ),
+                        "parent": trigger_resource,
                         "template": celpy.json_to_cel(managed_resource),
                     }
                 )
@@ -169,6 +178,7 @@ async def reconcile_function(
                 function.outcome.tests.evaluate(
                     {
                         "inputs": converted_inputs,
+                        "parent": trigger_resource,
                         "resource": (
                             celpy.json_to_cel(resource[0].raw) if resource else None
                         ),
@@ -183,14 +193,22 @@ async def reconcile_function(
     if not function.outcome.ok_value:
         return Ok(None)
 
-    return Ok(
-        function.outcome.ok_value.evaluate(
+    try:
+        resource = celpy.json_to_cel(resource[0].raw) if resource else None
+        ok_value = function.outcome.ok_value.evaluate(
             {
                 "inputs": converted_inputs,
-                "resource": celpy.json_to_cel(resource[0].raw) if resource else None,
+                "parent": trigger_resource,
+                "resource": resource,
             }
         )
-    )
+        return Ok(json.loads(json.dumps(ok_value)))
+    except celpy.CELEvalError as err:
+        logging.exception(f"Failure computing OK value. {err.tree}")
+        return PermFail(f"Failed to compute OK Value. {err.token}")
+    except:
+        logging.exception("Failure computing OK value.")
+        return PermFail("Failed to compute OK Value.")
 
 
 def _predicate_to_koreo_result(results: list) -> Outcome:
