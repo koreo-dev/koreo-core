@@ -64,14 +64,16 @@ def start_controller(group: str, kind: str, version: str):
     @kopf.on.create(group=group, kind=kind, version=version)
     @kopf.on.update(group=group, kind=kind, version=version)
     @kopf.on.resume(group=group, kind=kind, version=version)
-    async def reconcile_custom_workflow(meta: kopf.Meta, spec: kopf.Spec, *_, **__):
+    async def reconcile_custom_workflow(
+        meta: kopf.Meta, spec: kopf.Spec, patch: kopf.Patch, *_, **__
+    ):
         logging.info(f"Reconciling {key}")
 
         kr8s_api = kr8s.api()
 
         workflow_keys = get_custom_crd_workflows(custom_crd=key)
 
-        outcomes = None
+        outcomes = {}
         for workflow_key in workflow_keys:
             workflow = get_resource_from_cache(
                 resource_type=Workflow, cache_key=workflow_key
@@ -80,7 +82,7 @@ def start_controller(group: str, kind: str, version: str):
                 logging.error("Missing Workflow!")
                 return
             logging.info(f"Running Workflow {workflow_key}")
-            outcomes = await reconcile_workflow(
+            outcomes[workflow_key] = await reconcile_workflow(
                 api=kr8s_api,
                 trigger_metadata=dict(meta),
                 trigger_spec=dict(spec),
@@ -94,8 +96,9 @@ def start_controller(group: str, kind: str, version: str):
             ]
             error_outcome = combine(error_outcomes)
             if is_error(error_outcome):
+                patch.update({"status": {"koreo": error_outcome.message}})
                 raise_for_error(error_outcome)
 
-            return outcomes
+            patch.update({"status": {"koreo": outcomes}})
 
         return True

@@ -40,4 +40,12 @@ async def reconcile_workflow(
 
         accumulated_outputs[step.label] = outcome.data
 
+    if is_not_ok:
+        error_outcomes = [
+            outcome
+            for outcome in accumulated_outputs.values()
+            if result.is_error(outcome)
+        ]
+        return result.combine(error_outcomes)
+
     return accumulated_outputs
