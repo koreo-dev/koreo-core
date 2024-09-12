@@ -55,6 +55,9 @@ spec:
                             type: string
                             nullable: false
                         required: [name, version]
+                      inputs:
+                        type: string
+                        nullable: true
                     required: [label, functionRef]
 
               required: [crdRef, steps]
