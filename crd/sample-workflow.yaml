@@ -41,6 +41,42 @@ spec:
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Workflow
 metadata:
+  name: flojo-mojo
+  namespace: koreo-testing
+  labels:
+    koreo.realkinetic.com/name: flojo-mojo
+    koreo.realkinetic.com/version: v1
+    koreo.realkinetic.com/bump: "1"
+spec:
+  crdRef:
+    apiGroup: konfig.realkinetic.com
+    version: v1alpha8
+    kind: Domain
+
+  steps:
+    - label: config
+      functionRef:
+        name: domain-config
+        version: v1
+    - label: metadata
+      functionRef:
+        name: domain-subresource-metadata
+        version: v1
+      inputs:
+        config: steps.config
+      staticInputs:
+        test_label: test label value
+    - label: value
+      functionRef:
+        name: domain-subresource-value
+        version: v1
+      inputs:
+        config: steps.config
+        metadata: steps.metadata
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Workflow
+metadata:
   name: fully-built-2
   namespace: koreo-testing
   labels:

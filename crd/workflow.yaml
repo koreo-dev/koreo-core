@@ -56,7 +56,12 @@ spec:
                             nullable: false
                         required: [name, version]
                       inputs:
-                        type: string
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                        nullable: true
+                      staticInputs:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
                         nullable: true
                     required: [label, functionRef]
 

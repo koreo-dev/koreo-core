@@ -273,3 +273,94 @@ spec:
       mapKey:
         name: some
         value: 1
+
+  outcome:
+    okValue: resource.metadata.uid
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Function
+metadata:
+  name: domain-config
+  namespace: koreo-testing
+  labels:
+    koreo.realkinetic.com/name: domain-config
+    koreo.realkinetic.com/version: v1
+spec:
+  managedResource:
+    behaviors:
+      load: virtual
+      create: false
+      update: never
+      delete: abandon
+
+  inputValidators:
+    - type: PermFail
+      message: Domain resource-name must start with a letter.
+      test: parent.metadata.name.matches("^[0-9][a-zA-Z]+")
+
+    - type: PermFail
+      message: Domain resource must have platform label.
+      test: '!has(parent.metadata.labels["konfig.realkinetic.com/platform"])'
+
+  outcome:
+    okValue: |
+      {
+        "domain_resource_name": parent.metadata.name,
+        "namespace": parent.metadata.namespace,
+        "platform_resource_name": parent.metadata.labels["konfig.realkinetic.com/platform"],
+        "domain_human_name": has(parent.spec.domainName) ? parent.spec.domainName: parent.metadata.name
+      }
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Function
+metadata:
+  name: domain-subresource-metadata
+  namespace: koreo-testing
+  labels:
+    koreo.realkinetic.com/name: domain-subresource-metadata
+    koreo.realkinetic.com/version: v1
+spec:
+  managedResource:
+    behaviors:
+      load: virtual
+      create: false
+      update: never
+      delete: abandon
+
+  outcome:
+    okValue: |
+      {
+        "name": inputs.config.domain_resource_name,
+        "namespace": inputs.config.namespace,
+        "labels": {
+          "app.kubernetes.io/managed-by": "konfig",
+          "konfig.realkinetic.com/platform": inputs.config.platform_resource_name,
+          "konfig.realkinetic.com/domain": inputs.config.domain_resource_name,
+          "konfig-platform": inputs.config.platform_resource_name,
+          "konfig-domain": inputs.config.domain_resource_name,
+          "testing": string("is fun!")
+        }
+      }
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Function
+metadata:
+  name: domain-subresource-value
+  namespace: koreo-testing
+  labels:
+    koreo.realkinetic.com/name: domain-subresource-value
+    koreo.realkinetic.com/version: v1
+spec:
+  managedResource:
+    behaviors:
+      load: virtual
+      create: false
+      update: never
+      delete: abandon
+
+  outcome:
+    okValue: |
+      {
+        "metadata-name": inputs.metadata.name,
+        "config-human-name": inputs.config.domain_human_name
+      }
