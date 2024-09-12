@@ -88,7 +88,7 @@ class Retry:
         self.delay = delay
 
     def __str__(self) -> str:
-        return f"Retry({self.delay}, message={self.message})"
+        return f"Retry(delay={self.delay}, message={self.message})"
 
     def combine(self, other: Outcome):
         if isinstance(other, (DepSkip, Skip, Ok)):

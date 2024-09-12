@@ -1,6 +1,5 @@
 from typing import Any
 import asyncio
-import logging
 
 import kr8s
 
@@ -13,12 +12,9 @@ from . import structure
 
 async def reconcile_workflow(
     api: kr8s.Api,
-    trigger_metadata: dict,
-    trigger_spec: dict,
+    trigger: dict,
     workflow: structure.Workflow,
 ):
-
-    trigger = {"metadata": trigger_metadata, "spec": trigger_spec}
 
     task_map: dict[str, asyncio.Task[result.Outcome]] = {}
 
@@ -49,15 +45,14 @@ async def reconcile_workflow(
     outcomes = {task.get_name(): task.result() for task in done}
 
     # TDOO: If not completion specified, just do a simple encoding?
-    return {
-        step: outcome.data if result.is_ok(outcome) else outcome
-        for step, outcome in outcomes.items()
-    }
+    return {step: _outcome_encoder(outcome) for step, outcome in outcomes.items()}
 
 
-def _outcome_encoder(outcome: result.Outcome) -> dict:
+def _outcome_encoder(outcome: result.Outcome) -> Any:
     if result.is_ok(outcome):
         return outcome.data
+
+    return f"{outcome}"
 
 
 async def _reconcile_step(

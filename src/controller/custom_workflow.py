@@ -73,6 +73,8 @@ def start_controller(group: str, kind: str, version: str):
 
         workflow_keys = get_custom_crd_workflows(custom_crd=key)
 
+        trigger = {"metadata": dict(meta), "spec": dict(spec)}
+
         outcomes = {}
         for workflow_key in workflow_keys:
             workflow = get_resource_from_cache(
@@ -84,8 +86,7 @@ def start_controller(group: str, kind: str, version: str):
             logging.info(f"Running Workflow {workflow_key}")
             outcomes[workflow_key] = await reconcile_workflow(
                 api=kr8s_api,
-                trigger_metadata=dict(meta),
-                trigger_spec=dict(spec),
+                trigger=trigger,
                 workflow=workflow,
             )
             logging.info(f"Workflow {workflow_key} outcomes: {outcomes}")
