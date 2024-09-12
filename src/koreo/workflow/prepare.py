@@ -19,8 +19,10 @@ async def prepare_workflow(cache_key: str, spec: dict | None) -> structure.Workf
     if not spec:
         spec = {}
 
+    cel_env = celpy.Environment()
+
     spec_steps = spec.get("steps", [])
-    steps = _load_functions(spec_steps)
+    steps = _load_functions(cel_env, spec_steps)
 
     function_keys = []
     for step in spec_steps:
@@ -47,7 +49,7 @@ async def prepare_workflow(cache_key: str, spec: dict | None) -> structure.Workf
     return structure.Workflow(
         crd_ref=crd_ref,
         steps=steps,
-        completion=_build_completion(spec.get("completion", {})),
+        completion=_build_completion(cel_env, spec.get("completion", {})),
     )
 
 
@@ -59,7 +61,11 @@ def _build_crd_ref(crd_ref_spec: dict) -> structure.ConfigCRDRef:
     )
 
 
-def _load_functions(step_spec: list[dict]) -> list[structure.FunctionRef]:
+def _load_functions(
+    cel_env: celpy.Environment, step_spec: list[dict]
+) -> list[structure.FunctionRef]:
+    known_steps: set[str] = set()
+
     functions = []
     for step in step_spec:
         function_ref = step.get("functionRef", {})
@@ -72,16 +78,41 @@ def _load_functions(step_spec: list[dict]) -> list[structure.FunctionRef]:
         if not function:
             raise Exception("Missing function")
 
+        input_mapper_spec = step.get("inputs")
+        if not input_mapper_spec:
+            input_mapper = None
+            dynamic_input_keys = []
+        else:
+            dynamic_input_keys = input_mapper_spec.keys()
+            if set(dynamic_input_keys).difference(known_steps):
+                raise Exception("Steps must be ordered!")
+            input_mapper = None
+            # print(f"*******************DYNAMIC_INPUT_KEYS  {dynamic_input_keys}")
+            # input_mapper_expression = cel_env.compile(input_mapper_spec)
+            # print(
+            #     f"*******************INPUT_MAPPER_EXPRESSION {input_mapper_expression}"
+            # )
+            # input_mapper = cel_env.program(input_mapper_expression)
+
+        step_label = step.get("label")
+        known_steps.add(step_label)
+
+        static_inputs = step.get("staticInputs") or {}
+
         functions.append(
             structure.FunctionRef(
-                label=step.get("label"),
+                label=step_label,
                 function=function,
-                arg_map=None,
+                inputs=input_mapper,
+                dynamic_input_keys=dynamic_input_keys,
+                static_inputs=static_inputs,
             )
         )
 
     return functions
 
 
-def _build_completion(completion_spec: dict) -> celpy.Runner | None:
+def _build_completion(
+    cel_env: celpy.Environment, completion_spec: dict
+) -> celpy.Runner | None:
     return None

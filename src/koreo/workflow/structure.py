@@ -1,4 +1,4 @@
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import celpy
 
@@ -15,7 +15,10 @@ class FunctionRef(NamedTuple):
     label: str
     function: Function
 
-    arg_map: celpy.Runner | None
+    inputs: celpy.Runner | None
+    dynamic_input_keys: list[str]
+
+    static_inputs: dict[str, Any]
 
 
 class Workflow(NamedTuple):

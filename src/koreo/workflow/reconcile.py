@@ -1,3 +1,5 @@
+from typing import Any
+import asyncio
 import logging
 
 import kr8s
@@ -15,37 +17,90 @@ async def reconcile_workflow(
     trigger_spec: dict,
     workflow: structure.Workflow,
 ):
-    accumulated_outputs: dict[str, result.Outcome] = {}
 
-    is_not_ok = False
+    trigger = {"metadata": trigger_metadata, "spec": trigger_spec}
 
-    for step in workflow.steps:
-        if is_not_ok:
-            accumulated_outputs[step.label] = result.DepSkip("Prior outcome non-Ok")
-            continue
+    task_map: dict[str, asyncio.Task[result.Outcome]] = {}
 
-        outcome = await reconcile_function(
+    async with asyncio.TaskGroup() as task_group:
+        for step in workflow.steps:
+            step_dependencies = [
+                task_map[dependency] for dependency in step.dynamic_input_keys
+            ]
+            task_map[step.label] = task_group.create_task(
+                _reconcile_step(
+                    api=api,
+                    step=step,
+                    trigger=trigger,
+                    dependencies=step_dependencies,
+                ),
+                name=step.label,
+            )
+
+    tasks = task_map.values()
+    done, pending = await asyncio.wait(tasks)
+    if pending:
+        timed_out_tasks = ", ".join(task.get_name() for task in pending)
+        return result.Retry(
+            message=f"Timeout running Workflow Steps ({timed_out_tasks}), will retry.",
+            delay=15,
+        )
+
+    outcomes = {task.get_name(): task.result() for task in done}
+
+    # TDOO: If not completion specified, just do a simple encoding?
+    return {
+        step: outcome.data if result.is_ok(outcome) else outcome
+        for step, outcome in outcomes.items()
+    }
+
+
+def _outcome_encoder(outcome: result.Outcome) -> dict:
+    if result.is_ok(outcome):
+        return outcome.data
+
+
+async def _reconcile_step(
+    api: kr8s.Api,
+    step: structure.FunctionRef,
+    dependencies: list[asyncio.Task[result.Outcome]],
+    trigger: dict,
+):
+    if not dependencies:
+        return await reconcile_function(
             api=api,
             function=step.function,
-            trigger_metadata=trigger_metadata,
-            trigger_spec=trigger_spec,
-            inputs=accumulated_outputs,
+            trigger=trigger,
+            inputs=step.static_inputs,
         )
-        logging.info(f"{outcome}")
 
-        if result.is_not_ok(outcome):
-            is_not_ok = True
-            accumulated_outputs[step.label] = outcome
-            continue
+    [resolved, pending] = await asyncio.wait(dependencies)
+    if pending:
+        timed_out_tasks = ", ".join(task.get_name() for task in pending)
+        return result.Retry(
+            message=f"Timeout running Workflow Steps ({timed_out_tasks}), will retry.",
+            delay=15,
+        )
 
-        accumulated_outputs[step.label] = outcome.data
+    ok_outcomes: dict[str, Any] = {}
 
-    if is_not_ok:
-        error_outcomes = [
-            outcome
-            for outcome in accumulated_outputs.values()
-            if result.is_error(outcome)
-        ]
-        return result.combine(error_outcomes)
+    for task in resolved:
+        step_label = task.get_name()
+        step_result = task.result()
+        match step_result:
+            case result.Ok(data=data):
+                ok_outcomes[step_label] = data
+            case _:
+                message = step_result.message if hasattr(step_result, "message") else ""
+                return result.DepSkip(
+                    f"'{step_label}' status is {type(step_result).__name__} ({message})."
+                )
 
-    return accumulated_outputs
+    inputs = step.static_inputs | ok_outcomes
+
+    return await reconcile_function(
+        api=api,
+        function=step.function,
+        trigger=trigger,
+        inputs=inputs,
+    )

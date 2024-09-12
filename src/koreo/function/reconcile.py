@@ -29,15 +29,12 @@ from .structure import Function, ManagedResource
 async def reconcile_function(
     api: kr8s.Api,
     function: Function,
-    trigger_metadata: dict,
-    trigger_spec: dict,
+    trigger: dict,
     inputs: dict,
 ):
     base_inputs = {
         "inputs": celpy.json_to_cel(inputs),
-        "parent": celpy.json_to_cel(
-            {"metadata": trigger_metadata, "spec": trigger_spec}
-        ),
+        "parent": celpy.json_to_cel(trigger),
     }
 
     validation_outcome = _run_checks(
