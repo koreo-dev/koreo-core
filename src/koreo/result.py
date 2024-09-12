@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import reduce
-from typing import NoReturn, TypeGuard, TypeVar
+from typing import Any, NoReturn, TypeGuard, TypeVar
 
 import kopf
 
@@ -162,7 +162,7 @@ def is_not_ok(candidate: Outcome) -> TypeGuard[NonOkOutcome]:
     return not is_ok(candidate=candidate)
 
 
-def is_error(candidate: Outcome) -> TypeGuard[Retry | PermFail]:
+def is_error(candidate: Any) -> TypeGuard[Retry | PermFail]:
     if isinstance(candidate, (Retry, PermFail)):
         return True
 
