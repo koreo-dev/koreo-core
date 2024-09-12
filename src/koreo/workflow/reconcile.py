@@ -15,6 +15,8 @@ async def reconcile_workflow(
     trigger: dict,
     workflow: structure.Workflow,
 ):
+    if not result.is_ok(workflow.steps_ready):
+        return workflow.steps_ready
 
     task_map: dict[str, asyncio.Task[result.Outcome]] = {}
 

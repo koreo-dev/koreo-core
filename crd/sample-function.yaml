@@ -6,21 +6,16 @@ metadata:
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
 metadata:
-  name: empty
+  name: empty.v1
   namespace: koreo-testing
   labels:
-    koreo.realkinetic.com/name: empty
-    koreo.realkinetic.com/version: v1
     koreo.realkinetic.com/bump: "13"
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
 metadata:
-  name: input-validation-tests
+  name: input-validation-tests.v1
   namespace: koreo-testing
-  labels:
-    koreo.realkinetic.com/name: input-validation-tests
-    koreo.realkinetic.com/version: v1
 spec:
   inputValidators:
     - type: Skip
@@ -48,11 +43,8 @@ spec:
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
 metadata:
-  name: outcome-tests
+  name: outcome-tests.v1
   namespace: koreo-testing
-  labels:
-    koreo.realkinetic.com/name: outcome-tests
-    koreo.realkinetic.com/version: v1
 spec:
   outcome:
     tests:
@@ -71,11 +63,9 @@ spec:
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
 metadata:
-  name: outcome-ok-value
+  name: outcome-ok-value.v1
   namespace: koreo-testing
   labels:
-    koreo.realkinetic.com/name: outcome-ok-value
-    koreo.realkinetic.com/version: v1
     koreo.realkinetic.com/bump: "4"
 spec:
   outcome:
@@ -84,11 +74,9 @@ spec:
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
 metadata:
-  name: materializers-base-nested
+  name: materializers-base-nested.v1
   namespace: koreo-testing
   labels:
-    koreo.realkinetic.com/name: materializers-base-nested
-    koreo.realkinetic.com/version: v1
     koreo.realkinetic.com/bump: "12"
 spec:
   materializers:
@@ -116,11 +104,8 @@ spec:
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
 metadata:
-  name: materializers-base-flat
+  name: materializers-base-flat.v1
   namespace: koreo-testing
-  labels:
-    koreo.realkinetic.com/name: materializers-base-flat
-    koreo.realkinetic.com/version: v1
 spec:
   materializers:
     base:
@@ -145,11 +130,8 @@ spec:
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
 metadata:
-  name: materializers-on-create-nested
+  name: materializers-on-create-nested.v1
   namespace: koreo-testing
-  labels:
-    koreo.realkinetic.com/name: materializers-on-create-nested
-    koreo.realkinetic.com/version: v1
 spec:
   materializers:
     onCreate:
@@ -176,11 +158,8 @@ spec:
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
 metadata:
-  name: materializers-on-create-flat
+  name: materializers-on-create-flat.v1
   namespace: koreo-testing
-  labels:
-    koreo.realkinetic.com/name: materializers-on-create-flat
-    koreo.realkinetic.com/version: v1
 spec:
   materializers:
     onCreate:
@@ -207,9 +186,6 @@ kind: Function
 metadata:
   name: gcp-folder.v1
   namespace: koreo-testing
-  labels:
-    koreo.realkinetic.com/name: gcp-folder
-    koreo.realkinetic.com/version: v1
 spec:
   outcome:
     tests:
@@ -233,11 +209,8 @@ spec:
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
 metadata:
-  name: dummy-test
+  name: dummy-test.v1
   namespace: koreo-testing
-  labels:
-    koreo.realkinetic.com/name: dummy-test
-    koreo.realkinetic.com/version: v1
 spec:
   managedResource:
     crd:
@@ -280,11 +253,8 @@ spec:
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
 metadata:
-  name: domain-config
+  name: domain-config.v1
   namespace: koreo-testing
-  labels:
-    koreo.realkinetic.com/name: domain-config
-    koreo.realkinetic.com/version: v1
 spec:
   managedResource:
     behaviors:
@@ -314,11 +284,8 @@ spec:
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
 metadata:
-  name: domain-subresource-metadata
+  name: domain-subresource-metadata.v1
   namespace: koreo-testing
-  labels:
-    koreo.realkinetic.com/name: domain-subresource-metadata
-    koreo.realkinetic.com/version: v1
 spec:
   managedResource:
     behaviors:
@@ -345,11 +312,8 @@ spec:
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
 metadata:
-  name: domain-subresource-value
+  name: domain-subresource-value.v1
   namespace: koreo-testing
-  labels:
-    koreo.realkinetic.com/name: domain-subresource-value
-    koreo.realkinetic.com/version: v1
 spec:
   managedResource:
     behaviors:
@@ -357,6 +321,11 @@ spec:
       create: false
       update: never
       delete: abandon
+
+  inputValidators:
+    - type: PermFail
+      message: testing skip encoding
+      test: "!has(inputs.metadata.name)"
 
   outcome:
     okValue: |

@@ -51,10 +51,7 @@ spec:
                           name:
                             type: string
                             nullable: false
-                          version:
-                            type: string
-                            nullable: false
-                        required: [name, version]
+                        required: [name]
                       inputs:
                         type: object
                         x-kubernetes-preserve-unknown-fields: true

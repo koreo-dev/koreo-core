@@ -2,6 +2,7 @@ from typing import Any, NamedTuple
 
 import celpy
 
+from koreo.result import Outcome
 from koreo.function.structure import Function
 
 
@@ -24,6 +25,7 @@ class FunctionRef(NamedTuple):
 class Workflow(NamedTuple):
     crd_ref: ConfigCRDRef
 
+    steps_ready: Outcome
     steps: list[FunctionRef]
 
     completion: celpy.Runner | None

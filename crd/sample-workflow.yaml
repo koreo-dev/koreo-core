@@ -16,11 +16,9 @@ spec:
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Workflow
 metadata:
-  name: fully-built
+  name: fully-built.v1
   namespace: koreo-testing
   labels:
-    koreo.realkinetic.com/name: fully-built
-    koreo.realkinetic.com/version: v1
     koreo.realkinetic.com/bump: "2"
 spec:
   crdRef:
@@ -31,21 +29,17 @@ spec:
   steps:
     - label: empty
       functionRef:
-        name: empty
-        version: v1
+        name: empty.v1
     - label: ok-value
       functionRef:
-        name: outcome-ok-value
-        version: v1
+        name: outcome-ok-value.v1
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Workflow
 metadata:
-  name: flojo-mojo
+  name: flojo-mojo.v1
   namespace: koreo-testing
   labels:
-    koreo.realkinetic.com/name: flojo-mojo
-    koreo.realkinetic.com/version: v1
     koreo.realkinetic.com/bump: "1"
 spec:
   crdRef:
@@ -56,20 +50,17 @@ spec:
   steps:
     - label: config
       functionRef:
-        name: domain-config
-        version: v1
+        name: domain-config.v1
     - label: metadata
       functionRef:
-        name: domain-subresource-metadata
-        version: v1
+        name: domain-subresource-metadata.v1
       inputs:
         config: steps.config
       staticInputs:
         test_label: test label value
     - label: value
       functionRef:
-        name: domain-subresource-value
-        version: v1
+        name: domain-subresource-value.v1
       inputs:
         config: steps.config
         metadata: steps.metadata
@@ -77,11 +68,9 @@ spec:
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Workflow
 metadata:
-  name: fully-built-2
+  name: fully-built-2.v1
   namespace: koreo-testing
   labels:
-    koreo.realkinetic.com/name: fully-built
-    koreo.realkinetic.com/version: v1
     koreo.realkinetic.com/bump: "2"
 spec:
   crdRef:
@@ -92,21 +81,16 @@ spec:
   steps:
     - label: empty
       functionRef:
-        name: empty
-        version: v1
+        name: empty.v1
     - label: ok-value
       functionRef:
-        name: outcome-ok-value
-        version: v1
+        name: outcome-ok-value.v1
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Workflow
 metadata:
-  name: dummy-test-1
+  name: dummy-test-1.v1
   namespace: koreo-testing
-  labels:
-    koreo.realkinetic.com/name: dummy-test-1
-    koreo.realkinetic.com/version: v1
 spec:
   crdRef:
     apiGroup: konfig.realkinetic.com
@@ -116,5 +100,4 @@ spec:
   steps:
     - label: ok-value
       functionRef:
-        name: dummy-test
-        version: v1
+        name: dummy-test.v1
