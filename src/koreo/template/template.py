@@ -10,7 +10,7 @@ import jsonpath_ng
 import kopf
 import pykube
 
-from koreo.flow import Ok, Outcome, Retry, UnwrapOk
+from koreo.flow import Ok, Outcome, Retry
 from . import template_cel_functions
 
 
@@ -75,7 +75,7 @@ def default_template_reconciler(
     # TODO: Use `loaded_template.template.required_inputs` to set the signature
     # spec.
 
-    async def action(metadata: UnwrapOk[dict], **kwargs):
+    async def action(metadata, **kwargs):
         nonlocal loaded_template
         if loaded_template is None:
             try:

@@ -21,14 +21,14 @@ with open("crd/sample-function.yaml", "r") as raw_yamls:
 class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
     async def test_no_validators(self):
         prepared = await prepare.prepare_function(
-            cache_key="empty", spec=_functions["empty"].get("spec", {})
+            cache_key="empty.v1", spec=_functions["empty.v1"].get("spec", {})
         )
         self.assertIsNone(prepared.input_validators)
 
     async def test_no_problems(self):
         prepared = await prepare.prepare_function(
-            cache_key="input-validation-tests",
-            spec=_functions["input-validation-tests"].get("spec", {}),
+            cache_key="input-validation-tests.v1",
+            spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
         result = prepared.input_validators.evaluate(
             {"inputs": celpy.json_to_cel({"number": 6, "optional_skip_number": 3333})}
@@ -38,8 +38,8 @@ class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
 
     async def test_skip(self):
         prepared = await prepare.prepare_function(
-            cache_key="input-validation-tests",
-            spec=_functions["input-validation-tests"].get("spec", {}),
+            cache_key="input-validation-tests.v1",
+            spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
         cel_result = prepared.input_validators.evaluate(
             {"inputs": celpy.json_to_cel({"number": 4})}
@@ -56,8 +56,8 @@ class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
 
     async def test_optional_perm_fail(self):
         prepared = await prepare.prepare_function(
-            cache_key="input-validation-tests",
-            spec=_functions["input-validation-tests"].get("spec", {}),
+            cache_key="input-validation-tests.v1",
+            spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
         cel_result = prepared.input_validators.evaluate(
             {"inputs": celpy.json_to_cel({"number": 8, "optional_number": 250})}
@@ -74,8 +74,8 @@ class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
 
     async def test_retry_delay(self):
         prepared = await prepare.prepare_function(
-            cache_key="input-validation-tests",
-            spec=_functions["input-validation-tests"].get("spec", {}),
+            cache_key="input-validation-tests.v1",
+            spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
         cel_result = prepared.input_validators.evaluate(
             {"inputs": celpy.json_to_cel({"number": 15})}
@@ -93,8 +93,8 @@ class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
 
     async def test_multiple_issues(self):
         prepared = await prepare.prepare_function(
-            cache_key="input-validation-tests",
-            spec=_functions["input-validation-tests"].get("spec", {}),
+            cache_key="input-validation-tests.v1",
+            spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
         result = prepared.input_validators.evaluate(
             {"inputs": celpy.json_to_cel({"number": 0, "optional_retry_number": 7})}
@@ -106,13 +106,13 @@ class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
 class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
     async def test_none_defined(self):
         prepared = await prepare.prepare_function(
-            cache_key="empty", spec=_functions["empty"].get("spec", {})
+            cache_key="empty.v1", spec=_functions["empty.v1"].get("spec", {})
         )
         self.assertIsNone(prepared.outcome.tests)
 
     async def test_optional_perm_fail(self):
         prepared = await prepare.prepare_function(
-            cache_key="outcome-tests", spec=_functions["outcome-tests"].get("spec", {})
+            cache_key="outcome-tests.v1", spec=_functions["outcome-tests.v1"].get("spec", {})
         )
         cel_result = prepared.outcome.tests.evaluate(
             {"inputs": celpy.json_to_cel({"number": 5, "optional_number": 250})}
@@ -129,7 +129,7 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_retry_delay(self):
         prepared = await prepare.prepare_function(
-            cache_key="outcome-tests", spec=_functions["outcome-tests"].get("spec", {})
+            cache_key="outcome-tests.v1", spec=_functions["outcome-tests.v1"].get("spec", {})
         )
         cel_result = prepared.outcome.tests.evaluate(
             {"inputs": celpy.json_to_cel({"number": 15})}
@@ -147,7 +147,7 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_multiple_issues(self):
         prepared = await prepare.prepare_function(
-            cache_key="outcome-tests", spec=_functions["outcome-tests"].get("spec", {})
+            cache_key="outcome-tests.v1", spec=_functions["outcome-tests.v1"].get("spec", {})
         )
         result = prepared.outcome.tests.evaluate(
             {
@@ -161,7 +161,7 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_ok(self):
         prepared = await prepare.prepare_function(
-            cache_key="outcome-tests", spec=_functions["outcome-tests"].get("spec", {})
+            cache_key="outcome-tests.v1", spec=_functions["outcome-tests.v1"].get("spec", {})
         )
         results = prepared.outcome.tests.evaluate(
             {
@@ -181,14 +181,14 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
 class TestFunctionOutcomeOkValue(unittest.IsolatedAsyncioTestCase):
     async def test_none_defined(self):
         prepared = await prepare.prepare_function(
-            cache_key="empty", spec=_functions["empty"].get("spec", {})
+            cache_key="empty.v1", spec=_functions["empty.v1"].get("spec", {})
         )
         self.assertIsNone(prepared.outcome.ok_value)
 
     async def test_value(self):
         prepared = await prepare.prepare_function(
-            cache_key="outcome-ok-value",
-            spec=_functions["outcome-ok-value"].get("spec", {}),
+            cache_key="outcome-ok-value.v1",
+            spec=_functions["outcome-ok-value.v1"].get("spec", {}),
         )
         cel_result = prepared.outcome.ok_value.evaluate(
             {"inputs": celpy.json_to_cel({"output": 19283746})}
@@ -200,8 +200,8 @@ class TestFunctionOutcomeOkValue(unittest.IsolatedAsyncioTestCase):
 
     async def test_no_output(self):
         prepared = await prepare.prepare_function(
-            cache_key="outcome-ok-value",
-            spec=_functions["outcome-ok-value"].get("spec", {}),
+            cache_key="outcome-ok-value.v1",
+            spec=_functions["outcome-ok-value.v1"].get("spec", {}),
         )
         cel_result = prepared.outcome.ok_value.evaluate({})
 
@@ -213,14 +213,14 @@ class TestFunctionOutcomeOkValue(unittest.IsolatedAsyncioTestCase):
 class TestFunctionMaterializerBase(unittest.IsolatedAsyncioTestCase):
     async def test_none_defined(self):
         prepared = await prepare.prepare_function(
-            cache_key="empty", spec=_functions["empty"].get("spec", {})
+            cache_key="empty.v1", spec=_functions["empty.v1"].get("spec", {})
         )
         self.assertIsNone(prepared.materializers.base)
 
     async def test_base(self):
         prepared = await prepare.prepare_function(
-            cache_key="materializers-base-flat",
-            spec=_functions["materializers-base-flat"].get("spec", {}),
+            cache_key="materializers-base-flat.v1",
+            spec=_functions["materializers-base-flat.v1"].get("spec", {}),
         )
         cel_result = prepared.materializers.base.evaluate(
             {
@@ -250,8 +250,8 @@ class TestFunctionMaterializerBase(unittest.IsolatedAsyncioTestCase):
 
     async def test_nested_base(self):
         prepared = await prepare.prepare_function(
-            cache_key="materializers-base-nested",
-            spec=_functions["materializers-base-nested"].get("spec", {}),
+            cache_key="materializers-base-nested.v1",
+            spec=_functions["materializers-base-nested.v1"].get("spec", {}),
         )
         cel_result = prepared.materializers.base.evaluate(
             {
@@ -284,14 +284,14 @@ class TestFunctionMaterializerBase(unittest.IsolatedAsyncioTestCase):
 class TestFunctionMaterializerOnCreate(unittest.IsolatedAsyncioTestCase):
     async def test_none_defined(self):
         prepared = await prepare.prepare_function(
-            cache_key="empty", spec=_functions["empty"].get("spec", {})
+            cache_key="empty.v1", spec=_functions["empty.v1"].get("spec", {})
         )
         self.assertIsNone(prepared.materializers.on_create)
 
     async def test_flat(self):
         prepared = await prepare.prepare_function(
-            cache_key="materializers-on-create-flat",
-            spec=_functions["materializers-on-create-flat"].get("spec", {}),
+            cache_key="materializers-on-create-flat.v1",
+            spec=_functions["materializers-on-create-flat.v1"].get("spec", {}),
         )
         cel_result = prepared.materializers.on_create.evaluate(
             {
@@ -321,8 +321,8 @@ class TestFunctionMaterializerOnCreate(unittest.IsolatedAsyncioTestCase):
 
     async def test_nested(self):
         prepared = await prepare.prepare_function(
-            cache_key="materializers-on-create-nested",
-            spec=_functions["materializers-on-create-nested"].get("spec", {}),
+            cache_key="materializers-on-create-nested.v1",
+            spec=_functions["materializers-on-create-nested.v1"].get("spec", {}),
         )
         cel_result = prepared.materializers.on_create.evaluate(
             {
