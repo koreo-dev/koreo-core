@@ -4,13 +4,13 @@ import logging
 import asyncio
 
 from koreo.cache import reprepare_and_update_cache
+from koreo.cel_functions import koreo_cel_functions, koreo_function_annotations
 from koreo.workflow.prepare import prepare_workflow
 from koreo.workflow.structure import Workflow
-from koreo.cel_functions import koreo_cel_functions, koreo_function_annotations
 
 
-from .registry import get_function_workflows
 from . import structure
+from .registry import get_function_workflows
 
 import celpy
 

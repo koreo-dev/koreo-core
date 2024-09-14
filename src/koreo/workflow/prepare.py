@@ -2,17 +2,15 @@ import celpy
 import logging
 
 from koreo.cache import get_resource_from_cache
+from koreo.cel_functions import koreo_cel_functions, koreo_function_annotations
+from koreo.function.registry import index_workload_functions
 from koreo.function.structure import Function
 from koreo.result import Ok, Outcome, PermFail, Retry, combine
 
-from koreo.function.registry import index_workload_functions
-
-from koreo.cel_functions import koreo_cel_functions, koreo_function_annotations
-
 from controller.custom_workflow import start_controller
 
-from .registry import index_workload_custom_crd
 from . import structure
+from .registry import index_workload_custom_crd
 
 
 async def prepare_workflow(cache_key: str, spec: dict | None) -> structure.Workflow:
