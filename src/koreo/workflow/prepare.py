@@ -7,6 +7,8 @@ from koreo.result import Ok, Outcome, PermFail, Retry, combine
 
 from koreo.function.registry import index_workload_functions
 
+from koreo.cel_functions import koreo_cel_functions, koreo_function_annotations
+
 from controller.custom_workflow import start_controller
 
 from .registry import index_workload_custom_crd
@@ -19,7 +21,7 @@ async def prepare_workflow(cache_key: str, spec: dict | None) -> structure.Workf
     if not spec:
         spec = {}
 
-    cel_env = celpy.Environment()
+    cel_env = celpy.Environment(annotations=koreo_function_annotations)
 
     spec_steps = spec.get("steps", [])
     steps, steps_ready = _load_functions(cel_env, spec_steps)
@@ -105,7 +107,7 @@ def _load_functions(
             # print(
             #     f"*******************INPUT_MAPPER_EXPRESSION {input_mapper_expression}"
             # )
-            # input_mapper = cel_env.program(input_mapper_expression)
+            # input_mapper = cel_env.program(input_mapper_expression, functions=koreo_cel_functions)
 
         step_label = step.get("label")
         known_steps.add(step_label)

@@ -134,12 +134,12 @@ def _config_connect_ready(
     return celtypes.BoolType(True)
 
 
-function_annotations: dict[str, celpy.Annotation] = {
+koreo_function_annotations: dict[str, celpy.Annotation] = {
     "to_ref": celtypes.FunctionType,
     "self_ref": celtypes.FunctionType,
     "config_connect_ready": celtypes.FunctionType,
 }
-functions: dict[str, celpy.CELFunction] = {
+koreo_cel_functions: dict[str, celpy.CELFunction] = {
     "to_ref": _to_ref,
     "self_ref": _self_ref,
     "config_connect_ready": _config_connect_ready,

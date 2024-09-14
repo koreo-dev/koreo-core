@@ -6,6 +6,7 @@ import asyncio
 from koreo.cache import reprepare_and_update_cache
 from koreo.workflow.prepare import prepare_workflow
 from koreo.workflow.structure import Workflow
+from koreo.cel_functions import koreo_cel_functions, koreo_function_annotations
 
 
 from .registry import get_function_workflows
@@ -33,7 +34,7 @@ async def prepare_function(cache_key: str, spec: dict) -> structure.Function:
     managed_resource_spec = spec.get("managedResource")
     managed_resource = _build_resource_settings(spec=managed_resource_spec)
 
-    env = celpy.Environment()
+    env = celpy.Environment(annotations=koreo_function_annotations)
 
     input_validators = _predicate_extractor(
         cel_env=env,
@@ -144,7 +145,7 @@ def _prepare_outcome(
     ok_value_spec = outcome.get("okValue")
     if ok_value_spec:
         compiled = cel_env.compile(ok_value_spec)
-        ok_value = cel_env.program(compiled)
+        ok_value = cel_env.program(compiled, functions=koreo_cel_functions)
         ok_value.logger.setLevel(logging.WARNING)
 
     return structure.Outcome(tests=tests, ok_value=ok_value)
@@ -164,7 +165,7 @@ def _template_extractor(
      ])}}}"
 
     compiled = cel_env.compile(materializer)
-    program = cel_env.program(compiled)
+    program = cel_env.program(compiled, functions=koreo_cel_functions)
     program.logger.setLevel(logging.WARNING)
     return program
 
@@ -206,7 +207,7 @@ def _predicate_extractor(
     tests = f"{predicates}.filter(predicate, predicate.test)"
     compiled = cel_env.compile(tests)
 
-    program = cel_env.program(compiled)
+    program = cel_env.program(compiled, functions=koreo_cel_functions)
     program.logger.setLevel(logging.WARNING)
     return program
 
