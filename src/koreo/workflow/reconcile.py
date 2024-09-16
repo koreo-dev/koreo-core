@@ -46,15 +46,31 @@ async def reconcile_workflow(
 
     outcomes = {task.get_name(): task.result() for task in done}
 
-    # TDOO: If not completion specified, just do a simple encoding?
-    return {step: _outcome_encoder(outcome) for step, outcome in outcomes.items()}
+    # TDOO: If no completion specified, just do a simple encoding?
+    overall_result = {
+        step: _outcome_encoder(outcome) for step, outcome in outcomes.items()
+    }
+
+    overall_outcome = result.combine(
+        [outcome for outcome in overall_result.values() if result.is_error(outcome)]
+    )
+
+    if result.is_error(overall_outcome):
+        return overall_outcome
+
+    return overall_result
 
 
 def _outcome_encoder(outcome: result.Outcome) -> Any:
     if result.is_ok(outcome):
         return outcome.data
 
-    return f"{outcome}"
+    if result.is_not_error(outcome):
+        # This will be Skip or DepSkip, which are informational.
+        return f"{outcome}"
+
+    # Bubble errors up.
+    return outcome
 
 
 async def _reconcile_step(
