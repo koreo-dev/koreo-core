@@ -131,16 +131,18 @@ def _materialize_overlay(
     if not materializer:
         return managed_resource
 
-    overlay = json.loads(
-        json.dumps(
-            materializer.evaluate(
-                inputs
-                | {
-                    "template": celpy.json_to_cel(managed_resource),
-                }
-            )
+    try:
+        computed = materializer.evaluate(
+            inputs
+            | {
+                "template": celpy.json_to_cel(managed_resource),
+            }
         )
-    )
+        overlay = json.loads(json.dumps(computed))
+    except celpy.CELEvalError:
+        logging.exception(f"Encountered CELEvalError {computed}")
+
+        raise
 
     if overlay:
         for field_path, value in overlay.items():
