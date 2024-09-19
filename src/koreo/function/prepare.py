@@ -1,10 +1,11 @@
-from typing import Any, Callable
+from typing import Any
 import logging
 
 import asyncio
 
 from koreo.cache import reprepare_and_update_cache
-from koreo.cel_functions import koreo_cel_functions, koreo_function_annotations
+from koreo.cel.encoder import encode_cel
+from koreo.cel.functions import koreo_cel_functions, koreo_function_annotations
 from koreo.workflow.prepare import prepare_workflow
 from koreo.workflow.structure import Workflow
 
@@ -39,7 +40,6 @@ async def prepare_function(cache_key: str, spec: dict) -> structure.Function:
     input_validators = _predicate_extractor(
         cel_env=env,
         predicate_spec=spec.get("inputValidators"),
-        encoder=_encode_validators,
     )
 
     materializers = _prepare_materializers(
@@ -138,13 +138,12 @@ def _prepare_outcome(
         tests = _predicate_extractor(
             cel_env=cel_env,
             predicate_spec=test_spec,
-            encoder=_encode_validators,
         )
 
     ok_value = None
     ok_value_spec = outcome.get("okValue")
     if ok_value_spec:
-        compiled = cel_env.compile(ok_value_spec)
+        compiled = cel_env.compile(encode_cel(ok_value_spec))
         ok_value = cel_env.program(compiled, functions=koreo_cel_functions)
         ok_value.logger.setLevel(logging.WARNING)
 
@@ -197,12 +196,11 @@ def _encode_template(base: str, template_spec: dict | None) -> list[tuple[str, A
 def _predicate_extractor(
     cel_env: celpy.Environment,
     predicate_spec: list[dict] | None,
-    encoder: Callable[[list], str],
 ) -> celpy.Runner | None:
     if not predicate_spec:
         return None
 
-    predicates = encoder(predicate_spec)
+    predicates = encode_cel(predicate_spec)
 
     tests = f"{predicates}.filter(predicate, predicate.test)"
     compiled = cel_env.compile(tests)
@@ -210,28 +208,3 @@ def _predicate_extractor(
     program = cel_env.program(compiled, functions=koreo_cel_functions)
     program.logger.setLevel(logging.WARNING)
     return program
-
-
-def _encode_validators(predicates: list) -> str:
-
-    output = []
-
-    for predicate in predicates:
-        predicate_parts = []
-
-        type_: str = predicate.get("type")
-        predicate_parts.append(f'"type": "{type_}"')
-
-        if type_ == "Retry":
-            predicate_parts.append(f'"delay": {predicate.get('delay')}')
-
-        message: str = predicate.get("message")
-        if message:
-            message = message.replace('"', '\"')  # fmt: skip
-            predicate_parts.append(f'"message": "{message}"')
-
-        predicate_parts.append(f'"test": {predicate.get('test')}')
-
-        output.append(f"{{{','.join(predicate_parts)}}}")
-
-    return f"[{','.join(output)}]"

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import reduce
-from typing import Any, NoReturn, TypeGuard, TypeVar
+from typing import Any, NoReturn, TypeGuard, TypeVar, Iterable
 
 import kopf
 
@@ -144,7 +144,7 @@ UnwrappedOutcome = NonOkOutcome | OkT
 Outcomes = list[Outcome[OkT]]
 
 
-def combine(outcomes: Outcomes):
+def combine(outcomes: Iterable[Outcome]):
     if not outcomes:
         return Skip()
 

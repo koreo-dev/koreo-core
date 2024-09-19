@@ -1,11 +1,13 @@
 from typing import Any
 import asyncio
+import json
 
+import celpy
 import kr8s
 
-from koreo.function.reconcile import reconcile_function
-
 from koreo import result
+
+from koreo.function.reconcile import reconcile_function
 
 from . import structure
 
@@ -80,11 +82,13 @@ async def _reconcile_step(
     trigger: dict,
 ):
     if not dependencies:
+        if step.inputs:
+            inputs = json.loads(json.dumps(step.inputs.evaluate({})))
+        else:
+            inputs = {}
+
         return await reconcile_function(
-            api=api,
-            function=step.function,
-            trigger=trigger,
-            inputs=step.static_inputs,
+            api=api, function=step.function, trigger=trigger, inputs=inputs
         )
 
     [resolved, pending] = await asyncio.wait(dependencies)
@@ -109,7 +113,12 @@ async def _reconcile_step(
                     f"'{step_label}' status is {type(step_result).__name__} ({message})."
                 )
 
-    inputs = step.static_inputs | ok_outcomes
+    if not step.inputs:
+        inputs = {}
+    else:
+        inputs = json.loads(
+            json.dumps(step.inputs.evaluate({"steps": celpy.json_to_cel(ok_outcomes)}))
+        )
 
     return await reconcile_function(
         api=api,

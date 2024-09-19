@@ -102,6 +102,30 @@ class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(3, len(result))
 
+    async def test_dynamic_message(self):
+        prepared = await prepare.prepare_function(
+            cache_key="input-validation-tests.v1",
+            spec=_functions["input-validation-tests.v1"].get("spec", {}),
+        )
+        cel_result = prepared.input_validators.evaluate(
+            {
+                "inputs": celpy.json_to_cel(
+                    {"number": 8, "value_for_message": "set within message"}
+                )
+            }
+        )
+
+        results: list = json.loads(json.dumps(cel_result))
+
+        self.assertEqual(1, len(results))
+
+        result = results.pop()
+
+        self.assertEqual("Skip", result.get("type"))
+        self.assertEqual(
+            'value for message ("set within message") was set.', result.get("message")
+        )
+
 
 class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
     async def test_none_defined(self):
@@ -112,7 +136,8 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_optional_perm_fail(self):
         prepared = await prepare.prepare_function(
-            cache_key="outcome-tests.v1", spec=_functions["outcome-tests.v1"].get("spec", {})
+            cache_key="outcome-tests.v1",
+            spec=_functions["outcome-tests.v1"].get("spec", {}),
         )
         cel_result = prepared.outcome.tests.evaluate(
             {"inputs": celpy.json_to_cel({"number": 5, "optional_number": 250})}
@@ -129,7 +154,8 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_retry_delay(self):
         prepared = await prepare.prepare_function(
-            cache_key="outcome-tests.v1", spec=_functions["outcome-tests.v1"].get("spec", {})
+            cache_key="outcome-tests.v1",
+            spec=_functions["outcome-tests.v1"].get("spec", {}),
         )
         cel_result = prepared.outcome.tests.evaluate(
             {"inputs": celpy.json_to_cel({"number": 15})}
@@ -147,7 +173,8 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_multiple_issues(self):
         prepared = await prepare.prepare_function(
-            cache_key="outcome-tests.v1", spec=_functions["outcome-tests.v1"].get("spec", {})
+            cache_key="outcome-tests.v1",
+            spec=_functions["outcome-tests.v1"].get("spec", {}),
         )
         result = prepared.outcome.tests.evaluate(
             {
@@ -161,7 +188,8 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_ok(self):
         prepared = await prepare.prepare_function(
-            cache_key="outcome-tests.v1", spec=_functions["outcome-tests.v1"].get("spec", {})
+            cache_key="outcome-tests.v1",
+            spec=_functions["outcome-tests.v1"].get("spec", {}),
         )
         results = prepared.outcome.tests.evaluate(
             {

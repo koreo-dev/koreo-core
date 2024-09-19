@@ -20,25 +20,29 @@ spec:
   inputValidators:
     - type: Skip
       message: number too small, must be over 5.
-      test: inputs.number < 5
+      test: =inputs.number < 5
 
     - type: PermFail
       message: optional number not equal to 3333.
-      test: has(inputs.optional_number) && inputs.optional_number != 3333
+      test: =has(inputs.optional_number) && inputs.optional_number != 3333
 
     - type: Retry
       message: number too large, must be under 13.
-      test: inputs.number > 13
+      test: =inputs.number > 13
       delay: 90
 
     - type: PermFail
       message: number too small, must be over 1.
-      test: inputs.number < 1
+      test: =inputs.number < 1
 
     - type: Retry
       message: optional retry_number not equal to 1212.
-      test: has(inputs.optional_retry_number) && inputs.optional_retry_number != 1212
+      test: =has(inputs.optional_retry_number) && inputs.optional_retry_number != 1212
       delay: 75
+
+    - type: Skip
+      message: ="value for message (\"" + inputs.value_for_message + "\") was set."
+      test: =has(inputs.value_for_message)
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -50,15 +54,15 @@ spec:
     tests:
       - type: Retry
         message: number too large, must be under 13.
-        test: inputs.number > 13
+        test: =inputs.number > 13
         delay: 90
 
       - type: PermFail
         message: optional number not equal to 3333.
-        test: has(inputs.optional_number) && inputs.optional_number != 3333
+        test: =has(inputs.optional_number) && inputs.optional_number != 3333
 
       - type: Ok
-        test: has(inputs.output) && inputs.output == 11221122
+        test: =has(inputs.output) && inputs.output == 11221122
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -69,7 +73,7 @@ metadata:
     koreo.realkinetic.com/bump: "4"
 spec:
   outcome:
-    okValue: "has(inputs.output) ? inputs.output: null"
+    okValue: "=has(inputs.output) ? inputs.output: null"
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -190,10 +194,10 @@ spec:
   outcome:
     tests:
       - type: Ok
-        test: resource.config_connect_ready()
+        test: =resource.config_connect_ready()
 
     okValue: |
-      {"folderId": resource.status.folderId, "ref": resource.self_ref() }
+      ={"folderId": resource.status.folderId, "ref": resource.self_ref() }
 
   materializers:
     base:
@@ -248,7 +252,7 @@ spec:
         value: 1
 
   outcome:
-    okValue: resource.metadata.uid
+    okValue: =resource.metadata.uid
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -266,15 +270,15 @@ spec:
   inputValidators:
     - type: PermFail
       message: Domain resource-name must start with a letter.
-      test: parent.metadata.name.matches("^[0-9][a-zA-Z]+")
+      test: =parent.metadata.name.matches("^[0-9][a-zA-Z]+")
 
     - type: PermFail
       message: Domain resource must have platform label.
-      test: '!has(parent.metadata.labels["konfig.realkinetic.com/platform"])'
+      test: '=!has(parent.metadata.labels["konfig.realkinetic.com/platform"])'
 
   outcome:
     okValue: |
-      {
+      ={
         "domain_resource_name": parent.metadata.name,
         "namespace": parent.metadata.namespace,
         "platform_resource_name": parent.metadata.labels["konfig.realkinetic.com/platform"],
@@ -296,7 +300,7 @@ spec:
 
   outcome:
     okValue: |
-      {
+      ={
         "name": inputs.config.domain_resource_name,
         "namespace": inputs.config.namespace,
         "labels": {
@@ -325,11 +329,11 @@ spec:
   inputValidators:
     - type: PermFail
       message: testing skip encoding
-      test: "!has(inputs.metadata.name)"
+      test: "=!has(inputs.metadata.name)"
 
   outcome:
     okValue: |
-      {
+      ={
         "metadata-name": inputs.metadata.name,
         "config-human-name": inputs.config.domain_human_name
       }

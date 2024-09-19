@@ -34,16 +34,19 @@ spec:
                       type: string
                       nullable: false
                   required: [apiGroup, version, kind]
-
                 steps:
                   nullable: true
                   type: array
+                  maxItems: 20
                   items:
                     type: object
                     properties:
                       label:
                         type: string
                         nullable: false
+                        x-kubernetes-validations:
+                          - rule: "!self.contains('.')"
+                            message: "step labels may not '.'"
                       functionRef:
                         type: object
                         nullable: false
@@ -61,7 +64,45 @@ spec:
                         x-kubernetes-preserve-unknown-fields: true
                         nullable: true
                     required: [label, functionRef]
+                outcome:
+                  nullable: true
+                  type: object
+                  properties:
+                    tests:
+                      nullable: true
+                      type: array
+                      maxItems: 20
+                      items:
+                        type: object
+                        x-kubernetes-validations:
+                          - rule: (self.type == 'Retry' && has(self.delay) && self.delay > 0) || self.type != 'Retry'
+                            message: "Retry validators must provide delay-seconds."
+                          - rule: (self.type != 'Retry' && !has(self.delay)) || self.type == 'Retry'
+                            message: "Non-retry validators must not provide delay-seconds."
+                          - rule: (self.type == 'Ok' && !has(self.message)) || self.type != 'Ok'
+                            message: "Ok validators should not provide a message."
 
+                        properties:
+                          type:
+                            type: string
+                            nullable: false
+                            enum: [Ok, PermFail, Retry]
+                          test:
+                            type: string
+                            nullable: false
+                            x-kubernetes-validations:
+                              - rule: self.startsWith('=')
+                                message: "test must be a cel expression."
+                          message:
+                            type: string
+                            nullable: true
+                          delay:
+                            type: integer
+                            nullable: true
+                        required: [type, test]
+                    okValue:
+                      nullable: true
+                      type: string
               required: [crdRef, steps]
             status:
               x-kubernetes-preserve-unknown-fields: true

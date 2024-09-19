@@ -19,8 +19,6 @@ class FunctionRef(NamedTuple):
     inputs: celpy.Runner | None
     dynamic_input_keys: list[str]
 
-    static_inputs: dict[str, Any]
-
 
 class Workflow(NamedTuple):
     crd_ref: ConfigCRDRef

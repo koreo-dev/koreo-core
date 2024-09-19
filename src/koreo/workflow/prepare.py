@@ -1,8 +1,12 @@
-import celpy
 import logging
+import re
+
+import celpy
 
 from koreo.cache import get_resource_from_cache
-from koreo.cel_functions import koreo_cel_functions, koreo_function_annotations
+from koreo.cel.encoder import encode_cel
+from koreo.cel.structure_extractor import extract_argument_structure
+from koreo.cel.functions import koreo_cel_functions, koreo_function_annotations
 from koreo.function.registry import index_workload_functions
 from koreo.function.structure import Function
 from koreo.result import Ok, Outcome, PermFail, Retry, combine
@@ -60,6 +64,9 @@ def _build_crd_ref(crd_ref_spec: dict) -> structure.ConfigCRDRef:
     )
 
 
+INPUT_NAME_PATTERN = re.compile("steps.([^.]+).?")
+
+
 def _load_functions(
     cel_env: celpy.Environment, step_spec: list[dict]
 ) -> tuple[list[structure.FunctionRef], Outcome]:
@@ -89,7 +96,18 @@ def _load_functions(
             input_mapper = None
             dynamic_input_keys = []
         else:
-            dynamic_input_keys = input_mapper_spec.keys()
+            encoded_input_extractor = encode_cel(input_mapper_spec)
+            logging.info(f"INPUT MAPPER SPEC: {encoded_input_extractor}")
+
+            input_mapper_expression = cel_env.compile(encoded_input_extractor)
+            used_vars = extract_argument_structure(input_mapper_expression)
+
+            dynamic_input_keys = [
+                INPUT_NAME_PATTERN.match(key).group(1)
+                for key in used_vars
+                if key.startswith("steps.")
+            ]
+
             out_of_order_steps = set(dynamic_input_keys).difference(known_steps)
             if out_of_order_steps:
                 outcomes.append(
@@ -99,18 +117,12 @@ def _load_functions(
                 )
                 continue
 
-            input_mapper = None
-            # print(f"*******************DYNAMIC_INPUT_KEYS  {dynamic_input_keys}")
-            # input_mapper_expression = cel_env.compile(input_mapper_spec)
-            # print(
-            #     f"*******************INPUT_MAPPER_EXPRESSION {input_mapper_expression}"
-            # )
-            # input_mapper = cel_env.program(input_mapper_expression, functions=koreo_cel_functions)
+            input_mapper = cel_env.program(
+                input_mapper_expression, functions=koreo_cel_functions
+            )
 
         step_label = step.get("label")
         known_steps.add(step_label)
-
-        static_inputs = step.get("staticInputs") or {}
 
         outcomes.append(Ok(None))
         functions.append(
@@ -119,7 +131,6 @@ def _load_functions(
                 function=function,
                 inputs=input_mapper,
                 dynamic_input_keys=dynamic_input_keys,
-                static_inputs=static_inputs,
             )
         )
 

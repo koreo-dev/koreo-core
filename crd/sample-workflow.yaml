@@ -55,21 +55,20 @@ spec:
       functionRef:
         name: domain-subresource-metadata.v1
       inputs:
-        config: steps.config
-      staticInputs:
+        config: =steps.config
         test_label: test label value
     - label: value
       functionRef:
         name: domain-subresource-value.v1
       inputs:
-        config: steps.config
-        metadata: steps.metadata
+        config: =steps.config
+        metadata: =steps.metadata
     - label: concurrent
       functionRef:
         name: empty.v1
       inputs:
-        config: steps.config
-        metadata: steps.metadata
+        config: =steps.config
+        metadata: =steps.metadata
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Workflow
