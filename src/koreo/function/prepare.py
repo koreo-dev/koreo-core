@@ -4,7 +4,7 @@ import logging
 import asyncio
 
 from koreo.cache import reprepare_and_update_cache
-from koreo.cel.encoder import encode_cel
+from koreo.cel.encoder import encode_cel, encode_cel_template
 from koreo.cel.functions import koreo_cel_functions, koreo_function_annotations
 from koreo.workflow.prepare import prepare_workflow
 from koreo.workflow.structure import Workflow
@@ -32,8 +32,8 @@ async def prepare_function(cache_key: str, spec: dict) -> structure.Function:
     if not spec:
         spec = {}
 
-    managed_resource_spec = spec.get("managedResource")
-    managed_resource = _build_resource_settings(spec=managed_resource_spec)
+    managed_resource = _build_managed_resource(spec=spec.get("managedResource"))
+    behavior = _load_behavior(spec=spec.get("behavior"))
 
     env = celpy.Environment(annotations=koreo_function_annotations)
 
@@ -62,6 +62,7 @@ async def prepare_function(cache_key: str, spec: dict) -> structure.Function:
 
     return structure.Function(
         managed_resource=managed_resource,
+        behavior=behavior,
         input_validators=input_validators,
         materializers=materializers,
         outcome=outcome,
@@ -69,40 +70,31 @@ async def prepare_function(cache_key: str, spec: dict) -> structure.Function:
     )
 
 
-def _build_resource_settings(spec: dict | None):
+def _build_managed_resource(spec: dict | None) -> structure.ManagedResource | None:
     if not spec:
-        return structure.ManagedResource(
-            crd=None,
-            behaviors=structure.ManagerBehavior(
-                load="name",
-                create=True,
-                update="patch",
-                delete="destroy",
-            ),
-        )
+        return None
 
-    crd_spec = spec.get("crd")
-    if not crd_spec:
-        crd = None
-    else:
-        kind = crd_spec.get("kind")
-        plural = crd_spec.get("plural")
-        crd = structure.ManagedCRD(
-            api_version=crd_spec.get("apiVersion"),
-            kind=crd_spec.get("kind"),
-            plural=plural if plural else f"{kind.lower()}s",
-            namespaced=crd_spec.get("namespaced", True),
-        )
+    kind = spec.get("kind")
+    plural = spec.get("plural")
 
-    behavior_spec = spec.get("behaviors", {})
-    behaviors = structure.ManagerBehavior(
-        load=behavior_spec.get("load", "name"),
-        create=behavior_spec.get("create", True),
-        update=behavior_spec.get("update", "patch"),
-        delete=behavior_spec.get("delete", "destroy"),
+    return structure.ManagedResource(
+        api_version=spec.get("apiVersion"),
+        kind=kind,
+        plural=plural if plural else f"{kind.lower()}s",
+        namespaced=spec.get("namespaced", True),
     )
 
-    return structure.ManagedResource(crd=crd, behaviors=behaviors)
+
+def _load_behavior(spec: dict | None) -> structure.Behavior:
+    if not spec:
+        spec = {}
+
+    return structure.Behavior(
+        load=spec.get("load", "name"),
+        create=spec.get("create", True),
+        update=spec.get("update", "patch"),
+        delete=spec.get("delete", "destroy"),
+    )
 
 
 def _prepare_materializers(
@@ -157,40 +149,12 @@ def _template_extractor(
     if not template_spec:
         return None
 
-    field_expressions = _encode_template("", template_spec=template_spec)
-
-    materializer = f"{{{','.join([f'"{field}": {expression}'
-     for field, expression in field_expressions
-     ])}}}"
+    materializer = encode_cel_template(template_spec=template_spec)
 
     compiled = cel_env.compile(materializer)
     program = cel_env.program(compiled, functions=koreo_cel_functions)
     program.logger.setLevel(logging.WARNING)
     return program
-
-
-def _encode_template(base: str, template_spec: dict | None) -> list[tuple[str, Any]]:
-    output: list[tuple[str, Any]] = []
-
-    if not template_spec:
-        return []
-
-    for field, expression in template_spec.items():
-        safe_field = field.replace('"', "'")
-
-        field_name = safe_field
-        if base:
-            field_name = f"{base}.{safe_field}"
-
-        if isinstance(expression, dict):
-            output.extend(_encode_template(field_name, expression))
-        else:
-            print(
-                f"field name: {field_name}, expression (type={type(expression)}): {expression}"
-            )
-            output.append((field_name, expression))
-
-    return output
 
 
 def _predicate_extractor(

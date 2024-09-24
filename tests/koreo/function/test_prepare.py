@@ -266,13 +266,14 @@ class TestFunctionMaterializerBase(unittest.IsolatedAsyncioTestCase):
         print(result)
         self.maxDiff = None
         output = {
+            "apiVersion": "tests.koreo.realkinetic.com/v1alpha8",
+            "kind": "TestCase",
+            "metadata.name": "base-test",
             "metadata.namespace": "my-test-namespace",
             "spec.name": "Person Name",
             "spec.age": 55,
-            "spec.children.*": {
-                "name": "Person Name, Jr.",
-                "age": 35,
-            },
+            "spec.children.*.name": "Person Name, Jr.",
+            "spec.children.*.age": 35,
         }
         self.assertDictEqual(output, result)
 
@@ -294,18 +295,17 @@ class TestFunctionMaterializerBase(unittest.IsolatedAsyncioTestCase):
 
         result: list = json.loads(json.dumps(cel_result))
 
-        print(result)
         self.maxDiff = None
         output = {
+            "apiVersion": "tests.koreo.realkinetic.com/v1alpha8",
+            "kind": "TestCase",
+            "metadata.name": "base-test",
             "metadata.namespace": "my-test-namespace",
             "spec.name": "Person Name",
             "spec.age": 55,
-            "spec.children.*": {
-                "name": "Person Name, Jr.",
-                "age": 35,
-            },
+            "spec.children.*.name": "Person Name, Jr.",
+            "spec.children.*.age": 35,
         }
-        print(result)
         self.assertDictEqual(output, result)
 
 

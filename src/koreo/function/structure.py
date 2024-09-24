@@ -13,27 +13,23 @@ class Outcome(NamedTuple):
     ok_value: celpy.Runner | None
 
 
-class ManagedCRD(NamedTuple):
+class ManagedResource(NamedTuple):
     api_version: str
     kind: str
     plural: str
     namespaced: bool
 
 
-class ManagerBehavior(NamedTuple):
+class Behavior(NamedTuple):
     load: Literal["name", "label-query", "virtual"]
     create: bool
     update: Literal["patch", "recreate", "never"]
     delete: Literal["destroy", "abandon"]
 
 
-class ManagedResource(NamedTuple):
-    crd: ManagedCRD | None
-    behaviors: ManagerBehavior
-
-
 class Function(NamedTuple):
-    managed_resource: ManagedResource
+    managed_resource: ManagedResource | None
+    behavior: Behavior
 
     input_validators: celpy.Runner | None
 

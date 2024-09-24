@@ -1,3 +1,5 @@
+from typing import Any
+
 CEL_PREFIX = "="
 
 
@@ -22,6 +24,30 @@ def encode_cel(value):
         return f'"{ value.replace('"', '\"') }"'  # fmt: skip
 
     return value.lstrip(CEL_PREFIX)
+
+
+def encode_cel_template(template_spec: dict):
+    return f"{{{','.join([f'"{field}": {expression}'
+     for field, expression in _encode_template_dict("", template_spec)
+     ])}}}"
+
+
+def _encode_template_dict(base: str, template_spec: dict):
+    output: list[tuple[str, Any]] = []
+
+    for field, expression in template_spec.items():
+        safe_field = field.replace('"', "'")
+
+        field_name = safe_field
+        if base:
+            field_name = f"{base}.{safe_field}"
+
+        if isinstance(expression, dict):
+            output.extend(_encode_template_dict(field_name, expression))
+        else:
+            output.append((field_name, encode_cel(expression)))
+
+    return output
 
 
 def _encode_plain(maybe_number) -> bool:

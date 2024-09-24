@@ -85,25 +85,17 @@ metadata:
 spec:
   materializers:
     base:
+      apiVersion: tests.koreo.realkinetic.com/v1alpha8
+      kind: TestCase
       metadata:
-        namespace: inputs.metadata.namespace
+        name: base-test
+        namespace: =inputs.metadata.namespace
       spec:
-        name: inputs.person.name
-        age: inputs.person.age
-        children.*: |
-          { "name": inputs.person.name + ", Jr.", "age": inputs.person.age - 20 }
-
-  template:
-    apiVersion: tests.koreo.realkinetic.com/v1alpha8
-    kind: TestCase
-    metadata:
-      name: base-test
-    spec:
-      name: Name of Person
-      age: Age of Person
-      children:
-        - name: Name of Child
-          age: Age of Child
+        name: =inputs.person.name
+        age: =inputs.person.age
+        children.*:
+          name: =inputs.person.name + ', Jr.'
+          age: =inputs.person.age - 20
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -113,23 +105,17 @@ metadata:
 spec:
   materializers:
     base:
-      "metadata.namespace": inputs.metadata.namespace
-      "spec.name": inputs.person.name
-      "spec.age": inputs.person.age
-      "spec.children.*": |
-        { "name": inputs.person.name + ", Jr.", "age": inputs.person.age - 20 }
-
-  template:
-    apiVersion: tests.koreo.realkinetic.com/v1alpha8
-    kind: TestCase
-    metadata:
-      name: base-test
-    spec:
-      name: Name of Person
-      age: Age of Person
-      children:
-        - name: Name of Child
-          age: Age of Child
+      "apiVersion": tests.koreo.realkinetic.com/v1alpha8
+      "kind": TestCase
+      "metadata.name": base-test
+      "metadata.namespace": =inputs.metadata.namespace
+      "spec.name": =inputs.person.name
+      "spec.age": =inputs.person.age
+      "spec.children.*":
+        {
+          "name": '=inputs.person.name + ", Jr."',
+          "age": "=inputs.person.age - 20",
+        }
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -138,26 +124,25 @@ metadata:
   namespace: koreo-testing
 spec:
   materializers:
+    base:
+      apiVersion: tests.koreo.realkinetic.com/v1alpha8
+      kind: TestCase
+      metadata:
+        name: base-test
+      spec:
+        name: Name of Person
+        age: Age of Person
+        children:
+          - name: Name of Child
+            age: Age of Child
     onCreate:
       metadata:
-        namespace: inputs.metadata.namespace
+        namespace: =inputs.metadata.namespace
       spec:
-        name: inputs.person.name
-        age: inputs.person.age
+        name: =inputs.person.name
+        age: =inputs.person.age
         children.*: |
-          { "name": inputs.person.name + ", Jr.", "age": inputs.person.age - 20 }
-
-  template:
-    apiVersion: tests.koreo.realkinetic.com/v1alpha8
-    kind: TestCase
-    metadata:
-      name: base-test
-    spec:
-      name: Name of Person
-      age: Age of Person
-      children:
-        - name: Name of Child
-          age: Age of Child
+          ={ "name": inputs.person.name + ", Jr.", "age": inputs.person.age - 20 }
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -166,24 +151,23 @@ metadata:
   namespace: koreo-testing
 spec:
   materializers:
+    base:
+      apiVersion: tests.koreo.realkinetic.com/v1alpha8
+      kind: TestCase
+      metadata:
+        name: base-test
+      spec:
+        name: Name of Person
+        age: Age of Person
+        children:
+          - name: Name of Child
+            age: Age of Child
     onCreate:
-      "metadata.namespace": inputs.metadata.namespace
-      "spec.name": inputs.person.name
-      "spec.age": inputs.person.age
+      "metadata.namespace": =inputs.metadata.namespace
+      "spec.name": =inputs.person.name
+      "spec.age": =inputs.person.age
       "spec.children.*": |
-        { "name": inputs.person.name + ", Jr.", "age": inputs.person.age - 20 }
-
-  template:
-    apiVersion: tests.koreo.realkinetic.com/v1alpha8
-    kind: TestCase
-    metadata:
-      name: base-test
-    spec:
-      name: Name of Person
-      age: Age of Person
-      children:
-        - name: Name of Child
-          age: Age of Child
+        ={ "name": inputs.person.name + ", Jr.", "age": inputs.person.age - 20 }
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -201,14 +185,12 @@ spec:
 
   materializers:
     base:
-      metadata: inputs.metadata
+      apiVersion: resourcemanager.cnrm.cloud.google.com/v1beta1
+      kind: Folder
+      metadata: =inputs.metadata
       spec:
-        displayName: inputs.params.name
-        folderRef: inputs.parent_folder.ref.to_ref()
-
-  template:
-    apiVersion: resourcemanager.cnrm.cloud.google.com/v1beta1
-    kind: Folder
+        displayName: =inputs.params.name
+        folderRef: =inputs.parent_folder.ref.to_ref()
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -217,39 +199,34 @@ metadata:
   namespace: koreo-testing
 spec:
   managedResource:
-    crd:
-      apiVersion: koreo.realkinetic.com/v1alpha8
-      kind: TestDummy
-      plural: testdummies
-      namespaced: true
-    behaviors:
-      update: recreate
+    apiVersion: koreo.realkinetic.com/v1alpha8
+    kind: TestDummy
+    plural: testdummies
+    namespaced: true
+
+  behavior:
+    update: recreate
 
   materializers:
     base:
-      "metadata.name": parent.metadata.name
-      "metadata.namespace": string("koreo-testing")
+      apiVersion: koreo.realkinetic.com/v1alpha8
+      kind: TestDummy
+      metadata:
+        name: =parent.metadata.name
+        namespace: =string("koreo-testing")
+        labels:
+          testing.realkinetic.com/key: value
       spec:
         intKey: 99
-        strKey: string("A string!")
-
-  template:
-    apiVersion: koreo.realkinetic.com/v1alpha8
-    kind: TestDummy
-    metadata:
-      labels:
-        testing.realkinetic.com/key: value
-    spec:
-      intKey: 7
-      strKey: "yay"
-      listKey:
-        - name: first
-          value: 1
-        - name: second
-          value: 2
-      mapKey:
-        name: some
-        value: 1
+        strKey: =string("A string!")
+        listKey:
+          - name: first
+            value: 1
+          - name: second
+            value: 2
+        mapKey:
+          name: some
+          value: 10
 
   outcome:
     okValue: =resource.metadata.uid
@@ -260,12 +237,11 @@ metadata:
   name: domain-config.v1
   namespace: koreo-testing
 spec:
-  managedResource:
-    behaviors:
-      load: virtual
-      create: false
-      update: never
-      delete: abandon
+  behavior:
+    load: virtual
+    create: false
+    update: never
+    delete: abandon
 
   inputValidators:
     - type: PermFail
@@ -291,12 +267,11 @@ metadata:
   name: domain-subresource-metadata.v1
   namespace: koreo-testing
 spec:
-  managedResource:
-    behaviors:
-      load: virtual
-      create: false
-      update: never
-      delete: abandon
+  behavior:
+    load: virtual
+    create: false
+    update: never
+    delete: abandon
 
   outcome:
     okValue: |
@@ -319,12 +294,11 @@ metadata:
   name: domain-subresource-value.v1
   namespace: koreo-testing
 spec:
-  managedResource:
-    behaviors:
-      load: virtual
-      create: false
-      update: never
-      delete: abandon
+  behavior:
+    load: virtual
+    create: false
+    update: never
+    delete: abandon
 
   inputValidators:
     - type: PermFail
