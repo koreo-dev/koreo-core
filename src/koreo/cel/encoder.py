@@ -40,7 +40,11 @@ def _encode_template_dict(base: str, template_spec: dict):
 
         field_name = safe_field
         if base:
-            field_name = f"{base}.{safe_field}"
+            if base.endswith("labels") or base.endswith("annotations"):
+                field_name = f"{base}['{safe_field}']"
+                print(field_name)
+            else:
+                field_name = f"{base}.{safe_field}"
 
         if isinstance(expression, dict):
             output.extend(_encode_template_dict(field_name, expression))

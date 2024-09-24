@@ -215,7 +215,7 @@ spec:
         name: =parent.metadata.name
         namespace: =string("koreo-testing")
         labels:
-          testing.realkinetic.com/key: value
+          testing.realkinetic.com/key: =parent.metadata.name
       spec:
         intKey: 99
         strKey: =string("A string!")
