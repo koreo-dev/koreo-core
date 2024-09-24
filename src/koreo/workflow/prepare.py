@@ -52,7 +52,7 @@ async def prepare_workflow(cache_key: str, spec: dict | None) -> structure.Workf
         crd_ref=crd_ref,
         steps_ready=steps_ready,
         steps=steps,
-        completion=_build_completion(cel_env, spec.get("completion", {})),
+        status=_build_status(cel_env=cel_env, status_spec=spec.get("status")),
     )
 
 
@@ -137,7 +137,29 @@ def _load_functions(
     return functions, combine(outcomes)
 
 
-def _build_completion(
-    cel_env: celpy.Environment, completion_spec: dict
-) -> celpy.Runner | None:
-    return None
+def _build_status(
+    cel_env: celpy.Environment, status_spec: dict | None
+) -> structure.Status:
+    if not status_spec:
+        return structure.Status(conditions=[], state=None)
+
+    state_spec = status_spec.get("state")
+    if not state_spec:
+        state = None
+    else:
+        state = cel_env.program(cel_env.compile(encode_cel(state_spec)))
+
+    conditions_spec = status_spec.get("conditions")
+    if not conditions_spec:
+        conditions = []
+    else:
+        conditions = [
+            structure.ConditionSpec(
+                type_=condition_spec.type,
+                name=condition_spec.name,
+                step=condition_spec.step,
+            )
+            for condition_spec in conditions_spec
+        ]
+
+    return structure.Status(conditions=conditions, state=state)

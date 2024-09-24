@@ -103,6 +103,33 @@ spec:
     kind: Domain
 
   steps:
-    - label: ok-value
+    - label: dummy-test
       functionRef:
         name: dummy-test.v1
+  status:
+    conditions:
+      - type: Test
+        name: this is fun
+        step: dummy-test
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Workflow
+metadata:
+  name: status-test.v1
+  namespace: koreo-testing
+spec:
+  crdRef:
+    apiGroup: konfig.realkinetic.com
+    version: v1alpha8
+    kind: Domain
+
+  steps:
+    - label: dummy-test
+      functionRef:
+        name: dummy-test.v1
+
+  status:
+    conditions:
+      - type: Test
+        name: this is fun
+        step: dummy-test

@@ -20,10 +20,21 @@ class FunctionRef(NamedTuple):
     dynamic_input_keys: list[str]
 
 
+class ConditionSpec(NamedTuple):
+    type_: str
+    name: str
+    step: str
+
+
+class Status(NamedTuple):
+    conditions: list[ConditionSpec]
+    state: celpy.Runner | None
+
+
 class Workflow(NamedTuple):
     crd_ref: ConfigCRDRef
 
     steps_ready: Outcome
     steps: list[FunctionRef]
 
-    completion: celpy.Runner | None
+    status: Status

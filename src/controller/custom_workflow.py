@@ -4,14 +4,14 @@ import logging
 import kopf
 import kr8s
 
+from resources.k8s.conditions import Condition, update_condition
+
 from koreo.result import combine, is_error, raise_for_error
 
 from koreo.cache import get_resource_from_cache
 from koreo.workflow.reconcile import reconcile_workflow
 from koreo.workflow.registry import get_custom_crd_workflows
 from koreo.workflow.structure import Workflow
-
-from koreo.workflow import registry
 
 
 @kopf.on.login()
@@ -65,7 +65,12 @@ def start_controller(group: str, kind: str, version: str):
     @kopf.on.update(group=group, kind=kind, version=version)
     @kopf.on.resume(group=group, kind=kind, version=version)
     async def reconcile_custom_workflow(
-        meta: kopf.Meta, spec: kopf.Spec, patch: kopf.Patch, *_, **__
+        meta: kopf.Meta,
+        spec: kopf.Spec,
+        status: kopf.Status,
+        patch: kopf.Patch,
+        *_,
+        **__,
     ):
         logging.info(f"Reconciling {key}")
 
@@ -75,6 +80,7 @@ def start_controller(group: str, kind: str, version: str):
 
         trigger = {"metadata": dict(meta), "spec": dict(spec)}
 
+        conditions: list[Condition] = status.get("conditions", [])
         outcomes = {}
         for workflow_key in workflow_keys:
             workflow = get_resource_from_cache(
@@ -84,13 +90,18 @@ def start_controller(group: str, kind: str, version: str):
                 logging.error("Missing Workflow!")
                 return
             logging.info(f"Running Workflow {workflow_key}")
-            outcomes[workflow_key] = await reconcile_workflow(
+
+            workflow_outcomes, workflow_conditions = await reconcile_workflow(
                 api=kr8s_api,
                 workflow_key=workflow_key,
                 trigger=trigger,
                 workflow=workflow,
             )
-            logging.info(f"Workflow {workflow_key} outcomes: {outcomes}")
+            outcomes[workflow_key] = workflow_outcomes
+            for condition in workflow_conditions:
+                conditions = update_condition(
+                    conditions=conditions, condition=condition
+                )
 
         if outcomes:
             error_outcomes = [
@@ -98,9 +109,16 @@ def start_controller(group: str, kind: str, version: str):
             ]
             error_outcome = combine(error_outcomes)
             if is_error(error_outcome):
-                patch.update({"status": {"koreo": error_outcome.message}})
+                patch.update(
+                    {
+                        "status": {
+                            "conditions": conditions,
+                            "koreo": error_outcome.message,
+                        }
+                    }
+                )
                 raise_for_error(error_outcome)
 
-            patch.update({"status": {"koreo": outcomes}})
+            patch.update({"status": {"conditions": conditions, "koreo": outcomes}})
 
         return True
