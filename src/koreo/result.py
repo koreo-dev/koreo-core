@@ -10,9 +10,11 @@ class DepSkip:
     """This is internal for skipping due to dependency fail."""
 
     message: str | None
+    location: str | None
 
-    def __init__(self, message: str | None = None):
+    def __init__(self, message: str | None = None, location: str | None = None):
         self.message = message
+        self.location = location
 
     def combine(self, other: Outcome):
         return other
@@ -28,9 +30,11 @@ class Skip:
     """Indicates that this was intentially skipped."""
 
     message: str | None
+    location: str | None
 
-    def __init__(self, message: str | None = None):
+    def __init__(self, message: str | None = None, location: str | None = None):
         self.message = message
+        self.location = location
 
     def combine(self, other: Outcome):
         if isinstance(other, (DepSkip,)):
@@ -49,9 +53,11 @@ class Ok[T]:
     """Indicates success and `self.data` contains a value of type `T`."""
 
     data: T
+    location: str | None
 
-    def __init__(self, data: T):
+    def __init__(self, data: T, location: str | None = None):
         self.data = data
+        self.location = location
 
     def __str__(self) -> str:
         return f"Ok({self.data})"
@@ -60,21 +66,28 @@ class Ok[T]:
         if isinstance(other, (DepSkip, Skip)):
             return self
 
-        if isinstance(other, Ok):
-            data = []
-            if isinstance(self.data, list):
-                data.extend(self.data)
-            elif self.data is not None:
-                data.append(self.data)
+        if not isinstance(other, Ok):
+            return other
 
-            if isinstance(other.data, list):
-                data.extend(other.data)
-            elif other.data is not None:
-                data.append(other.data)
+        data = []
+        if isinstance(self.data, list):
+            data.extend(self.data)
+        elif self.data is not None:
+            data.append(self.data)
 
-            return Ok(data=data)
+        if isinstance(other.data, list):
+            data.extend(other.data)
+        elif other.data is not None:
+            data.append(other.data)
 
-        return other
+        location = []
+        if self.location:
+            location.append(self.location)
+
+        if other.location:
+            location.append(other.location)
+
+        return Ok(data=data, location=", ".join(location))
 
 
 class Retry:
@@ -82,10 +95,14 @@ class Retry:
 
     message: str | None
     delay: int
+    location: str | None
 
-    def __init__(self, delay: int = 60, message: str | None = None):
+    def __init__(
+        self, delay: int = 60, message: str | None = None, location: str | None = None
+    ):
         self.message = message
         self.delay = delay
+        self.location = location
 
     def __str__(self) -> str:
         return f"Retry(delay={self.delay}, message={self.message})"
@@ -104,9 +121,17 @@ class Retry:
         if other.message:
             message.append(other.message)
 
+        location = []
+        if self.location:
+            location.append(self.location)
+
+        if other.location:
+            location.append(other.location)
+
         return Retry(
             message=", ".join(message),
             delay=max(self.delay, other.delay),
+            location=", ".join(location),
         )
 
 
@@ -114,9 +139,11 @@ class PermFail:
     """An error indicating retries should not be attempted."""
 
     message: str | None
+    location: str | None
 
-    def __init__(self, message: str | None = None):
+    def __init__(self, message: str | None = None, location: str | None = None):
         self.message = message
+        self.location = location
 
     def __str__(self) -> str:
         return f"Permanent Failure (message={self.message})"
@@ -132,7 +159,14 @@ class PermFail:
         if other.message:
             message.append(other.message)
 
-        return PermFail(message=", ".join(message))
+        location = []
+        if self.location:
+            location.append(self.location)
+
+        if other.location:
+            location.append(other.location)
+
+        return PermFail(message=", ".join(message), location=", ".join(location))
 
 
 OkT = TypeVar("OkT")

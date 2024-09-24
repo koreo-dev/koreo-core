@@ -28,6 +28,7 @@ from .structure import Function, ManagedResource
 
 async def reconcile_function(
     api: kr8s.Api,
+    location: str,
     function: Function,
     trigger: dict,
     inputs: dict,
@@ -38,8 +39,7 @@ async def reconcile_function(
     }
 
     validation_outcome = _run_checks(
-        checks=function.input_validators,
-        inputs=base_inputs,
+        checks=function.input_validators, inputs=base_inputs, location=location
     )
     if not is_ok(validation_outcome):
         return validation_outcome
@@ -49,12 +49,14 @@ async def reconcile_function(
         template=function.template,
         materializer=function.materializers.base,
         inputs=base_inputs,
+        location=location,
     )
 
     # TODO: Add owners, if ManagedResource.behaviors.add-owner
 
     resource = await _resource_crud(
         api=api,
+        location=location,
         managed_resource=managed_resource,
         resource_config=function.managed_resource,
         on_create=function.materializers.on_create,
@@ -67,7 +69,9 @@ async def reconcile_function(
         "resource": celpy.json_to_cel(resource) if resource else None
     }
 
-    outcome_tests_outcome = _run_checks(checks=function.outcome.tests, inputs=inputs)
+    outcome_tests_outcome = _run_checks(
+        checks=function.outcome.tests, inputs=inputs, location=location
+    )
     if not is_ok(outcome_tests_outcome):
         return outcome_tests_outcome
 
@@ -76,44 +80,56 @@ async def reconcile_function(
 
     try:
         ok_value = function.outcome.ok_value.evaluate(inputs)
-        return Ok(json.loads(json.dumps(ok_value)))
+        return Ok(json.loads(json.dumps(ok_value)), location=location)
     except celpy.CELEvalError as err:
         msg = f"CEL Eval Error computing OK value. {err.tree}"
         logging.exception(msg)
-        return PermFail(msg)
+        return PermFail(msg, location=location)
     except:
         msg = "Failure computing OK value."
         logging.exception(msg)
-        return PermFail(msg)
+        return PermFail(msg, location=location)
 
 
-def _run_checks(checks: celpy.Runner | None, inputs: dict[str, celtypes.Value]):
+def _run_checks(
+    checks: celpy.Runner | None, inputs: dict[str, celtypes.Value], location: str
+):
     if not checks:
-        return Ok(None)
+        return Ok(None, location=location)
 
     check_results = json.loads(json.dumps(checks.evaluate(inputs)))
-    return _predicate_to_koreo_result(check_results)
+    return _predicate_to_koreo_result(check_results, location=location)
 
 
-def _predicate_to_koreo_result(results: list) -> Outcome:
+def _predicate_to_koreo_result(results: list, location: str) -> Outcome:
     outcomes = []
 
     for result in results:
         match result.get("type"):
             case "DepSkip":
-                outcomes.append(DepSkip(message=result.get("message")))
+                outcomes.append(
+                    DepSkip(message=result.get("message"), location=location)
+                )
             case "Ok":
-                outcomes.append(Ok(None))
+                outcomes.append(Ok(None, location=location))
             case "PermFail":
-                outcomes.append(PermFail(message=result.get("message")))
+                outcomes.append(
+                    PermFail(message=result.get("message"), location=location)
+                )
             case "Retry":
                 outcomes.append(
-                    Retry(message=result.get("message"), delay=result.get("delay"))
+                    Retry(
+                        message=result.get("message"),
+                        delay=result.get("delay"),
+                        location=location,
+                    )
                 )
             case "Skip":
-                outcomes.append(Skip(message=result.get("message")))
+                outcomes.append(Skip(message=result.get("message"), location=location))
             case _ as t:
-                outcomes.append(PermFail(f"Unknown predicate result type: {t}"))
+                outcomes.append(
+                    PermFail(f"Unknown predicate result type: {t}", location=location)
+                )
 
     if not outcomes:
         return Ok(None)
@@ -125,6 +141,7 @@ def _materialize_overlay(
     template: dict[str, Any] | None,
     materializer: celpy.Runner | None,
     inputs: dict[str, celtypes.Value],
+    location: str,
 ):
     managed_resource = copy.deepcopy(template) if template else {}
 
@@ -140,7 +157,7 @@ def _materialize_overlay(
         )
         overlay = json.loads(json.dumps(computed))
     except celpy.CELEvalError:
-        logging.exception(f"Encountered CELEvalError {computed}")
+        logging.exception(f"Encountered CELEvalError {computed}. ({location})")
 
         raise
 
@@ -193,6 +210,7 @@ def _build_resource_config(
 
 async def _resource_crud(
     api: kr8s.Api,
+    location: str,
     managed_resource: dict,
     resource_config: ManagedResource,
     on_create: celpy.Runner | None,
@@ -209,7 +227,8 @@ async def _resource_crud(
         resource_params.api_version and resource_params.kind and resource_params.name
     ):
         return PermFail(
-            f"kind ({resource_params.kind}), apiVersion ({resource_params.api_version}), and metadata.name ({resource_params.name}) are all required."
+            f"kind ({resource_params.kind}), apiVersion ({resource_params.api_version}), and metadata.name ({resource_params.name}) are all required. ({managed_resource}, {resource_config}, {resource_params._asdict()})",
+            location=location,
         )
 
     resource_class = kr8s.objects.new_class(
@@ -234,11 +253,11 @@ async def _resource_crud(
         else:
             msg = f"ServerError loading {resource_params.kind} resource {resource_params.namespace}/{resource_params.name}. ({type(err)}: {err})"
             logging.exception(msg)
-            return Retry(message=msg, delay=30)
+            return Retry(message=msg, delay=30, location=location)
     except Exception as err:
         msg = f"Failure loading {resource_params.kind} resource {resource_params.namespace}/{resource_params.name}. ({type(err)}: {err})"
         logging.exception(msg)
-        return Retry(message=msg, delay=30)
+        return Retry(message=msg, delay=30, location=location)
 
     if not resource_matches:
         resource = None
@@ -255,10 +274,11 @@ async def _resource_crud(
             template=managed_resource,
             materializer=on_create,
             inputs=inputs,
+            location=location,
         )
 
         logging.info(
-            f"Creating {resource_params.kind}.{resource_params.api_version} resource {resource_params.namespace}/{resource_params.name}."
+            f"Creating {resource_params.kind}.{resource_params.api_version} resource {resource_params.namespace}/{resource_params.name}. ({location})"
         )
         new_object = resource_class(
             api=api, resource=managed_resource, namespace=resource_params.namespace
@@ -268,6 +288,7 @@ async def _resource_crud(
         return Retry(
             message=f"Creating {resource_params.kind}.{resource_params.api_version} resource {resource_params.namespace}/{resource_params.name}.",
             delay=30,
+            location=location,
         )
 
     if not resource:
@@ -275,12 +296,12 @@ async def _resource_crud(
 
     if _validate_match(managed_resource, resource.raw):
         logging.debug(
-            f"{resource_params.kind}.{resource_params.api_version}/{resource_params.name} resource matched spec, skipping update."
+            f"{resource_params.kind}.{resource_params.api_version}/{resource_params.name} resource matched spec, skipping update. ({location})"
         )
         return resource.raw
 
     logging.info(
-        f"{resource_params.kind}.{resource_params.api_version}/{resource_params.name} resource did not match spec, updating."
+        f"{resource_params.kind}.{resource_params.api_version}/{resource_params.name} resource did not match spec, updating. ({location})"
     )
     if resource_config.behaviors.update == "patch":
         # TODO: Should this only send fields with differences?
@@ -288,12 +309,14 @@ async def _resource_crud(
         return Retry(
             message=f"Updating {resource_params.kind}.{resource_params.api_version} resource {resource_params.namespace}/{resource_params.name} to match template.",
             delay=5,
+            location=location,
         )
     elif resource_config.behaviors.update == "recreate":
         await resource.delete()
         return Retry(
             message=f"Deleting {resource_params.kind}.{resource_params.api_version} resource {resource_params.namespace}/{resource_params.name} to recreate.",
             delay=5,
+            location=location,
         )
 
     return resource.raw

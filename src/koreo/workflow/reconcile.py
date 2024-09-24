@@ -14,6 +14,7 @@ from . import structure
 
 async def reconcile_workflow(
     api: kr8s.Api,
+    workflow_key: str,
     trigger: dict,
     workflow: structure.Workflow,
 ):
@@ -30,6 +31,7 @@ async def reconcile_workflow(
             task_map[step.label] = task_group.create_task(
                 _reconcile_step(
                     api=api,
+                    workflow_key=workflow_key,
                     step=step,
                     trigger=trigger,
                     dependencies=step_dependencies,
@@ -42,8 +44,9 @@ async def reconcile_workflow(
     if pending:
         timed_out_tasks = ", ".join(task.get_name() for task in pending)
         return result.Retry(
-            message=f"Timeout running Workflow Steps ({timed_out_tasks}), will retry.",
-            delay=15,
+                message=f"Timeout running Workflow Steps ({timed_out_tasks}), will retry.",
+                delay=15,
+                location=workflow_key,
         )
 
     outcomes = {task.get_name(): task.result() for task in done}
@@ -77,10 +80,13 @@ def _outcome_encoder(outcome: result.Outcome) -> Any:
 
 async def _reconcile_step(
     api: kr8s.Api,
+    workflow_key: str,
     step: structure.FunctionRef,
     dependencies: list[asyncio.Task[result.Outcome]],
     trigger: dict,
 ):
+    location = f"{workflow_key}.{step.label}"
+
     if not dependencies:
         if step.inputs:
             inputs = json.loads(json.dumps(step.inputs.evaluate({})))
@@ -88,7 +94,11 @@ async def _reconcile_step(
             inputs = {}
 
         return await reconcile_function(
-            api=api, function=step.function, trigger=trigger, inputs=inputs
+            api=api,
+            location=location,
+            function=step.function,
+            trigger=trigger,
+            inputs=inputs,
         )
 
     [resolved, pending] = await asyncio.wait(dependencies)
@@ -97,6 +107,7 @@ async def _reconcile_step(
         return result.Retry(
             message=f"Timeout running Workflow Steps ({timed_out_tasks}), will retry.",
             delay=15,
+            location=location,
         )
 
     ok_outcomes: dict[str, Any] = {}
@@ -110,7 +121,8 @@ async def _reconcile_step(
             case _:
                 message = step_result.message if hasattr(step_result, "message") else ""
                 return result.DepSkip(
-                    f"'{step_label}' status is {type(step_result).__name__} ({message})."
+                    f"'{step_label}' status is {type(step_result).__name__} ({message}).",
+                    location=location,
                 )
 
     if not step.inputs:
@@ -122,6 +134,7 @@ async def _reconcile_step(
 
     return await reconcile_function(
         api=api,
+        location=location,
         function=step.function,
         trigger=trigger,
         inputs=inputs,

@@ -86,6 +86,7 @@ def start_controller(group: str, kind: str, version: str):
             logging.info(f"Running Workflow {workflow_key}")
             outcomes[workflow_key] = await reconcile_workflow(
                 api=kr8s_api,
+                workflow_key=workflow_key,
                 trigger=trigger,
                 workflow=workflow,
             )
