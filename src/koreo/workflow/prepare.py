@@ -97,7 +97,6 @@ def _load_functions(
             dynamic_input_keys = []
         else:
             encoded_input_extractor = encode_cel(input_mapper_spec)
-            logging.info(f"INPUT MAPPER SPEC: {encoded_input_extractor}")
 
             input_mapper_expression = cel_env.compile(encoded_input_extractor)
             used_vars = extract_argument_structure(input_mapper_expression)

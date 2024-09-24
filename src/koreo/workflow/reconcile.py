@@ -61,6 +61,7 @@ async def reconcile_workflow(
             condition_type=condition_spec.type_,
             thing_name=condition_spec.name,
             outcome=outcomes.get(condition_spec.step),
+            workflow_key=workflow_key,
         )
         for condition_spec in workflow.status.conditions
     ]
@@ -156,11 +157,15 @@ async def _reconcile_step(
 
 
 def _condition_helper(
-    condition_type: str, thing_name: str, outcome: result.Outcome | None
+    condition_type: str,
+    thing_name: str,
+    outcome: result.Outcome | None,
+    workflow_key: str,
 ) -> Condition:
     reason = "Pending"
     message: str = f"Awaiting {thing_name} reconciliation."
     status = "True"
+    location = workflow_key
 
     if not outcome:
         return Condition(
@@ -168,14 +173,13 @@ def _condition_helper(
             reason=reason,
             message=message,
             status=status,
+            location=location,
         )
 
     match outcome:
         case result.DepSkip(message=skip_message, location=location):
             reason = "DepSkip"
-            message: str = (
-                f"{thing_name} awaiting dependencies to be ready. ({location})"
-            )
+            message: str = f"{thing_name} awaiting dependencies to be ready."
             if skip_message:
                 message: str = (
                     f"{thing_name} awaiting dependencies to be ready ({skip_message})"
@@ -183,26 +187,24 @@ def _condition_helper(
 
         case result.Skip(message=skip_message, location=location):
             reason = "Skip"
-            message: str = f"{thing_name} management is disabled. ({location})"
+            message: str = f"{thing_name} management is disabled."
             if skip_message:
                 message: str = f"Skipping {thing_name}: {skip_message}"
 
         case result.Ok(location=location):
             reason = "Ready"
-            message: str = f"{thing_name} ready. ({location})"
+            message: str = f"{thing_name} ready."
 
         case result.Retry(message=retry_message, location=location):
             reason = "Wait"
-            message: str = f"Awaiting {thing_name} to be ready. ({location})"
+            message: str = f"Awaiting {thing_name} to be ready."
             if retry_message:
-                message: str = (
-                    f"Awaiting {thing_name} to be ready ({retry_message}). ({location})"
-                )
+                message: str = f"Awaiting {thing_name} to be ready ({retry_message})."
 
         case result.PermFail(message=fail_message, location=location):
             reason = "Failure"
             message: str = (
-                f"Unrecoverable error reconciling {thing_name}. ({fail_message}). ({location})"
+                f"Unrecoverable error reconciling {thing_name}. ({fail_message})."
             )
 
     return Condition(
@@ -210,4 +212,5 @@ def _condition_helper(
         reason=reason,
         message=message,
         status=status,
+        location=location,
     )

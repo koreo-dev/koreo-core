@@ -23,7 +23,7 @@ from ..result import (
     is_ok,
 )
 
-from .structure import Function, ManagedResource
+from .structure import Behavior, Function, ManagedResource
 
 
 async def reconcile_function(
@@ -52,13 +52,14 @@ async def reconcile_function(
         location=location,
     )
 
-    # TODO: Add owners, if ManagedResource.behaviors.add-owner
+    # TODO: Add owners, if behaviors.add-owner
 
     resource = await _resource_crud(
         api=api,
         location=location,
+        behavior=function.behavior,
         managed_resource=managed_resource,
-        resource_config=function.managed_resource,
+        managed_resource_config=function.managed_resource,
         on_create=function.materializers.on_create,
         inputs=base_inputs,
     )
@@ -180,18 +181,18 @@ class _Resource(NamedTuple):
 
 def _build_resource_config(
     managed_resource: dict,
-    resource_config: ManagedResource,
+    managed_resource_config: ManagedResource,
 ):
     computed_metadata = managed_resource.get("metadata", {})
 
     name = computed_metadata.get("name")
     namespace = computed_metadata.get("namespace")
 
-    if resource_config.crd:
-        api_version = resource_config.crd.api_version
-        kind = resource_config.crd.kind
-        plural = resource_config.crd.plural
-        namespaced = resource_config.crd.namespaced
+    if managed_resource_config:
+        api_version = managed_resource_config.api_version
+        kind = managed_resource_config.kind
+        plural = managed_resource_config.plural
+        namespaced = managed_resource_config.namespaced
     else:
         api_version = managed_resource.get("apiVersion")
         kind = managed_resource.get("kind")
@@ -211,39 +212,46 @@ def _build_resource_config(
 async def _resource_crud(
     api: kr8s.Api,
     location: str,
+    behavior: Behavior,
     managed_resource: dict,
-    resource_config: ManagedResource,
+    managed_resource_config: ManagedResource,
     on_create: celpy.Runner | None,
     inputs: dict[str, celtypes.Value],
 ):
     if not managed_resource:
         return None
 
-    resource_params = _build_resource_config(
-        managed_resource=managed_resource, resource_config=resource_config
+    resource_api_params = _build_resource_config(
+        managed_resource=managed_resource,
+        managed_resource_config=managed_resource_config,
     )
 
     if not (
-        resource_params.api_version and resource_params.kind and resource_params.name
+        resource_api_params.api_version
+        and resource_api_params.kind
+        and resource_api_params.name
     ):
         return PermFail(
-            f"kind ({resource_params.kind}), apiVersion ({resource_params.api_version}), and metadata.name ({resource_params.name}) are all required. ({managed_resource}, {resource_config}, {resource_params._asdict()})",
+            f"kind ({resource_api_params.kind}), apiVersion ({resource_api_params.api_version}), and metadata.name ({resource_api_params.name}) are all required. ({managed_resource}, {managed_resource_config}, {resource_api_params._asdict()})",
             location=location,
         )
 
     resource_class = kr8s.objects.new_class(
-        version=resource_params.api_version,
-        kind=resource_params.kind,
-        plural=resource_params.plural,
-        namespaced=resource_params.namespaced,
+        version=resource_api_params.api_version,
+        kind=resource_api_params.kind,
+        plural=resource_api_params.plural,
+        namespaced=resource_api_params.namespaced,
         asyncio=True,
     )
+
+    resource_api = f"{resource_api_params.kind}.{resource_api_params.api_version}"
+    resource_name = f"{resource_api_params.namespace}/{resource_api_params.name}"
 
     try:
         resource_matches = await api.async_get(
             resource_class,
-            resource_params.name,
-            namespace=resource_params.namespace,
+            resource_api_params.name,
+            namespace=resource_api_params.namespace,
         )
     except kr8s.NotFoundError:
         resource_matches = None
@@ -251,11 +259,11 @@ async def _resource_crud(
         if err.response and err.response.status_code == 404:
             resource_matches = None
         else:
-            msg = f"ServerError loading {resource_params.kind} resource {resource_params.namespace}/{resource_params.name}. ({type(err)}: {err})"
+            msg = f"ServerError loading {resource_api} resource {resource_name}. ({type(err)}: {err})"
             logging.exception(msg)
             return Retry(message=msg, delay=30, location=location)
     except Exception as err:
-        msg = f"Failure loading {resource_params.kind} resource {resource_params.namespace}/{resource_params.name}. ({type(err)}: {err})"
+        msg = f"Failure loading {resource_api} resource {resource_name}. ({type(err)}: {err})"
         logging.exception(msg)
         return Retry(message=msg, delay=30, location=location)
 
@@ -264,12 +272,12 @@ async def _resource_crud(
     else:
         if len(resource_matches) > 1:
             return PermFail(
-                f"{resource_params.kind}.{resource_params.api_version}/{resource_params.name} resource matched multiple resources."
+                f"{resource_api}/{resource_name} resource matched multiple resources."
             )
         else:
             resource = resource_matches[0]
 
-    if not resource and resource_config.behaviors.create:
+    if not resource and behavior.create:
         managed_resource = _materialize_overlay(
             template=managed_resource,
             materializer=on_create,
@@ -277,16 +285,14 @@ async def _resource_crud(
             location=location,
         )
 
-        logging.info(
-            f"Creating {resource_params.kind}.{resource_params.api_version} resource {resource_params.namespace}/{resource_params.name}. ({location})"
-        )
+        logging.info(f"Creating {resource_api} resource {resource_name}. ({location})")
         new_object = resource_class(
-            api=api, resource=managed_resource, namespace=resource_params.namespace
+            api=api, resource=managed_resource, namespace=resource_api_params.namespace
         )
         await new_object.create()
         # TODO: Dynamic create delay?
         return Retry(
-            message=f"Creating {resource_params.kind}.{resource_params.api_version} resource {resource_params.namespace}/{resource_params.name}.",
+            message=f"Creating {resource_api} resource {resource_name}.",
             delay=30,
             location=location,
         )
@@ -296,25 +302,25 @@ async def _resource_crud(
 
     if _validate_match(managed_resource, resource.raw):
         logging.debug(
-            f"{resource_params.kind}.{resource_params.api_version}/{resource_params.name} resource matched spec, skipping update. ({location})"
+            f"{resource_api}/{resource_name} resource matched spec, skipping update. ({location})"
         )
         return resource.raw
 
     logging.info(
-        f"{resource_params.kind}.{resource_params.api_version}/{resource_params.name} resource did not match spec, updating. ({location})"
+        f"{resource_api}/{resource_name} resource did not match spec, updating. ({location})"
     )
-    if resource_config.behaviors.update == "patch":
+    if behavior.update == "patch":
         # TODO: Should this only send fields with differences?
         await resource.patch(managed_resource)
         return Retry(
-            message=f"Updating {resource_params.kind}.{resource_params.api_version} resource {resource_params.namespace}/{resource_params.name} to match template.",
+            message=f"Updating {resource_api} resource {resource_name} to match template.",
             delay=5,
             location=location,
         )
-    elif resource_config.behaviors.update == "recreate":
+    elif behavior.update == "recreate":
         await resource.delete()
         return Retry(
-            message=f"Deleting {resource_params.kind}.{resource_params.api_version} resource {resource_params.namespace}/{resource_params.name} to recreate.",
+            message=f"Deleting {resource_api} resource {resource_name} to recreate.",
             delay=5,
             location=location,
         )

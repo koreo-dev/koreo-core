@@ -6,6 +6,7 @@ from typing import TypedDict, NotRequired
 class Condition(TypedDict):
     lastTransitionTime: NotRequired[str]
     lastUpdateTime: NotRequired[str]
+    location: NotRequired[str | None]
     message: NotRequired[str | None]
     status: str
     reason: str
@@ -50,6 +51,7 @@ def _new_condition(new: Condition) -> Condition:
         status=new.get("status"),
         reason=new.get("reason"),
         message=new.get("message"),
+        location=new.get("location"),
     )
 
 
@@ -65,4 +67,5 @@ def _merge_conditions(base: Condition, updated: Condition) -> Condition:
         status=updated.get("status"),
         reason=updated.get("reason"),
         message=updated.get("message"),
+        location=updated.get("location"),
     )
