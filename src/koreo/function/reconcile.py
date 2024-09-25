@@ -11,7 +11,7 @@ import jsonpath_ng
 import celpy
 from celpy import celtypes
 
-from ..result import (
+from koreo.result import (
     DepSkip,
     Ok,
     Outcome,
@@ -23,7 +23,15 @@ from ..result import (
     is_ok,
 )
 
-from .structure import Behavior, Function, ManagedResource
+from koreo.resource_template.registry import get_resource_template
+
+from .structure import (
+    Behavior,
+    DynamicResource,
+    Function,
+    ManagedResource,
+    StaticResource,
+)
 
 
 async def reconcile_function(
@@ -33,6 +41,9 @@ async def reconcile_function(
     trigger: dict,
     inputs: dict,
 ):
+    if not is_ok(function.function_ready):
+        return function.function_ready
+
     base_inputs = {
         "inputs": celpy.json_to_cel(inputs),
         "parent": celpy.json_to_cel(trigger),
@@ -44,9 +55,15 @@ async def reconcile_function(
     if not is_ok(validation_outcome):
         return validation_outcome
 
+    resource_config = _load_resource_config(
+        resource_config=function.resource_config, inputs=base_inputs, location=location
+    )
+    if is_error(resource_config):
+        return resource_config
+
     # Create base resource
     managed_resource = _materialize_overlay(
-        template=function.template,
+        template=resource_config.base_template,
         materializer=function.materializers.base,
         inputs=base_inputs,
         location=location,
@@ -57,9 +74,9 @@ async def reconcile_function(
     resource = await _resource_crud(
         api=api,
         location=location,
-        behavior=function.behavior,
+        behavior=resource_config.behavior,
         managed_resource=managed_resource,
-        managed_resource_config=function.managed_resource,
+        managed_resource_config=resource_config.managed_resource,
         on_create=function.materializers.on_create,
         inputs=base_inputs,
     )
@@ -90,6 +107,45 @@ async def reconcile_function(
         msg = "Failure computing OK value."
         logging.exception(msg)
         return PermFail(msg, location=location)
+
+
+class _ResourceConfig(NamedTuple):
+    behavior: Behavior
+    managed_resource: ManagedResource
+    base_template: dict
+
+
+def _load_resource_config(
+    resource_config: StaticResource | DynamicResource | None,
+    inputs: dict[str, celtypes.Value],
+    location: str,
+):
+    match resource_config:
+        case StaticResource(behavior=behavior, managed_resource=managed_resource):
+            return _ResourceConfig(
+                behavior=behavior, managed_resource=managed_resource, base_template={}
+            )
+
+        case DynamicResource(key=key):
+            template_key = json.loads(json.dumps(key.evaluate(inputs)))
+            resource_template = get_resource_template(template_key=template_key)
+            if not resource_template:
+                return Retry(
+                    message=f'ResourceTemplate ("{template_key}") not found, will retry.',
+                    delay=60,
+                    location=location,
+                )
+
+            return _ResourceConfig(
+                behavior=resource_template.behavior,
+                managed_resource=resource_template.managed_resource,
+                base_template=resource_template.template,
+            )
+
+    return PermFail(
+        "Must specify either dynamicResource or staticResource config.",
+        location=location,
+    )
 
 
 def _run_checks(

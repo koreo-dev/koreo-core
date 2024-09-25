@@ -2,6 +2,8 @@ from typing import NamedTuple, Literal
 
 import celpy
 
+from koreo import result
+
 
 class Materializers(NamedTuple):
     base: celpy.Runner | None
@@ -27,12 +29,21 @@ class Behavior(NamedTuple):
     delete: Literal["destroy", "abandon"]
 
 
-class Function(NamedTuple):
+class StaticResource(NamedTuple):
     managed_resource: ManagedResource | None
     behavior: Behavior
+
+
+class DynamicResource(NamedTuple):
+    key: celpy.Runner
+
+
+class Function(NamedTuple):
+    resource_config: StaticResource | DynamicResource | None
 
     input_validators: celpy.Runner | None
 
     materializers: Materializers
     outcome: Outcome
-    template: dict | None
+
+    function_ready: result.Outcome

@@ -7,7 +7,7 @@ from koreo.cache import prepare_and_cache
 
 
 async def load_cache(
-    koreo_namespace: str,
+    namespace: str,
     api_version: str,
     plural_kind: str,
     kind_title: str,
@@ -24,7 +24,7 @@ async def load_cache(
         scalable=False,
         asyncio=True,
     )
-    resources = resource_class.list(namespace=koreo_namespace)
+    resources = resource_class.list(namespace=namespace)
 
     for resource in await resources:
         logging.debug(f"Caching {resource.name}.")
@@ -39,7 +39,7 @@ async def load_cache(
 
 
 async def maintain_cache(
-    koreo_namespace: str,
+    namespace: str,
     api_version: str,
     plural_kind: str,
     kind_title: str,
@@ -62,9 +62,7 @@ async def maintain_cache(
                 asyncio=True,
             )
 
-            watcher = kr8s_api.async_watch(
-                kind=resource_class, namespace=koreo_namespace
-            )
+            watcher = kr8s_api.async_watch(kind=resource_class, namespace=namespace)
 
             async for event, resource in watcher:
                 logging.debug(

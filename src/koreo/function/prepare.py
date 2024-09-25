@@ -1,14 +1,13 @@
-from typing import Any
 import logging
 
 import asyncio
 
+from koreo.result import Ok, PermFail
 from koreo.cache import reprepare_and_update_cache
 from koreo.cel.encoder import encode_cel, encode_cel_template
 from koreo.cel.functions import koreo_cel_functions, koreo_function_annotations
 from koreo.workflow.prepare import prepare_workflow
 from koreo.workflow.structure import Workflow
-
 
 from . import structure
 from .registry import get_function_workflows
@@ -32,10 +31,34 @@ async def prepare_function(cache_key: str, spec: dict) -> structure.Function:
     if not spec:
         spec = {}
 
-    managed_resource = _build_managed_resource(spec=spec.get("managedResource"))
-    behavior = _load_behavior(spec=spec.get("behavior"))
+    function_ready = Ok(None)
 
     env = celpy.Environment(annotations=koreo_function_annotations)
+
+    resource_config = None
+
+    static_resource_spec = spec.get("staticResource")
+    if static_resource_spec:
+        resource_config = _build_static_resource(static_resource_spec)
+
+    dynamic_resource_spec = spec.get("dynamicResource")
+    if dynamic_resource_spec:
+        resource_config = structure.DynamicResource(
+            key=env.program(
+                env.compile(encode_cel(dynamic_resource_spec.get("key"))),
+                functions=koreo_cel_functions,
+            )
+        )
+
+    if static_resource_spec and dynamic_resource_spec:
+        function_ready = PermFail(
+            f"Can not specify static and dynamic resource config for {cache_key}"
+        )
+
+    if not resource_config:
+        resource_config = structure.StaticResource(
+            managed_resource=None, behavior=_load_behavior(None)
+        )
 
     input_validators = _predicate_extractor(
         cel_env=env,
@@ -61,12 +84,18 @@ async def prepare_function(cache_key: str, spec: dict) -> structure.Function:
         workflow_task.add_done_callback(__tasks.discard)
 
     return structure.Function(
-        managed_resource=managed_resource,
-        behavior=behavior,
+        resource_config=resource_config,
         input_validators=input_validators,
         materializers=materializers,
         outcome=outcome,
-        template=spec.get("template"),
+        function_ready=function_ready,
+    )
+
+
+def _build_static_resource(spec: dict) -> structure.StaticResource:
+    return structure.StaticResource(
+        behavior=_load_behavior(spec.get("behavior")),
+        managed_resource=_build_managed_resource(spec.get("managedResource")),
     )
 
 

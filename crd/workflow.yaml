@@ -44,7 +44,7 @@ spec:
                       label:
                         type: string
                         nullable: false
-                        maxLength: 20
+                        maxLength: 40
                         x-kubernetes-validations:
                           - rule: self.matches("^[[:word:]]+$")
                             message: "step labels must be alphanumeric (underscore is ok)."
@@ -75,7 +75,7 @@ spec:
                           type:
                             type: string
                             nullable: false
-                            maxLength: 20
+                            maxLength: 40
                             x-kubernetes-validations:
                               - rule: self.matches("^[A-Z][a-zA-Z0-9]+$")
                                 message: "type must be CamelCase, and contain only alphanumeric chars"
@@ -89,7 +89,7 @@ spec:
                           step:
                             type: string
                             nullable: true
-                            maxLength: 20
+                            maxLength: 40
                             x-kubernetes-validations:
                               - rule: self.matches("^[[:word:]]+$")
                                 message: "step labels must be alphanumeric (underscore is ok)."

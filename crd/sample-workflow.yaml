@@ -113,7 +113,6 @@ spec:
         step: dummy_test
     state:
       dummyTestUID: =steps.dummy_test
-
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Workflow
@@ -138,3 +137,43 @@ spec:
         step: dummy_test
     state:
       uid: =steps.dummy_test
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Workflow
+metadata:
+  name: dynamic-test.v1
+  namespace: koreo-testing
+spec:
+  crdRef:
+    apiGroup: konfig.realkinetic.com
+    version: v1alpha8
+    kind: Domain
+  steps:
+    - label: dynamic_template
+      functionRef:
+        name: dynamic-resource-test.v1
+    - label: dynamic_template_dynamic_key_a
+      functionRef:
+        name: dynamic-key-dynamic-resource-test.v1
+      inputs:
+        template_name: template-a.v1
+    - label: dynamic_template_dynamic_key_b
+      functionRef:
+        name: dynamic-key-dynamic-resource-test.v1
+      inputs:
+        template_name: template-b.v1
+  status:
+    conditions:
+      - type: DyanmicTemplate
+        name: Simple Dynamic Template
+        step: dynamic_template
+      - type: DyanmicKeyResourceTemplateA
+        name: Dynamic Key Dynamic Template
+        step: dynamic_template_dynamic_key_a
+      - type: DyanmicKeyResourceTemplateB
+        name: Dynamic Key Dynamic Template
+        step: dynamic_template_dynamic_key_b
+    state:
+      dynamic_template: =steps.dynamic_template
+      dynamic_key_a: =steps.dynamic_template_dynamic_key_a
+      dynamic_key_b: =steps.dynamic_template_dynamic_key_b

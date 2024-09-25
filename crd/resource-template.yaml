@@ -1,0 +1,78 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: resourcetemplates.koreo.realkinetic.com
+spec:
+  scope: Namespaced
+  group: koreo.realkinetic.com
+  names:
+    kind: ResourceTemplate
+    plural: resourcetemplates
+    singular: resourcetemplate
+  versions:
+    - name: v1alpha8
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                templateName:
+                  type: string
+                  nullable: false
+                  maxLength: 30
+                  x-kubernetes-validations:
+                    - rule: self.matches("^[a-zA-Z0-9-_.]+$")
+                      message: "template names must be alphanumeric (underscore, hyphen, and periods are ok)."
+                behavior:
+                  type: object
+                  nullable: false
+                  properties:
+                    load:
+                      type: string
+                      enum: [name, query, virtual]
+                      default: name
+                      nullable: false
+                    create:
+                      type: boolean
+                      default: true
+                      nullable: false
+                    update:
+                      type: string
+                      enum: [patch, recreate, never]
+                      default: patch
+                      nullable: false
+                    delete:
+                      type: string
+                      enum: [destroy, abandon]
+                      default: destroy
+                      nullable: false
+                managedResource:
+                  type: object
+                  nullable: true
+                  properties:
+                    apiVersion:
+                      type: string
+                      nullable: false
+                    kind:
+                      type: string
+                      nullable: false
+                    plural:
+                      type: string
+                      nullable: true
+                    namespaced:
+                      type: boolean
+                      default: true
+                      nullable: false
+                template:
+                  type: object
+                  nullable: false
+                  x-kubernetes-embedded-resource: true
+                  x-kubernetes-preserve-unknown-fields: true
+              required: [templateName, managedResource, template]
+            status:
+              x-kubernetes-preserve-unknown-fields: true
+              type: object

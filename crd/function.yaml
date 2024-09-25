@@ -20,53 +20,60 @@ spec:
             spec:
               type: object
               properties:
-                behavior:
-                  type: object
-                  nullable: false
-                  properties:
-                    load:
-                      type: string
-                      enum: [name, query, virtual]
-                      default: name
-                      nullable: false
-
-                    create:
-                      type: boolean
-                      default: true
-                      nullable: false
-
-                    update:
-                      type: string
-                      enum: [patch, recreate, never]
-                      default: patch
-                      nullable: false
-
-                    delete:
-                      type: string
-                      enum: [destroy, abandon]
-                      default: destroy
-                      nullable: false
-                managedResource:
-                  type: object
+                staticResource:
                   nullable: true
+                  type: object
                   properties:
-                    apiVersion:
-                      type: string
+                    behavior:
+                      type: object
                       nullable: false
-                    kind:
-                      type: string
-                      nullable: false
-                    plural:
-                      type: string
-                      nullable: true
-                    namespaced:
-                      type: boolean
-                      default: true
-                      nullable: false
+                      properties:
+                        load:
+                          type: string
+                          enum: [name, query, virtual]
+                          default: name
+                          nullable: false
+
+                        create:
+                          type: boolean
+                          default: true
+                          nullable: false
+
+                        update:
+                          type: string
+                          enum: [patch, recreate, never]
+                          default: patch
+                          nullable: false
+
+                        delete:
                           type: string
                           enum: [destroy, abandon]
                           default: destroy
                           nullable: false
+                    managedResource:
+                      type: object
+                      nullable: true
+                      properties:
+                        apiVersion:
+                          type: string
+                          nullable: false
+                        kind:
+                          type: string
+                          nullable: false
+                        plural:
+                          type: string
+                          nullable: true
+                        namespaced:
+                          type: boolean
+                          default: true
+                          nullable: false
+                dynamicResource:
+                  nullable: true
+                  type: object
+                  properties:
+                    key:
+                      type: string
+                      nullable: false
                 inputValidators:
                   nullable: true
                   type: array
@@ -147,7 +154,11 @@ spec:
                       nullable: true
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
-
+              oneOf:
+                - properties:
+                  required: [dynamicResource]
+                - properties:
+                  required: [staticResource]
             status:
               x-kubernetes-preserve-unknown-fields: true
               type: object

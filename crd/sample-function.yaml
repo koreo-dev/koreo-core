@@ -198,15 +198,14 @@ metadata:
   name: dummy-test.v1
   namespace: koreo-testing
 spec:
-  managedResource:
-    apiVersion: koreo.realkinetic.com/v1alpha8
-    kind: TestDummy
-    plural: testdummies
-    namespaced: true
-
-  behavior:
-    update: recreate
-
+  staticResource:
+    managedResource:
+      apiVersion: koreo.realkinetic.com/v1alpha8
+      kind: TestDummy
+      plural: testdummies
+      namespaced: true
+    behavior:
+      update: recreate
   materializers:
     base:
       apiVersion: koreo.realkinetic.com/v1alpha8
@@ -234,24 +233,49 @@ spec:
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
 metadata:
+  name: dynamic-resource-test.v1
+  namespace: koreo-testing
+spec:
+  dynamicResource:
+    #key: =inputs.resource.spec.kind.lowerAscii() + "." + inputs.resource.spec.apiVersion + "." + inputs.resource.metadata.annotations["konfig.realkinetic.com/template"]
+    key: testdummy.koreo.realkinetic.com/v1alpha8.simple-test.v1
+  outcome:
+    okValue: =resource.metadata.uid
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Function
+metadata:
+  name: dynamic-key-dynamic-resource-test.v1
+  namespace: koreo-testing
+spec:
+  dynamicResource:
+    key: ="testdummy.koreo.realkinetic.com/v1alpha8." + inputs.template_name
+  materializers:
+    base:
+      metadata:
+        name: =parent.metadata.name + "-" + inputs.template_name
+  outcome:
+    okValue: =resource.metadata.uid
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Function
+metadata:
   name: domain-config.v1
   namespace: koreo-testing
 spec:
-  behavior:
-    load: virtual
-    create: false
-    update: never
-    delete: abandon
-
+  staticResource:
+    behavior:
+      load: virtual
+      create: false
+      update: never
+      delete: abandon
   inputValidators:
     - type: PermFail
       message: Domain resource-name must start with a letter.
       test: =parent.metadata.name.matches("^[0-9][a-zA-Z]+")
-
     - type: PermFail
       message: Domain resource must have platform label.
       test: '=!has(parent.metadata.labels["konfig.realkinetic.com/platform"])'
-
   outcome:
     okValue: |
       ={
@@ -267,12 +291,12 @@ metadata:
   name: domain-subresource-metadata.v1
   namespace: koreo-testing
 spec:
-  behavior:
-    load: virtual
-    create: false
-    update: never
-    delete: abandon
-
+  staticResource:
+    behavior:
+      load: virtual
+      create: false
+      update: never
+      delete: abandon
   outcome:
     okValue: |
       ={
@@ -294,17 +318,16 @@ metadata:
   name: domain-subresource-value.v1
   namespace: koreo-testing
 spec:
-  behavior:
-    load: virtual
-    create: false
-    update: never
-    delete: abandon
-
+  staticResource:
+    behavior:
+      load: virtual
+      create: false
+      update: never
+      delete: abandon
   inputValidators:
     - type: PermFail
       message: testing skip encoding
       test: "=!has(inputs.metadata.name)"
-
   outcome:
     okValue: |
       ={

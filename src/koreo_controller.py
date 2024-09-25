@@ -15,20 +15,31 @@ from koreo.function.prepare import prepare_function
 from koreo.function.structure import Function
 from koreo.workflow.prepare import prepare_workflow
 from koreo.workflow.structure import Workflow
+from koreo.resource_template.prepare import prepare_resource_template
+from koreo.resource_template.structure import ResourceTemplate
 
 
 GROUP = "koreo.realkinetic.com"
 VERSION = "v1alpha8"
 API_VERSION = f"{GROUP}/{VERSION}"
 
-KOREO_RESOURCES = [
-    ("functions", "Function", Function, prepare_function),
-    ("workflows", "Workflow", Workflow, prepare_workflow),
-]
-
 KOREO_NAMESPACE = os.environ.get("KOREO_NAMESPACE", "koreo-testing")
 
+TEMPLATE_NAMESPACE = os.environ.get("TEMPLATE_NAMESPACE", "koreo-testing")
+
 RESOURCE_NAMESPACE = os.environ.get("RESOURCE_NAMESPACE", "koreo-testing")
+
+KOREO_RESOURCES = [
+    (
+        TEMPLATE_NAMESPACE,
+        "resourcetemplates",
+        "ResourceTemplate",
+        ResourceTemplate,
+        prepare_resource_template,
+    ),
+    (KOREO_NAMESPACE, "functions", "Function", Function, prepare_function),
+    (KOREO_NAMESPACE, "workflows", "Workflow", Workflow, prepare_workflow),
+]
 
 
 def start_custom_workflow_controller():
@@ -45,11 +56,11 @@ def main():
     # First load the Functions, then Workflows to ensure they're cached.
     # Then maintain the Function and Workflow caches in the background.
 
-    for plural_kind, kind_title, resource_class, preparer in KOREO_RESOURCES:
+    for namespace, plural_kind, kind_title, resource_class, preparer in KOREO_RESOURCES:
         # Block until completion.
         load_task = loop.create_task(
             koreo_cache.load_cache(
-                koreo_namespace=KOREO_NAMESPACE,
+                namespace=namespace,
                 api_version=API_VERSION,
                 plural_kind=plural_kind,
                 kind_title=kind_title,
@@ -65,7 +76,7 @@ def main():
         # Spawn in backgound
         maintain_task = loop.create_task(
             koreo_cache.maintain_cache(
-                koreo_namespace=KOREO_NAMESPACE,
+                namespace=namespace,
                 api_version=API_VERSION,
                 plural_kind=plural_kind,
                 kind_title=kind_title,
