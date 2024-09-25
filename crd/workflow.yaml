@@ -46,7 +46,7 @@ spec:
                         nullable: false
                         maxLength: 20
                         x-kubernetes-validations:
-                          - rule: self.matches("^[[:word:]-]+$")
+                          - rule: self.matches("^[[:word:]]+$")
                             message: "step labels must be alphanumeric (underscore is ok)."
                       functionRef:
                         type: object
@@ -91,7 +91,7 @@ spec:
                             nullable: true
                             maxLength: 20
                             x-kubernetes-validations:
-                              - rule: self.matches("^[[:word:]-]+$")
+                              - rule: self.matches("^[[:word:]]+$")
                                 message: "step labels must be alphanumeric (underscore is ok)."
                         required: [type, name, step]
                     state:

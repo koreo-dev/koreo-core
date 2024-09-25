@@ -66,17 +66,49 @@ async def reconcile_workflow(
         for condition_spec in workflow.status.conditions
     ]
 
-    # TDOO: If no completion specified, just do a simple encoding?
-    overall_result = {
-        step: _outcome_encoder(outcome) for step, outcome in outcomes.items()
-    }
-
     overall_outcome = result.combine(
-        [outcome for outcome in overall_result.values() if result.is_error(outcome)]
+        [outcome for outcome in outcomes.values() if result.is_error(outcome)]
     )
 
     if result.is_error(overall_outcome):
         return (overall_outcome, conditions)
+
+    if not workflow.status.state:
+        return (
+            {step: _outcome_encoder(outcome) for step, outcome in outcomes.items()},
+            conditions,
+        )
+
+    ok_outcomes = {
+        step: outcome.data
+        for step, outcome in outcomes.items()
+        if result.is_ok(outcome)
+    }
+    try:
+        state = workflow.status.state.evaluate(
+            {
+                "trigger": celpy.json_to_cel(trigger),
+                "steps": celpy.json_to_cel(ok_outcomes),
+            }
+        )
+    except Exception as err:
+        return (
+            result.PermFail(
+                f"Error evaluating Workflow ({workflow_key}) state ({err})"
+            ),
+            conditions,
+        )
+
+    try:
+        overall_result = json.loads(json.dumps(state))
+    except Exception as err:
+        return (
+            result.PermFail(
+                f"Error encoding Workflow ({workflow_key}) state ({state})"
+                f" with error {err}"
+            ),
+            conditions,
+        )
 
     return (overall_result, conditions)
 

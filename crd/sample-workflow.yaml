@@ -103,14 +103,17 @@ spec:
     kind: Domain
 
   steps:
-    - label: dummy-test
+    - label: dummy_test
       functionRef:
         name: dummy-test.v1
   status:
     conditions:
       - type: Test
         name: this is fun
-        step: dummy-test
+        step: dummy_test
+    state:
+      dummyTestUID: =steps.dummy_test
+
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Workflow
@@ -124,7 +127,7 @@ spec:
     kind: Domain
 
   steps:
-    - label: dummy-test
+    - label: dummy_test
       functionRef:
         name: dummy-test.v1
 
@@ -132,4 +135,6 @@ spec:
     conditions:
       - type: Test
         name: this is fun
-        step: dummy-test
+        step: dummy_test
+    state:
+      uid: =steps.dummy_test
