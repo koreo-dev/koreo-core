@@ -23,10 +23,6 @@ spec:
                 templateName:
                   type: string
                   nullable: false
-                  maxLength: 30
-                  x-kubernetes-validations:
-                    - rule: self.matches("^[a-zA-Z0-9-_.]+$")
-                      message: "template names must be alphanumeric (underscore, hyphen, and periods are ok)."
                 behavior:
                   type: object
                   nullable: false
