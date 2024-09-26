@@ -9,7 +9,7 @@ metadata:
   name: simple-template.v1
   namespace: koreo-testing
 spec:
-  templateName: simple-test.v1
+  templateName: =managedResource.kind + "." + managedResource.apiVersion + ".simple-test.v1"
   managedResource:
     apiVersion: koreo.realkinetic.com/v1alpha8
     kind: TestDummy
@@ -41,7 +41,7 @@ metadata:
   name: template-a.v1
   namespace: koreo-testing
 spec:
-  templateName: template-a.v1
+  templateName: =managedResource.kind + "." + managedResource.apiVersion + ".template-a.v1"
   managedResource:
     apiVersion: koreo.realkinetic.com/v1alpha8
     kind: TestDummy
@@ -57,6 +57,7 @@ spec:
         testing.realkinetic.com/a-label: some-forced-label
     spec:
       value: I am template A
+      intvalue: 99
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: ResourceTemplate
@@ -64,7 +65,7 @@ metadata:
   name: template-b.v1
   namespace: koreo-testing
 spec:
-  templateName: template-b.v1
+  templateName: =managedResource.kind + "." + managedResource.apiVersion + ".template-b.v1"
   managedResource:
     apiVersion: koreo.realkinetic.com/v1alpha8
     kind: TestDummy
@@ -80,3 +81,4 @@ spec:
         testing.realkinetic.com/a-label: some-forced-label
     spec:
       someting: I am template B
+      different: This is a test
