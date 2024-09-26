@@ -217,6 +217,10 @@ def _materialize_overlay(
         logging.exception(f"Encountered CELEvalError {computed}. ({location})")
 
         raise
+    except TypeError:
+        logging.exception(f"Encountered CELEvalError {computed}. ({location})")
+
+        raise
 
     if overlay:
         for field_path, value in overlay.items():

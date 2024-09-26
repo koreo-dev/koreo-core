@@ -56,6 +56,16 @@ spec:
                             type: string
                             nullable: false
                         required: [name]
+                      mappedInput:
+                        type: object
+                        nullable: true
+                        properties:
+                          source:
+                            type: string
+                            nullable: false
+                          inputKey:
+                            type: string
+                            nullable: false
                       inputs:
                         type: object
                         x-kubernetes-preserve-unknown-fields: true

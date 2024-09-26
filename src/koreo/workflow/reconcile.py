@@ -1,5 +1,6 @@
 from typing import Any
 import asyncio
+import copy
 import json
 
 import celpy
@@ -179,12 +180,82 @@ async def _reconcile_step(
             json.dumps(step.inputs.evaluate({"steps": celpy.json_to_cel(ok_outcomes)}))
         )
 
-    return await reconcile_function(
-        api=api,
-        location=location,
-        function=step.function,
-        trigger=trigger,
-        inputs=inputs,
+    if step.mapped_input:
+        return await _reconcile_mapped_function(
+            api=api,
+            location=location,
+            step=step,
+            steps=ok_outcomes,
+            trigger=trigger,
+            inputs=inputs,
+        )
+    else:
+        return await reconcile_function(
+            api=api,
+            location=location,
+            function=step.function,
+            trigger=trigger,
+            inputs=inputs,
+        )
+
+
+async def _reconcile_mapped_function(
+    api: kr8s.Api,
+    step: structure.FunctionRef,
+    location: str,
+    steps,
+    inputs: dict,
+    trigger: dict,
+):
+    assert step.mapped_input
+
+    source_iterator = json.loads(
+        json.dumps(
+            step.mapped_input.source_iterator.evaluate(
+                {"steps": celpy.json_to_cel(steps)}
+            )
+        )
+    )
+
+    tasks: list[asyncio.Task[result.Outcome]] = []
+
+    async with asyncio.TaskGroup() as task_group:
+        for idx, map_value in enumerate(source_iterator):
+            iterated_inputs = copy.deepcopy(inputs)
+            iterated_inputs.update({step.mapped_input.input_key: map_value})
+            tasks.append(
+                task_group.create_task(
+                    reconcile_function(
+                        api=api,
+                        location=f"{location}[{idx}]",
+                        function=step.function,
+                        trigger=trigger,
+                        inputs=iterated_inputs,
+                    ),
+                    name=f"{step.label}-{idx}",
+                )
+            )
+
+    done, pending = await asyncio.wait(tasks)
+    if pending:
+        timed_out_tasks = ", ".join(task.get_name() for task in pending)
+        return result.Retry(
+            message=f"Timeout running Workflow Mapped Step ({timed_out_tasks}), will retry.",
+            delay=15,
+            location=location,
+        )
+
+    outcomes = [task.result() for task in done]
+
+    overall_outcome = result.combine(
+        [outcome for outcome in outcomes if result.is_error(outcome)]
+    )
+
+    if result.is_error(overall_outcome):
+        return overall_outcome
+
+    return result.Ok(
+        [_outcome_encoder(outcome) for outcome in outcomes], location=location
     )
 
 

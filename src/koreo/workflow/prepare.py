@@ -91,34 +91,58 @@ def _load_functions(
             )
             continue
 
+        dynamic_input_keys = set()
+
+        mapped_input_spec = step.get("mappedInput")
+        if not mapped_input_spec:
+            mapped_input = None
+        else:
+            source_iterator = mapped_input_spec.get("source")
+            encoded_source_iterator = encode_cel(source_iterator)
+
+            source_iterator_expression = cel_env.compile(encoded_source_iterator)
+            used_vars = extract_argument_structure(source_iterator_expression)
+
+            dynamic_input_keys.update(
+                INPUT_NAME_PATTERN.match(key).group(1)
+                for key in used_vars
+                if key.startswith("steps.")
+            )
+
+            mapped_input = structure.MappedInput(
+                source_iterator=cel_env.program(
+                    source_iterator_expression, functions=koreo_cel_functions
+                ),
+                input_key=mapped_input_spec.get("inputKey"),
+            )
+
         input_mapper_spec = step.get("inputs")
         if not input_mapper_spec:
             input_mapper = None
-            dynamic_input_keys = []
         else:
             encoded_input_extractor = encode_cel(input_mapper_spec)
 
             input_mapper_expression = cel_env.compile(encoded_input_extractor)
             used_vars = extract_argument_structure(input_mapper_expression)
 
-            dynamic_input_keys = [
+            dynamic_input_keys.update(
                 INPUT_NAME_PATTERN.match(key).group(1)
                 for key in used_vars
                 if key.startswith("steps.")
-            ]
-
-            out_of_order_steps = set(dynamic_input_keys).difference(known_steps)
-            if out_of_order_steps:
-                outcomes.append(
-                    PermFail(
-                        message=f"Function ({function_cache_key}), must come after {', '.join(out_of_order_steps)}.",
-                    )
-                )
-                continue
+            )
 
             input_mapper = cel_env.program(
                 input_mapper_expression, functions=koreo_cel_functions
             )
+
+        out_of_order_steps = dynamic_input_keys.difference(known_steps)
+        if out_of_order_steps:
+            outcomes.append(
+                PermFail(
+                    message=f"Function ({function_cache_key}), must come after {', '.join(out_of_order_steps)}.",
+                )
+            )
+            continue
 
         step_label = step.get("label")
         known_steps.add(step_label)
@@ -128,8 +152,9 @@ def _load_functions(
             structure.FunctionRef(
                 label=step_label,
                 function=function,
+                mapped_input=mapped_input,
                 inputs=input_mapper,
-                dynamic_input_keys=dynamic_input_keys,
+                dynamic_input_keys=list(dynamic_input_keys),
             )
         )
 

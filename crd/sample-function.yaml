@@ -333,3 +333,49 @@ spec:
         "metadata-name": inputs.metadata.name,
         "config-human-name": inputs.config.domain_human_name
       }
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Function
+metadata:
+  name: mapped-input-source.v1
+  namespace: koreo-testing
+spec:
+  staticResource:
+    behavior:
+      load: virtual
+      create: false
+      update: never
+      delete: abandon
+  outcome:
+    okValue: =["a", "b", "c", "d", "e"]
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Function
+metadata:
+  name: mapped-input-resource.v1
+  namespace: koreo-testing
+spec:
+  staticResource:
+    managedResource:
+      apiVersion: koreo.realkinetic.com/v1alpha8
+      kind: TestDummy
+      plural: testdummies
+      namespaced: true
+    behavior:
+      update: recreate
+  materializers:
+    base:
+      apiVersion: koreo.realkinetic.com/v1alpha8
+      kind: TestDummy
+      metadata:
+        name: ="mapped-dummy-" + string(inputs.key)
+        namespace: koreo-testing
+      spec:
+        fixedInput: =inputs.static_value
+        mappedPosition: =inputs.key
+        hardCoded:
+          string: Demo time
+          number: 42
+
+  outcome:
+    okValue: =resource.metadata.uid

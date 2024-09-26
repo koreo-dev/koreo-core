@@ -141,6 +141,43 @@ spec:
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Workflow
 metadata:
+  name: mapped-input-test.v1
+  namespace: koreo-testing
+spec:
+  crdRef:
+    apiGroup: konfig.realkinetic.com
+    version: v1alpha8
+    kind: Domain
+
+  steps:
+    - label: source
+      functionRef:
+        name: mapped-input-source.v1
+
+    - label: multi_out
+      functionRef:
+        name: mapped-input-resource.v1
+      mappedInput:
+        source: =steps.source
+        inputKey: key
+      inputs:
+        static_value: "This will not change"
+
+  status:
+    conditions:
+      - type: SourceValues
+        name: Source Step
+        step: source
+      - type: Resources
+        name: Resrouces
+        step: multi_out
+    state:
+      source: =steps.source
+      resources: =steps.multi_out
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Workflow
+metadata:
   name: dynamic-test.v1
   namespace: koreo-testing
 spec:

@@ -20,10 +20,7 @@ async def login_fn(logger, *_, **__):
 
     await kr8s_api.auth.reauthenticate()
 
-    logger.info(
-        "*****LOGIN LOGIN LOGIN Party down like a clown  LOGIN LOGIN LOGIN*****"
-    )
-    print("*****LOGIN LOGIN LOGIN Party down like a clown LOGIN LOGIN LOGIN*****")
+    logger.info("Reauthenticating kopf.")
 
     return kopf.ConnectionInfo(
         server=kr8s_api.auth.server,

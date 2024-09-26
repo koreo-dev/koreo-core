@@ -12,10 +12,16 @@ class ConfigCRDRef(NamedTuple):
     kind: str
 
 
+class MappedInput(NamedTuple):
+    source_iterator: celpy.Runner
+    input_key: str
+
+
 class FunctionRef(NamedTuple):
     label: str
     function: Function
 
+    mapped_input: MappedInput | None
     inputs: celpy.Runner | None
     dynamic_input_keys: list[str]
 
