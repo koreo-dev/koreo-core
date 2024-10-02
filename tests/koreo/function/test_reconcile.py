@@ -3,7 +3,83 @@ import random
 import string
 import unittest
 
+import json
+import celpy
+
+from koreo.cel.encoder import encode_cel, encode_cel_template
+
+from koreo.result import Ok
+
+from koreo.function import structure as function_structure
 from koreo.function import reconcile
+
+
+class TestReconcileFunction(unittest.IsolatedAsyncioTestCase):
+    async def test_reconcile(self):
+        cel_env = celpy.Environment()
+
+        inputs = cel_env.program(cel_env.compile(encode_cel({"value": 7}))).evaluate({})
+
+        input_validators = cel_env.program(
+            cel_env.compile(
+                f"{encode_cel([{'type': 'Skip', 'message': 'Bad input', 'test': '=!has(inputs.value)'}])}.filter(predicate, predicate.test)"
+            )
+        )
+
+        source_ok_value = cel_env.program(
+            cel_env.compile(
+                encode_cel(
+                    json.loads(
+                        json.dumps(
+                            {
+                                "resources": [
+                                    # {"bool": True},
+                                    # {"bool": False},
+                                    {"int": 18},
+                                    {"float": 1.2},
+                                    {"str": "some string"},
+                                ]
+                            }
+                        )
+                    )
+                )
+            )
+        )
+
+        function = function_structure.Function(
+            resource_config=function_structure.StaticResource(
+                behavior=function_structure.Behavior(
+                    load="virtual",
+                    create=False,
+                    update="never",
+                    delete="abandon",
+                ),
+                managed_resource=None,
+            ),
+            input_validators=input_validators,
+            function_ready=Ok(None),
+            outcome=function_structure.Outcome(tests=None, ok_value=source_ok_value),
+            materializers=function_structure.Materializers(base=None, on_create=None),
+        )
+
+        result = await reconcile.reconcile_function(
+            api=None, location="unittest", function=function, trigger={}, inputs=inputs
+        )
+
+        self.assertEqual(
+            json.dumps(
+                {
+                    "resources": [
+                        # {"bool": True},
+                        # {"bool": False},
+                        {"int": 18},
+                        {"float": 1.2},
+                        {"str": "some string"},
+                    ]
+                }
+            ),
+            json.dumps(celpy.CELJSONEncoder.to_python(result.data)),
+        )
 
 
 class TestValidateMatch(unittest.TestCase):

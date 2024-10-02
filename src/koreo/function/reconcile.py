@@ -3,7 +3,6 @@ from typing import Any, NamedTuple
 import logging
 
 import copy
-import json
 
 import kr8s
 import jsonpath_ng
@@ -38,15 +37,15 @@ async def reconcile_function(
     api: kr8s.Api,
     location: str,
     function: Function,
-    trigger: dict,
-    inputs: dict,
+    trigger: celtypes.Value,
+    inputs: celtypes.Value,
 ):
     if not is_ok(function.function_ready):
         return function.function_ready
 
     base_inputs = {
-        "inputs": celpy.json_to_cel(inputs),
-        "parent": celpy.json_to_cel(trigger),
+        "inputs": inputs,
+        "parent": trigger,
     }
 
     validation_outcome = _run_checks(
@@ -83,12 +82,12 @@ async def reconcile_function(
     if is_error(resource):
         return resource
 
-    inputs = base_inputs | {
+    full_inputs = base_inputs | {
         "resource": celpy.json_to_cel(resource) if resource else None
     }
 
     outcome_tests_outcome = _run_checks(
-        checks=function.outcome.tests, inputs=inputs, location=location
+        checks=function.outcome.tests, inputs=full_inputs, location=location
     )
     if not is_ok(outcome_tests_outcome):
         return outcome_tests_outcome
@@ -97,8 +96,8 @@ async def reconcile_function(
         return Ok(None)
 
     try:
-        ok_value = function.outcome.ok_value.evaluate(inputs)
-        return Ok(json.loads(json.dumps(ok_value)), location=location)
+        ok_value = function.outcome.ok_value.evaluate(full_inputs)
+        return Ok(ok_value, location=location)
     except celpy.CELEvalError as err:
         msg = f"CEL Eval Error computing OK value. {err.tree}"
         logging.exception(msg)
@@ -127,7 +126,7 @@ def _load_resource_config(
             )
 
         case DynamicResource(key=key):
-            template_key = json.loads(json.dumps(key.evaluate(inputs)))
+            template_key = key.evaluate(inputs)
             resource_template = get_resource_template(template_key=template_key)
             if not resource_template:
                 return Retry(
@@ -154,8 +153,7 @@ def _run_checks(
     if not checks:
         return Ok(None, location=location)
 
-    check_results = json.loads(json.dumps(checks.evaluate(inputs)))
-    return _predicate_to_koreo_result(check_results, location=location)
+    return _predicate_to_koreo_result(checks.evaluate(inputs), location=location)
 
 
 def _predicate_to_koreo_result(results: list, location: str) -> Outcome:
@@ -206,19 +204,18 @@ def _materialize_overlay(
         return managed_resource
 
     try:
-        computed = materializer.evaluate(
+        overlay = materializer.evaluate(
             inputs
             | {
                 "template": celpy.json_to_cel(managed_resource),
             }
         )
-        overlay = json.loads(json.dumps(computed))
     except celpy.CELEvalError:
-        logging.exception(f"Encountered CELEvalError {computed}. ({location})")
+        logging.exception(f"Encountered CELEvalError {overlay}. ({location})")
 
         raise
     except TypeError:
-        logging.exception(f"Encountered CELEvalError {computed}. ({location})")
+        logging.exception(f"Encountered CELEvalError {overlay}. ({location})")
 
         raise
 
