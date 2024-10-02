@@ -1,10 +1,11 @@
 from typing import Any
 import asyncio
 import copy
-import json
+
+import kr8s
 
 import celpy
-import kr8s
+from celpy.celtypes import Value
 
 from resources.k8s.conditions import Condition
 
@@ -20,7 +21,7 @@ async def reconcile_workflow(
     workflow_key: str,
     trigger: dict,
     workflow: structure.Workflow,
-) -> tuple[result.Outcome, list[Condition]]:
+) -> tuple[result.Outcome[Value], list[Condition]]:
     if not result.is_ok(workflow.steps_ready):
         return (workflow.steps_ready, [])
 
@@ -100,18 +101,7 @@ async def reconcile_workflow(
             conditions,
         )
 
-    try:
-        overall_result = json.loads(json.dumps(state))
-    except Exception as err:
-        return (
-            result.PermFail(
-                f"Error encoding Workflow ({workflow_key}) state ({state})"
-                f" with error {err}"
-            ),
-            conditions,
-        )
-
-    return (overall_result, conditions)
+    return (state, conditions)
 
 
 def _outcome_encoder(outcome: result.Outcome) -> Any:
@@ -137,7 +127,7 @@ async def _reconcile_step(
 
     if not dependencies:
         if step.inputs:
-            inputs = json.loads(json.dumps(step.inputs.evaluate({})))
+            inputs = step.inputs.evaluate({})
         else:
             inputs = {}
 
@@ -176,9 +166,7 @@ async def _reconcile_step(
     if not step.inputs:
         inputs = {}
     else:
-        inputs = json.loads(
-            json.dumps(step.inputs.evaluate({"steps": celpy.json_to_cel(ok_outcomes)}))
-        )
+        inputs = step.inputs.evaluate({"steps": celpy.json_to_cel(ok_outcomes)})
 
     if step.mapped_input:
         return await _reconcile_mapped_function(
@@ -209,12 +197,8 @@ async def _reconcile_mapped_function(
 ):
     assert step.mapped_input
 
-    source_iterator = json.loads(
-        json.dumps(
-            step.mapped_input.source_iterator.evaluate(
-                {"steps": celpy.json_to_cel(steps)}
-            )
-        )
+    source_iterator = step.mapped_input.source_iterator.evaluate(
+        {"steps": celpy.json_to_cel(steps)}
     )
 
     tasks: list[asyncio.Task[result.Outcome]] = []
