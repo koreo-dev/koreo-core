@@ -7,8 +7,12 @@ LABEL_NAMESPACE = "koreo.realkinetic.com"
 ACTIVE_LABEL = f"{LABEL_NAMESPACE}/active"
 
 
-def get_resource_from_cache[T](resource_type: type[T], cache_key: str) -> T | None:
-    cached = __CACHE[resource_type.__name__].get(cache_key)
+def get_resource_from_cache[T](resource_class: type[T], cache_key: str) -> T | None:
+    resource_class_name = resource_class.__name__
+    if not __CACHE.get(resource_class_name):
+        __CACHE[resource_class_name] = {}
+
+    cached = __CACHE[resource_class.__name__].get(cache_key)
 
     if cached:
         return cached.resource
@@ -104,7 +108,7 @@ def _extract_meta(metadata: dict) -> __ResourceMetadata:
     resource_version = metadata.get("resourceVersion")
 
     if not (resource_name and resource_version):
-        raise Exception("Bad Resource: resource name and version are required.")
+        raise TypeError("Bad Resource: resource name and version are required.")
 
     labels = metadata.get("labels", {})
 
@@ -118,3 +122,9 @@ def _extract_meta(metadata: dict) -> __ResourceMetadata:
         resource_version=resource_version,
         active=label_active,
     )
+
+
+def _reset_cache():
+    """This is for unit testing."""
+    global __CACHE
+    __CACHE = {}
