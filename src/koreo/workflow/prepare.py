@@ -79,7 +79,7 @@ def _load_functions(
         function_ref = step.get("functionRef", {})
         function_cache_key = function_ref.get("name")
         function = get_resource_from_cache(
-            resource_type=Function,
+            resource_class=Function,
             cache_key=function_cache_key,
         )
         if not function:

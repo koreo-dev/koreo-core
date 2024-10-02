@@ -16,4 +16,4 @@ def get_resource_template(template_key: str) -> ResourceTemplate | None:
     if not cache_key:
         return None
 
-    return get_resource_from_cache(resource_type=ResourceTemplate, cache_key=cache_key)
+    return get_resource_from_cache(resource_class=ResourceTemplate, cache_key=cache_key)

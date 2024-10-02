@@ -17,6 +17,7 @@ def extract_argument_structure(compiled: Tree) -> list[str]:
 
 def _process_member_dot(tree: Tree):
     if len(tree.children) != 2:
+        # TODO: Not sure this is possible?
         raise Exception(f"UNKNOWN MEMBER_DOT LENGTH! {len(tree.children)}: {tree}")
 
     # print(f"{len(tree.children)}: {tree.children[0]}")
@@ -34,11 +35,13 @@ def _process_member_dot(tree: Tree):
     if root.data == "primary":
         return f"{_process_primary(root)}.{terminal}"
 
+    # TODO: Is this possible?
     raise Exception(f"UNKNOWN MEMBER_DOT ROOT TYPE! {root}")
 
 
 def _process_member_index(tree: Tree):
     if len(tree.children) != 2:
+        # TODO: Not sure this is possible?
         raise Exception(f"UNKNOWN MEMBER_INDEX LENGTH! {len(tree.children)}: {tree}")
 
     # print(f"{len(tree.children)}: {tree.children[0]}")
@@ -49,7 +52,6 @@ def _process_member_index(tree: Tree):
         terminal_value: str = _process_primary(terminal)
 
     elif terminal.data == "expr":
-
         terminal_value = None
         while terminal and terminal.children:
             if terminal.data == "primary":

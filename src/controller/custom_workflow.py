@@ -81,7 +81,7 @@ def start_controller(group: str, kind: str, version: str):
         outcomes = {}
         for workflow_key in workflow_keys:
             workflow = get_resource_from_cache(
-                resource_type=Workflow, cache_key=workflow_key
+                resource_class=Workflow, cache_key=workflow_key
             )
             if not workflow:
                 logging.error("Missing Workflow!")
