@@ -11,6 +11,8 @@ class ResourceTemplate(NamedTuple):
     managed_resource: ManagedResource
     behavior: Behavior
 
+    context: dict
+
     template: dict
 
     valid: Outcome

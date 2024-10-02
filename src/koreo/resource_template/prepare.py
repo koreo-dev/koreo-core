@@ -1,10 +1,10 @@
 import logging
 
 import celpy
-import json
 
 from koreo.result import Ok, PermFail
 from koreo.cel.encoder import encode_cel
+from koreo.cel.functions import koreo_cel_functions, koreo_function_annotations
 
 from . import structure
 from .registry import index_resource_template
@@ -24,6 +24,7 @@ async def prepare_resource_template(
     managed_resource = _build_managed_resource(spec=managed_resource_spec)
     behavior = _load_behavior(spec=spec.get("behavior"))
 
+    context = spec.get("context", {})
     template = spec.get("template", {})
 
     # Validity Tests.
@@ -42,16 +43,17 @@ async def prepare_resource_template(
             f"Template resource spec must match managedResource configuration for {cache_key}."
         )
 
-    cel_env = celpy.Environment()
-    template_key = json.loads(
-        json.dumps(
-            cel_env.program(cel_env.compile(encode_cel(template_name))).evaluate(
-                {
-                    "managedResource": celpy.json_to_cel(managed_resource_spec),
-                    "template": celpy.celpy.json_to_cel(template),
-                }
-            )
-        )
+    cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+    template_name_expression = cel_env.program(
+        cel_env.compile(encode_cel(template_name)),
+        functions=koreo_cel_functions,
+    )
+    template_key = template_name_expression.evaluate(
+        {
+            "managedResource": celpy.json_to_cel(managed_resource_spec),
+            "template": celpy.celpy.json_to_cel(template),
+        }
     )
 
     index_resource_template(cache_key=cache_key, template_key=template_key)
@@ -60,6 +62,7 @@ async def prepare_resource_template(
         template_name=template_name,
         managed_resource=managed_resource,
         behavior=behavior,
+        context=context,
         template=template,
         valid=valid,
     )
