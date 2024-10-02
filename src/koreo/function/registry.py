@@ -21,3 +21,9 @@ def index_workload_functions(workflow: str, functions: list[str]):
 
 def get_function_workflows(function: str) -> list[str]:
     return list(__function_wokflow_index[function])
+
+
+def _reset_registry():
+    global __workflow_function_index, __function_wokflow_index
+    __workflow_function_index = defaultdict(set[str])
+    __function_wokflow_index = defaultdict(set[str])
