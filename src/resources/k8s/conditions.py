@@ -28,20 +28,6 @@ def update_condition(conditions: Conditions, condition: Condition):
     return conditions
 
 
-def load_conditions(
-    default_conditions: Conditions, current_conditions: Conditions
-) -> Conditions:
-    if not current_conditions:
-        return default_conditions
-
-    conditions = {cond.get("type"): cond for cond in default_conditions}
-
-    for condition in current_conditions:
-        conditions[condition.get("type")] = condition
-
-    return list(conditions.values())
-
-
 def _new_condition(new: Condition) -> Condition:
     event_time = datetime.now(UTC).isoformat()
     return Condition(
