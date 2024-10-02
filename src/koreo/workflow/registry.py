@@ -21,3 +21,9 @@ def index_workload_custom_crd(workflow: str, custom_crd: str):
 
 def get_custom_crd_workflows(custom_crd: str) -> list[str]:
     return list(__custom_crd_wokflow_index[custom_crd])
+
+
+def _reset_registry():
+    global __workflow_custom_crd_index, __custom_crd_wokflow_index
+    __workflow_custom_crd_index = defaultdict(str)
+    __custom_crd_wokflow_index = defaultdict(set[str])
