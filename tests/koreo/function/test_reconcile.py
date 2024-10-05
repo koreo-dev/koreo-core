@@ -1,10 +1,11 @@
 import copy
+import json
 import random
 import string
 import unittest
 
-import json
 import celpy
+import jsonpath_ng
 
 from koreo.cel.encoder import encode_cel, encode_cel_template
 
@@ -15,6 +16,37 @@ from koreo.function import reconcile
 
 
 class TestReconcileFunction(unittest.IsolatedAsyncioTestCase):
+    def test_overlay(self):
+        base = {}
+
+        cel_env = celpy.Environment()
+
+        overlay = celpy.CELJSONEncoder.to_python(
+            cel_env.program(
+                cel_env.compile(
+                    encode_cel(
+                        json.loads(
+                            '{"metadata.name": "test-case", "spec": {"boolTrue": true, "boolFalse": false}}'
+                        )
+                    )
+                )
+            ).evaluate({})
+        )
+
+        for field_path, value in overlay.items():
+            field_expr = jsonpath_ng.parse(field_path)
+            field_expr.update_or_create(base, value)
+
+        self.assertDictEqual(
+            {
+                "metadata": {"name": "test-case"},
+                "spec": {"boolTrue": True, "boolFalse": False},
+            },
+            base,
+        )
+        self.assertIsInstance(base.get("spec").get("boolTrue"), bool)
+        self.assertIsInstance(base.get("spec").get("boolFalse"), bool)
+
     async def test_reconcile(self):
         cel_env = celpy.Environment()
 

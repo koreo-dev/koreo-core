@@ -25,7 +25,7 @@ async def prepare_resource_template(
     behavior = _load_behavior(spec=spec.get("behavior"))
 
     context = spec.get("context", {})
-    template = spec.get("template", {})
+    template = celpy.json_to_cel(spec.get("template", {}))
 
     # Validity Tests.
     valid = Ok(None)

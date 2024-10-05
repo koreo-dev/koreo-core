@@ -1,4 +1,4 @@
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 import logging
 
@@ -111,7 +111,7 @@ async def reconcile_function(
 class _ResourceConfig(NamedTuple):
     behavior: Behavior
     managed_resource: ManagedResource
-    base_template: dict
+    base_template: celtypes.Value
 
 
 def _load_resource_config(
@@ -122,7 +122,9 @@ def _load_resource_config(
     match resource_config:
         case StaticResource(behavior=behavior, managed_resource=managed_resource):
             return _ResourceConfig(
-                behavior=behavior, managed_resource=managed_resource, base_template={}
+                behavior=behavior,
+                managed_resource=managed_resource,
+                base_template=celpy.json_to_cel({}),
             )
 
         case DynamicResource(key=key):
@@ -153,7 +155,12 @@ def _run_checks(
     if not checks:
         return Ok(None, location=location)
 
-    return _predicate_to_koreo_result(checks.evaluate(inputs), location=location)
+    try:
+        return _predicate_to_koreo_result(checks.evaluate(inputs), location=location)
+    except Exception as err:
+        return PermFail(
+            f"Error evaluating checks for {location}. {err}", location=location
+        )
 
 
 def _predicate_to_koreo_result(results: list, location: str) -> Outcome:
@@ -193,31 +200,30 @@ def _predicate_to_koreo_result(results: list, location: str) -> Outcome:
 
 
 def _materialize_overlay(
-    template: dict[str, Any] | None,
+    template: celtypes.Value | None,
     materializer: celpy.Runner | None,
     inputs: dict[str, celtypes.Value],
     location: str,
 ):
-    managed_resource = copy.deepcopy(template) if template else {}
+    managed_resource = copy.deepcopy(template) if template else celpy.json_to_cel({})
 
     if not materializer:
         return managed_resource
 
     try:
-        overlay = materializer.evaluate(
-            inputs
-            | {
-                "template": celpy.json_to_cel(managed_resource),
-            }
-        )
-    except celpy.CELEvalError:
-        logging.exception(f"Encountered CELEvalError {overlay}. ({location})")
+        computed_inputs = inputs | {"template": managed_resource}
+
+        overlay = materializer.evaluate(computed_inputs)
+    except celpy.CELEvalError as err:
+        logging.exception(f"Encountered CELEvalError {err}. ({location})")
 
         raise
-    except TypeError:
-        logging.exception(f"Encountered CELEvalError {overlay}. ({location})")
+    except TypeError as err:
+        logging.exception(f"Encountered TypeError {err}. ({location})")
 
         raise
+
+    # TODO: Insert check for CELEvalError here?
 
     if overlay:
         for field_path, value in overlay.items():
@@ -346,7 +352,17 @@ async def _resource_crud(
         new_object = resource_class(
             api=api, resource=managed_resource, namespace=resource_api_params.namespace
         )
-        await new_object.create()
+        try:
+            await new_object.create()
+        except TypeError as err:
+            logging.error(f"Error creating: {managed_resource}")
+            # TODO: Should this be Retry or PermFail? What about timeouts /
+            # transient errors?
+            return PermFail(
+                message=f"Error creating {resource_api} resource {resource_name}: {err}",
+                location=location,
+            )
+
         # TODO: Dynamic create delay?
         return Retry(
             message=f"Creating {resource_api} resource {resource_name}.",
@@ -364,10 +380,13 @@ async def _resource_crud(
         return resource.raw
 
     logging.info(
-        f"{resource_api}/{resource_name} resource did not match spec, updating. ({location})"
+        f"{resource_api}/{resource_name} resource did not match spec. ({location})"
     )
     if behavior.update == "patch":
         # TODO: Should this only send fields with differences?
+        logging.info(
+            f"Patching {resource_api}/{resource_name} to match spec. ({location})"
+        )
         await resource.patch(managed_resource)
         return Retry(
             message=f"Updating {resource_api} resource {resource_name} to match template.",
@@ -375,11 +394,18 @@ async def _resource_crud(
             location=location,
         )
     elif behavior.update == "recreate":
+        logging.info(
+            f"Will re-create {resource_api}/{resource_name} to match spec. ({location})"
+        )
         await resource.delete()
         return Retry(
             message=f"Deleting {resource_api} resource {resource_name} to recreate.",
             delay=5,
             location=location,
+        )
+    else:
+        logging.info(
+            f"Skipping update (behavior.update is 'never') for {resource_api}/{resource_name}. ({location})"
         )
 
     return resource.raw

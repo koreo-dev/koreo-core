@@ -1,6 +1,7 @@
 import logging
 
 
+import celpy
 import kopf
 import kr8s
 
@@ -75,7 +76,7 @@ def start_controller(group: str, kind: str, version: str):
 
         workflow_keys = get_custom_crd_workflows(custom_crd=key)
 
-        trigger = {"metadata": dict(meta), "spec": dict(spec)}
+        trigger = celpy.json_to_cel({"metadata": dict(meta), "spec": dict(spec)})
 
         conditions: list[Condition] = status.get("conditions", [])
         outcomes = {}

@@ -5,7 +5,7 @@ import copy
 import kr8s
 
 import celpy
-from celpy.celtypes import Value
+from celpy import celtypes
 
 from resources.k8s.conditions import Condition
 
@@ -19,9 +19,9 @@ from . import structure
 async def reconcile_workflow(
     api: kr8s.Api,
     workflow_key: str,
-    trigger: dict,
+    trigger: celtypes.Value,
     workflow: structure.Workflow,
-) -> tuple[result.Outcome[Value], list[Condition]]:
+) -> tuple[result.Outcome[celtypes.Value], list[Condition]]:
     if not result.is_ok(workflow.steps_ready):
         return (workflow.steps_ready, [])
 
@@ -89,7 +89,7 @@ async def reconcile_workflow(
     try:
         state = workflow.status.state.evaluate(
             {
-                "trigger": celpy.json_to_cel(trigger),
+                "trigger": trigger,
                 "steps": celpy.json_to_cel(ok_outcomes),
             }
         )
@@ -121,7 +121,7 @@ async def _reconcile_step(
     workflow_key: str,
     step: structure.FunctionRef,
     dependencies: list[asyncio.Task[result.Outcome]],
-    trigger: dict,
+    trigger: celtypes.Value,
 ):
     location = f"{workflow_key}.{step.label}"
 
@@ -129,7 +129,7 @@ async def _reconcile_step(
         if step.inputs:
             inputs = step.inputs.evaluate({})
         else:
-            inputs = {}
+            inputs = celpy.json_to_cel({})
 
         return await reconcile_function(
             api=api,
@@ -148,7 +148,7 @@ async def _reconcile_step(
             location=location,
         )
 
-    ok_outcomes: dict[str, Any] = {}
+    ok_outcomes = celtypes.MapType()
 
     for task in resolved:
         step_label = task.get_name()
@@ -164,9 +164,9 @@ async def _reconcile_step(
                 )
 
     if not step.inputs:
-        inputs = {}
+        inputs = celpy.json_to_cel({})
     else:
-        inputs = step.inputs.evaluate({"steps": celpy.json_to_cel(ok_outcomes)})
+        inputs = step.inputs.evaluate({"steps": ok_outcomes})
 
     if step.mapped_input:
         return await _reconcile_mapped_function(
@@ -191,15 +191,13 @@ async def _reconcile_mapped_function(
     api: kr8s.Api,
     step: structure.FunctionRef,
     location: str,
-    steps,
-    inputs: dict,
-    trigger: dict,
+    steps: celtypes.MapType,
+    inputs: celtypes.Value,
+    trigger: celtypes.Value,
 ):
     assert step.mapped_input
 
-    source_iterator = step.mapped_input.source_iterator.evaluate(
-        {"steps": celpy.json_to_cel(steps)}
-    )
+    source_iterator = step.mapped_input.source_iterator.evaluate({"steps": steps})
 
     tasks: list[asyncio.Task[result.Outcome]] = []
 
