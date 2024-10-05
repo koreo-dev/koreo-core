@@ -1,10 +1,8 @@
-from typing import Any
 import asyncio
 import copy
 
 import kr8s
 
-import celpy
 from celpy import celtypes
 
 from resources.k8s.conditions import Condition
@@ -81,16 +79,18 @@ async def reconcile_workflow(
             conditions,
         )
 
-    ok_outcomes = {
-        step: outcome.data
-        for step, outcome in outcomes.items()
-        if result.is_ok(outcome)
-    }
+    ok_outcomes = celtypes.MapType(
+        {
+            step: outcome.data
+            for step, outcome in outcomes.items()
+            if result.is_ok(outcome)
+        }
+    )
     try:
         state = workflow.status.state.evaluate(
             {
                 "trigger": trigger,
-                "steps": celpy.json_to_cel(ok_outcomes),
+                "steps": ok_outcomes,
             }
         )
     except Exception as err:
@@ -104,13 +104,13 @@ async def reconcile_workflow(
     return (state, conditions)
 
 
-def _outcome_encoder(outcome: result.Outcome) -> Any:
+def _outcome_encoder(outcome: result.Outcome):
     if result.is_ok(outcome):
         return outcome.data
 
     if result.is_not_error(outcome):
         # This will be Skip or DepSkip, which are informational.
-        return f"{outcome}"
+        return celtypes.StringType(f"{outcome}")
 
     # Bubble errors up.
     return outcome
@@ -129,7 +129,7 @@ async def _reconcile_step(
         if step.inputs:
             inputs = step.inputs.evaluate({})
         else:
-            inputs = celpy.json_to_cel({})
+            inputs = celtypes.MapType()
 
         return await reconcile_function(
             api=api,
@@ -164,7 +164,7 @@ async def _reconcile_step(
                 )
 
     if not step.inputs:
-        inputs = celpy.json_to_cel({})
+        inputs = celtypes.MapType()
     else:
         inputs = step.inputs.evaluate({"steps": ok_outcomes})
 
@@ -237,7 +237,8 @@ async def _reconcile_mapped_function(
         return overall_outcome
 
     return result.Ok(
-        [_outcome_encoder(outcome) for outcome in outcomes], location=location
+        celtypes.ListType(_outcome_encoder(outcome) for outcome in outcomes),
+        location=location,
     )
 
 

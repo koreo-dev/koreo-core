@@ -93,11 +93,11 @@ async def reconcile_function(
         return outcome_tests_outcome
 
     if not function.outcome.ok_value:
-        return Ok(None)
+        return Ok(celpy.json_to_cel(None))
 
     try:
         ok_value = function.outcome.ok_value.evaluate(full_inputs)
-        return Ok(ok_value, location=location)
+        return Ok(data=ok_value, location=location)
     except celpy.CELEvalError as err:
         msg = f"CEL Eval Error computing OK value. {err.tree}"
         logging.exception(msg)
@@ -124,7 +124,7 @@ def _load_resource_config(
             return _ResourceConfig(
                 behavior=behavior,
                 managed_resource=managed_resource,
-                base_template=celpy.json_to_cel({}),
+                base_template=celtypes.MapType(),
             )
 
         case DynamicResource(key=key):
@@ -205,7 +205,7 @@ def _materialize_overlay(
     inputs: dict[str, celtypes.Value],
     location: str,
 ):
-    managed_resource = copy.deepcopy(template) if template else celpy.json_to_cel({})
+    managed_resource = copy.deepcopy(template) if template else celtypes.MapType()
 
     if not materializer:
         return managed_resource
