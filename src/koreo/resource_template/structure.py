@@ -2,8 +2,6 @@ from typing import NamedTuple
 
 from celpy import celtypes
 
-from koreo.result import Outcome
-
 from koreo.function.structure import ManagedResource, Behavior
 
 
@@ -13,8 +11,6 @@ class ResourceTemplate(NamedTuple):
     managed_resource: ManagedResource
     behavior: Behavior
 
-    context: dict
+    context: celtypes.MapType
 
-    template: celtypes.Value
-
-    valid: Outcome
+    template: celtypes.MapType
