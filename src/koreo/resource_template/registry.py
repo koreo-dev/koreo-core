@@ -17,3 +17,8 @@ def get_resource_template(template_key: str) -> ResourceTemplate | None:
         return None
 
     return get_resource_from_cache(resource_class=ResourceTemplate, cache_key=cache_key)
+
+
+def _reset_registry():
+    global __template_name_cache_key_index
+    __template_name_cache_key_index = defaultdict(str)
