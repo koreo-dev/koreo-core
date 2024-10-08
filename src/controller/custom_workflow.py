@@ -111,12 +111,21 @@ def start_controller(group: str, kind: str, version: str):
                     {
                         "status": {
                             "conditions": conditions,
-                            "koreo": error_outcome.message,
+                            "koreo": {
+                                "errors": error_outcome.message,
+                                "locations": error_outcome.location,
+                            },
                         }
                     }
                 )
                 raise_for_error(error_outcome)
 
-            patch.update({"status": {"conditions": conditions, "koreo": outcomes}})
+            koreo_value = {
+                "errors": None,
+                "locations": None,
+            }
+            koreo_value.update(celpy.CELJSONEncoder.to_python(outcomes))
+
+            patch.update({"status": {"conditions": conditions, "koreo": koreo_value}})
 
         return True
