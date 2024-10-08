@@ -5,6 +5,7 @@ import celpy
 import yaml
 
 from koreo.function import prepare
+from koreo.result import PermFail
 
 _functions = {}
 
@@ -18,10 +19,19 @@ with open("crd/sample-function.yaml", "r") as raw_yamls:
         _functions[key] = function_yaml
 
 
+class TestFunctionErrors(unittest.IsolatedAsyncioTestCase):
+    async def test_no_spec(self):
+        prepared = await prepare.prepare_function(
+            cache_key="empty.v1", spec=_functions["empty.v1"].get("spec")
+        )
+        self.assertIsInstance(prepared, PermFail)
+
+
 class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
     async def test_no_validators(self):
         prepared = await prepare.prepare_function(
-            cache_key="empty.v1", spec=_functions["empty.v1"].get("spec", {})
+            cache_key="outcome-tests.v1",
+            spec=_functions["outcome-tests.v1"].get("spec", {}),
         )
         self.assertIsNone(prepared.input_validators)
 
@@ -130,7 +140,8 @@ class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
 class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
     async def test_none_defined(self):
         prepared = await prepare.prepare_function(
-            cache_key="empty.v1", spec=_functions["empty.v1"].get("spec", {})
+            cache_key="input-validation-tests.v1",
+            spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
         self.assertIsNone(prepared.outcome.tests)
 
@@ -209,7 +220,8 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
 class TestFunctionOutcomeOkValue(unittest.IsolatedAsyncioTestCase):
     async def test_none_defined(self):
         prepared = await prepare.prepare_function(
-            cache_key="empty.v1", spec=_functions["empty.v1"].get("spec", {})
+            cache_key="input-validation-tests.v1",
+            spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
         self.assertIsNone(prepared.outcome.ok_value)
 
@@ -241,7 +253,8 @@ class TestFunctionOutcomeOkValue(unittest.IsolatedAsyncioTestCase):
 class TestFunctionMaterializerBase(unittest.IsolatedAsyncioTestCase):
     async def test_none_defined(self):
         prepared = await prepare.prepare_function(
-            cache_key="empty.v1", spec=_functions["empty.v1"].get("spec", {})
+            cache_key="input-validation-tests.v1",
+            spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
         self.assertIsNone(prepared.materializers.base)
 
@@ -312,7 +325,8 @@ class TestFunctionMaterializerBase(unittest.IsolatedAsyncioTestCase):
 class TestFunctionMaterializerOnCreate(unittest.IsolatedAsyncioTestCase):
     async def test_none_defined(self):
         prepared = await prepare.prepare_function(
-            cache_key="empty.v1", spec=_functions["empty.v1"].get("spec", {})
+            cache_key="input-validation-tests.v1",
+            spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
         self.assertIsNone(prepared.materializers.on_create)
 

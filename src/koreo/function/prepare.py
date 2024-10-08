@@ -2,7 +2,7 @@ import logging
 
 import asyncio
 
-from koreo.result import Ok, PermFail
+from koreo.result import Ok, PermFail, UnwrappedOutcome
 from koreo.cache import reprepare_and_update_cache
 from koreo.cel.encoder import encode_cel, encode_cel_template
 from koreo.cel.functions import koreo_cel_functions, koreo_function_annotations
@@ -15,6 +15,7 @@ from .registry import get_function_workflows
 import celpy
 
 # Try to reduce the incredibly verbose logging from celpy
+logging.getLogger("Environment").setLevel(logging.WARNING)
 logging.getLogger("NameContainer").setLevel(logging.WARNING)
 logging.getLogger("Evaluator").setLevel(logging.WARNING)
 logging.getLogger("evaluation").setLevel(logging.WARNING)
@@ -23,15 +24,18 @@ logging.getLogger("celtypes").setLevel(logging.WARNING)
 __tasks = set()
 
 
-async def prepare_function(cache_key: str, spec: dict) -> structure.Function:
+async def prepare_function(
+    cache_key: str, spec: dict
+) -> UnwrappedOutcome[structure.Function]:
     # NOTE: We can try `celpy.Environment(runner_class=celpy.CompiledRunner)`
     # We need to do a safety check to ensure there are no escapes / injections.
     logging.info(f"Prepare function {cache_key}")
 
     if not spec:
-        spec = {}
-
-    function_ready = Ok(None)
+        return PermFail(
+            message=f"Missing `spec` for Function '{cache_key}'.",
+            location=f"prepare:Function:{cache_key}",
+        )
 
     env = celpy.Environment(annotations=koreo_function_annotations)
 
@@ -39,7 +43,12 @@ async def prepare_function(cache_key: str, spec: dict) -> structure.Function:
 
     static_resource_spec = spec.get("staticResource")
     if static_resource_spec:
-        resource_config = _build_static_resource(static_resource_spec)
+        resource_config = structure.StaticResource(
+            behavior=_load_behavior(static_resource_spec.get("behavior")),
+            managed_resource=_build_managed_resource(
+                static_resource_spec.get("managedResource")
+            ),
+        )
 
     dynamic_resource_spec = spec.get("dynamicResource")
     if dynamic_resource_spec:
@@ -51,8 +60,9 @@ async def prepare_function(cache_key: str, spec: dict) -> structure.Function:
         )
 
     if static_resource_spec and dynamic_resource_spec:
-        function_ready = PermFail(
-            f"Can not specify static and dynamic resource config for {cache_key}"
+        return PermFail(
+            message=f"Can not specify static and dynamic resource config for {cache_key}",
+            location=f"prepare:Function:{cache_key}",
         )
 
     if not resource_config:
@@ -71,6 +81,7 @@ async def prepare_function(cache_key: str, spec: dict) -> structure.Function:
 
     outcome = _prepare_outcome(cel_env=env, outcome=spec.get("outcome"))
 
+    # Update Workflows using this Function.
     loop = asyncio.get_event_loop()
     for workflow_key in get_function_workflows(function=cache_key):
         workflow_task = loop.create_task(
@@ -88,14 +99,6 @@ async def prepare_function(cache_key: str, spec: dict) -> structure.Function:
         input_validators=input_validators,
         materializers=materializers,
         outcome=outcome,
-        function_ready=function_ready,
-    )
-
-
-def _build_static_resource(spec: dict) -> structure.StaticResource:
-    return structure.StaticResource(
-        behavior=_load_behavior(spec.get("behavior")),
-        managed_resource=_build_managed_resource(spec.get("managedResource")),
     )
 
 
@@ -104,12 +107,12 @@ def _build_managed_resource(spec: dict | None) -> structure.ManagedResource | No
         return None
 
     kind = spec.get("kind")
-    plural = spec.get("plural")
+    plural = spec.get("plural", f"{kind.lower()}s")
 
     return structure.ManagedResource(
         api_version=spec.get("apiVersion"),
         kind=kind,
-        plural=plural if plural else f"{kind.lower()}s",
+        plural=plural,
         namespaced=spec.get("namespaced", True),
     )
 

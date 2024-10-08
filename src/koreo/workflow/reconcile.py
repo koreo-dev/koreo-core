@@ -19,11 +19,13 @@ async def reconcile_workflow(
     workflow_key: str,
     trigger: celtypes.Value,
     workflow: structure.Workflow,
-) -> tuple[result.Outcome[celtypes.Value], list[Condition]]:
+) -> tuple[result.UnwrappedOutcome[celtypes.Value], list[Condition]]:
     if not result.is_ok(workflow.steps_ready):
-        return (workflow.steps_ready, [])
+        updated_outcome = copy.deepcopy(workflow.steps_ready)
+        updated_outcome.location = f"{workflow_key}:{updated_outcome.location}"
+        return (updated_outcome, [])
 
-    task_map: dict[str, asyncio.Task[result.Outcome]] = {}
+    task_map: dict[str, asyncio.Task[result.UnwrappedOutcome]] = {}
 
     async with asyncio.TaskGroup() as task_group:
         for step in workflow.steps:
@@ -58,16 +60,35 @@ async def reconcile_workflow(
 
     conditions = [
         _condition_helper(
-            condition_type=condition_spec.type_,
-            thing_name=condition_spec.name,
-            outcome=outcomes.get(condition_spec.step),
+            condition_type=step.condition.type_,
+            thing_name=step.condition.name,
+            outcome=outcomes.get(step.label),
             workflow_key=workflow_key,
         )
-        for condition_spec in workflow.status.conditions
+        for step in workflow.steps
+        if step.condition
     ]
 
-    overall_outcome = result.combine(
-        [outcome for outcome in outcomes.values() if result.is_error(outcome)]
+    conditions.extend(
+        [
+            _condition_helper(
+                condition_type=condition_spec.type_,
+                thing_name=condition_spec.name,
+                outcome=outcomes.get(condition_spec.step),
+                workflow_key=workflow_key,
+            )
+            for condition_spec in workflow.status.conditions
+        ]
+    )
+
+    overall_outcome = result.unwrapped_combine(outcomes=outcomes.values())
+    conditions.append(
+        _condition_helper(
+            condition_type=f"Ready:{workflow_key}",
+            thing_name=f"Workflow {workflow_key}",
+            outcome=overall_outcome,
+            workflow_key=workflow_key,
+        )
     )
 
     if result.is_error(overall_outcome):
@@ -75,17 +96,22 @@ async def reconcile_workflow(
 
     if not workflow.status.state:
         return (
-            {step: _outcome_encoder(outcome) for step, outcome in outcomes.items()},
+            celtypes.MapType(
+                {
+                    celtypes.StringType(step): _outcome_encoder(outcome)
+                    for step, outcome in outcomes.items()
+                }
+            ),
             conditions,
         )
 
     ok_outcomes = celtypes.MapType(
         {
-            step: outcome.data
+            celtypes.StringType(step): _outcome_encoder(outcome)
             for step, outcome in outcomes.items()
-            if result.is_ok(outcome)
         }
     )
+
     try:
         state = workflow.status.state.evaluate(
             {
@@ -104,15 +130,16 @@ async def reconcile_workflow(
     return (state, conditions)
 
 
-def _outcome_encoder(outcome: result.Outcome):
-    if result.is_ok(outcome):
-        return outcome.data
+def _outcome_encoder(outcome: result.UnwrappedOutcome):
+    if result.is_error(outcome):
+        return outcome
 
-    if result.is_not_error(outcome):
+    if result.is_skip(outcome):
         # This will be Skip or DepSkip, which are informational.
+        # TODO: Should these be encoded some other way?
         return celtypes.StringType(f"{outcome}")
 
-    # Bubble errors up.
+    # This should be an unwrapped-Ok value
     return outcome
 
 
@@ -120,7 +147,7 @@ async def _reconcile_step(
     api: kr8s.Api,
     workflow_key: str,
     step: structure.FunctionRef,
-    dependencies: list[asyncio.Task[result.Outcome]],
+    dependencies: list[asyncio.Task[result.UnwrappedOutcome]],
     trigger: celtypes.Value,
 ):
     location = f"{workflow_key}.{step.label}"
@@ -154,14 +181,36 @@ async def _reconcile_step(
         step_label = task.get_name()
         step_result = task.result()
         match step_result:
-            case result.Ok(data=data):
-                ok_outcomes[step_label] = data
-            case _:
-                message = step_result.message if hasattr(step_result, "message") else ""
+            case result.DepSkip(message=skip_message, location=skip_location):
                 return result.DepSkip(
-                    f"'{step_label}' status is {type(step_result).__name__} ({message}).",
+                    f"'{step_label}' is waiting on dependency ({skip_message} at {skip_location}).",
                     location=location,
                 )
+
+            case result.Skip(message=skip_message, location=skip_location):
+                return result.DepSkip(
+                    f"'{step_label}' was skipped ({skip_message} at {skip_location}).",
+                    location=location,
+                )
+
+            case result.Retry(message=retry_message, location=retry_location):
+                return result.DepSkip(
+                    f"'{step_label}' is waiting ({retry_message} at {retry_location}).",
+                    location=location,
+                )
+
+            case result.PermFail(message=fail_message, location=fail_location):
+                return result.DepSkip(
+                    f"'{step_label}' is in failure state ({fail_message} at {fail_location}).",
+                    location=location,
+                )
+
+            case result.Ok(data=data):
+                ok_outcomes[celtypes.StringType(step_label)] = data
+
+            case _:
+                # This should be an UnwrappedOutcome (Ok)
+                ok_outcomes[celtypes.StringType(step_label)] = step_result
 
     if not step.inputs:
         inputs = celtypes.MapType()
@@ -194,12 +243,18 @@ async def _reconcile_mapped_function(
     steps: celtypes.MapType,
     inputs: celtypes.Value,
     trigger: celtypes.Value,
-):
+) -> result.UnwrappedOutcome[celtypes.ListType]:
     assert step.mapped_input
 
     source_iterator = step.mapped_input.source_iterator.evaluate({"steps": steps})
 
-    tasks: list[asyncio.Task[result.Outcome]] = []
+    if not isinstance(source_iterator, celtypes.ListType):
+        return result.PermFail(
+            message=f"Workflow Mapped Step source must be a list-type.",
+            location=location,
+        )
+
+    tasks: list[asyncio.Task[result.UnwrappedOutcome[celtypes.Value]]] = []
 
     async with asyncio.TaskGroup() as task_group:
         for idx, map_value in enumerate(source_iterator):
@@ -229,23 +284,20 @@ async def _reconcile_mapped_function(
 
     outcomes = [task.result() for task in done]
 
-    overall_outcome = result.combine(
+    error_outcome = result.combine(
         [outcome for outcome in outcomes if result.is_error(outcome)]
     )
 
-    if result.is_error(overall_outcome):
-        return overall_outcome
+    if result.is_error(error_outcome):
+        return error_outcome
 
-    return result.Ok(
-        celtypes.ListType(_outcome_encoder(outcome) for outcome in outcomes),
-        location=location,
-    )
+    return celtypes.ListType([_outcome_encoder(outcome) for outcome in outcomes])
 
 
 def _condition_helper(
     condition_type: str,
     thing_name: str,
-    outcome: result.Outcome | None,
+    outcome: result.UnwrappedOutcome | None,
     workflow_key: str,
 ) -> Condition:
     reason = "Pending"
@@ -277,10 +329,6 @@ def _condition_helper(
             if skip_message:
                 message: str = f"Skipping {thing_name}: {skip_message}"
 
-        case result.Ok(location=location):
-            reason = "Ready"
-            message: str = f"{thing_name} ready."
-
         case result.Retry(message=retry_message, location=location):
             reason = "Wait"
             message: str = f"Awaiting {thing_name} to be ready."
@@ -292,6 +340,15 @@ def _condition_helper(
             message: str = (
                 f"Unrecoverable error reconciling {thing_name}. ({fail_message})."
             )
+
+        case result.Ok(location=location):
+            reason = "Ready"
+            message: str = f"{thing_name} ready."
+
+        case _:
+            # This should be an UnwrappedOutcome (Ok)
+            reason = "Ready"
+            message: str = f"{thing_name} ready."
 
     return Condition(
         type=condition_type,

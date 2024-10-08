@@ -9,7 +9,7 @@ from koreo.cel.structure_extractor import extract_argument_structure
 from koreo.cel.functions import koreo_cel_functions, koreo_function_annotations
 from koreo.function.registry import index_workload_functions
 from koreo.function.structure import Function
-from koreo.result import Ok, Outcome, PermFail, Retry, combine
+from koreo.result import Ok, Outcome, PermFail, Retry, combine, is_error
 
 from controller.custom_workflow import start_controller
 
@@ -76,6 +76,8 @@ def _load_functions(
 
     functions = []
     for step in step_spec:
+        step_label = step.get("label")
+
         function_ref = step.get("functionRef", {})
         function_cache_key = function_ref.get("name")
         function = get_resource_from_cache(
@@ -87,6 +89,17 @@ def _load_functions(
                 Retry(
                     message=f"Missing Function ({function_cache_key}), can not prepare Workflow.",
                     delay=15,
+                    location=f"{step_label}:{function_cache_key}",
+                )
+            )
+            continue
+
+        if is_error(function):
+            outcomes.append(
+                Retry(
+                    message=f"Function ({function_cache_key}) is not healthy ({function.message}). Workflow prepare will retry.",
+                    delay=180,
+                    location=f"{step_label}:{function_cache_key}",
                 )
             )
             continue
@@ -140,14 +153,28 @@ def _load_functions(
             outcomes.append(
                 PermFail(
                     message=f"Function ({function_cache_key}), must come after {', '.join(out_of_order_steps)}.",
+                    location=f"{step_label}:{function_cache_key}",
                 )
             )
             continue
 
-        step_label = step.get("label")
+        condition_spec = step.get("condition")
+        if not condition_spec:
+            condition = None
+        else:
+            condition = structure.FunctionConditionSpec(
+                type_=condition_spec.type,
+                name=condition_spec.name,
+            )
+
         known_steps.add(step_label)
 
-        outcomes.append(Ok(None))
+        outcomes.append(
+            Ok(
+                data=None,
+                location=f"{step_label}:{function_cache_key}",
+            )
+        )
         functions.append(
             structure.FunctionRef(
                 label=step_label,
@@ -155,6 +182,7 @@ def _load_functions(
                 mapped_input=mapped_input,
                 inputs=input_mapper,
                 dynamic_input_keys=list(dynamic_input_keys),
+                condition=condition,
             )
         )
 

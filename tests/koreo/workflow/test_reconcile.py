@@ -41,7 +41,6 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                             managed_resource=None,
                         ),
                         input_validators=None,
-                        function_ready=Ok(None),
                         outcome=function_structure.Outcome(
                             tests=None, ok_value=source_ok_value
                         ),
@@ -49,6 +48,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                             base=None, on_create=None
                         ),
                     ),
+                    condition=None,
                 )
             ],
         )

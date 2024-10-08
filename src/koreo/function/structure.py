@@ -2,8 +2,6 @@ from typing import NamedTuple, Literal
 
 import celpy
 
-from koreo import result
-
 
 class Materializers(NamedTuple):
     base: celpy.Runner | None
@@ -45,5 +43,3 @@ class Function(NamedTuple):
 
     materializers: Materializers
     outcome: Outcome
-
-    function_ready: result.Outcome

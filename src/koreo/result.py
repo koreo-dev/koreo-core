@@ -171,7 +171,9 @@ class PermFail:
 
 OkT = TypeVar("OkT")
 
-NonOkOutcome = DepSkip | Skip | Retry | PermFail
+ErrorOutcome = Retry | PermFail
+SkipOutcome = DepSkip | Skip
+NonOkOutcome = SkipOutcome | ErrorOutcome
 Outcome = NonOkOutcome | Ok[OkT]
 UnwrappedOutcome = NonOkOutcome | OkT
 
@@ -185,6 +187,19 @@ def combine(outcomes: Iterable[Outcome]):
     return reduce(lambda acc, outcome: acc.combine(outcome), outcomes)
 
 
+def unwrapped_combine(outcomes: Iterable[UnwrappedOutcome]):
+    if not outcomes:
+        return Skip()
+
+    return reduce(
+        lambda acc, outcome: acc.combine(
+            Ok(outcome) if is_unwrapped_ok(outcome) else outcome
+        ),
+        outcomes,
+        DepSkip(),  # The lowest priority in a combine flow
+    )
+
+
 def is_ok[T](candidate: Outcome[T]) -> TypeGuard[Ok[T]]:
     if isinstance(candidate, Ok):
         return True
@@ -192,12 +207,29 @@ def is_ok[T](candidate: Outcome[T]) -> TypeGuard[Ok[T]]:
     return False
 
 
+def is_unwrapped_ok[T](candidate: UnwrappedOutcome[T]) -> TypeGuard[T]:
+    if is_error(candidate):
+        return False
+
+    if is_skip(candidate):
+        return False
+
+    return True
+
+
 def is_not_ok(candidate: Outcome) -> TypeGuard[NonOkOutcome]:
     return not is_ok(candidate=candidate)
 
 
-def is_error(candidate: Any) -> TypeGuard[Retry | PermFail]:
+def is_error(candidate: Any) -> TypeGuard[ErrorOutcome]:
     if isinstance(candidate, (Retry, PermFail)):
+        return True
+
+    return False
+
+
+def is_skip(candidate: Any) -> TypeGuard[SkipOutcome]:
+    if isinstance(candidate, (DepSkip, Skip)):
         return True
 
     return False

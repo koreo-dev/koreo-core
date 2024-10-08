@@ -17,30 +17,39 @@ async def prepare_resource_template(
     logging.info(f"Prepare resource template {cache_key}")
 
     if not spec:
-        return PermFail(f"Missing `spec` for ResourceTemplate '{cache_key}'.")
+        return PermFail(
+            message=f"Missing `spec` for ResourceTemplate '{cache_key}'.",
+            location=f"prepare:ResourceTemplate:{cache_key}",
+        )
 
     template_name_exp_str = spec.get("templateName")
 
     if not template_name_exp_str:
         return PermFail(
-            f"Missing `spec.templateName` for ResourceTemplate '{cache_key}'."
+            message=f"Missing `spec.templateName` for ResourceTemplate '{cache_key}'.",
+            location=f"prepare:ResourceTemplate:{cache_key}",
         )
 
     managed_resource_spec = spec.get("managedResource")
     managed_resource = _build_managed_resource(spec=managed_resource_spec)
     if not managed_resource:
         return PermFail(
-            f"Missing `spec.managedResource` for ResourceTemplate '{cache_key}'."
+            message=f"Missing `spec.managedResource` for ResourceTemplate '{cache_key}'.",
+            location=f"prepare:ResourceTemplate:{cache_key}",
         )
 
     template_spec = spec.get("template", {})
     template = celpy.json_to_cel(template_spec)
     if not template_spec:
-        return PermFail(f"Missing `spec.template` for ResourceTemplate '{cache_key}'.")
+        return PermFail(
+            message=f"Missing `spec.template` for ResourceTemplate '{cache_key}'.",
+            location=f"prepare:ResourceTemplate:{cache_key}",
+        )
 
     if not isinstance(template, celtypes.MapType):
         return PermFail(
-            f"ResourceTemplate '{cache_key}' `spec.template` must be an object."
+            message=f"ResourceTemplate '{cache_key}' `spec.template` must be an object.",
+            location=f"prepare:ResourceTemplate:{cache_key}",
         )
 
     if not (
@@ -48,9 +57,12 @@ async def prepare_resource_template(
         and managed_resource.kind == template_spec.get("kind")
     ):
         return PermFail(
-            f"ResourceTemplate '{cache_key}' `apiVersion` and `kind` must match "
-            f"in `spec.template` ('{template_spec.get("apiVersion")}', '{template_spec.get("kind")}') "
-            f"and spec.managedResource ('{managed_resource.api_version}', '{managed_resource.kind}')."
+            message=(
+                f"ResourceTemplate '{cache_key}' `apiVersion` and `kind` must match "
+                f"in `spec.template` ('{template_spec.get("apiVersion")}', '{template_spec.get("kind")}') "
+                f"and spec.managedResource ('{managed_resource.api_version}', '{managed_resource.kind}')."
+            ),
+            location=f"prepare:ResourceTemplate:{cache_key}",
         )
 
     behavior = _load_behavior(spec=spec.get("behavior", {}))
@@ -58,7 +70,8 @@ async def prepare_resource_template(
     context = celpy.json_to_cel(spec.get("context", {}))
     if not isinstance(context, celtypes.MapType):
         return PermFail(
-            f"ResourceTemplate '{cache_key}' `spec.context` ('{context}') must be an object."
+            message=f"ResourceTemplate '{cache_key}' `spec.context` ('{context}') must be an object.",
+            location=f"prepare:ResourceTemplate:{cache_key}",
         )
 
     cel_env = celpy.Environment(annotations=koreo_function_annotations)
@@ -78,8 +91,11 @@ async def prepare_resource_template(
 
     if not isinstance(template_key, celtypes.StringType):
         return PermFail(
-            f"ResourceTemplate '{cache_key}' `spec.templateName` "
-            f"('{template_name_exp_str}') must evaluate to a string ('{template_key}')."
+            message=(
+                f"ResourceTemplate '{cache_key}' `spec.templateName` "
+                f"('{template_name_exp_str}') must evaluate to a string ('{template_key}')."
+            ),
+            location=f"prepare:ResourceTemplate:{cache_key}",
         )
 
     index_resource_template(cache_key=cache_key, template_key=template_key)

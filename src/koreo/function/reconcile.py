@@ -1,8 +1,8 @@
 from typing import NamedTuple
 
-import logging
-
 import copy
+import json
+import logging
 
 import kr8s
 import jsonpath_ng
@@ -17,9 +17,12 @@ from koreo.result import (
     PermFail,
     Retry,
     Skip,
+    UnwrappedOutcome,
     combine,
     is_error,
     is_ok,
+    is_not_ok,
+    is_unwrapped_ok,
 )
 
 from koreo.resource_template.registry import get_resource_template
@@ -39,10 +42,7 @@ async def reconcile_function(
     function: Function,
     trigger: celtypes.Value,
     inputs: celtypes.Value,
-):
-    if not is_ok(function.function_ready):
-        return function.function_ready
-
+) -> UnwrappedOutcome[celtypes.Value]:
     base_inputs = {
         "inputs": inputs,
         "parent": trigger,
@@ -51,14 +51,20 @@ async def reconcile_function(
     validation_outcome = _run_checks(
         checks=function.input_validators, inputs=base_inputs, location=location
     )
-    if not is_ok(validation_outcome):
+    if is_not_ok(validation_outcome):
         return validation_outcome
 
     resource_config = _load_resource_config(
         resource_config=function.resource_config, inputs=base_inputs, location=location
     )
-    if is_error(resource_config):
+    if not is_unwrapped_ok(resource_config):
         return resource_config
+
+    base_inputs = base_inputs | {
+        "inputs": inputs,
+        "parent": trigger,
+        "context": resource_config.context,
+    }
 
     # Create base resource
     managed_resource = _materialize_overlay(
@@ -93,11 +99,11 @@ async def reconcile_function(
         return outcome_tests_outcome
 
     if not function.outcome.ok_value:
-        return Ok(celpy.json_to_cel(None))
+        return celpy.json_to_cel(None)
 
     try:
         ok_value = function.outcome.ok_value.evaluate(full_inputs)
-        return Ok(data=ok_value, location=location)
+        return ok_value
     except celpy.CELEvalError as err:
         msg = f"CEL Eval Error computing OK value. {err.tree}"
         logging.exception(msg)
@@ -111,20 +117,22 @@ async def reconcile_function(
 class _ResourceConfig(NamedTuple):
     behavior: Behavior
     managed_resource: ManagedResource
-    base_template: celtypes.Value
+    base_template: celtypes.MapType
+    context: celtypes.MapType
 
 
 def _load_resource_config(
     resource_config: StaticResource | DynamicResource | None,
     inputs: dict[str, celtypes.Value],
     location: str,
-):
+) -> UnwrappedOutcome[_ResourceConfig]:
     match resource_config:
         case StaticResource(behavior=behavior, managed_resource=managed_resource):
             return _ResourceConfig(
                 behavior=behavior,
                 managed_resource=managed_resource,
                 base_template=celtypes.MapType(),
+                context=celtypes.MapType(),
             )
 
         case DynamicResource(key=key):
@@ -137,10 +145,18 @@ def _load_resource_config(
                     location=location,
                 )
 
+            if is_error(resource_template):
+                return Retry(
+                    message=f'ResourceTemplate ("{template_key}") requires correction ({resource_template.message}). Will retry while waiting.',
+                    delay=180,
+                    location=location,
+                )
+
             return _ResourceConfig(
                 behavior=resource_template.behavior,
                 managed_resource=resource_template.managed_resource,
                 base_template=resource_template.template,
+                context=resource_template.context,
             )
 
     return PermFail(
@@ -200,7 +216,7 @@ def _predicate_to_koreo_result(results: list, location: str) -> Outcome:
 
 
 def _materialize_overlay(
-    template: celtypes.Value | None,
+    template: celtypes.MapType | None,
     materializer: celpy.Runner | None,
     inputs: dict[str, celtypes.Value],
     location: str,
@@ -276,7 +292,7 @@ async def _resource_crud(
     api: kr8s.Api,
     location: str,
     behavior: Behavior,
-    managed_resource: dict,
+    managed_resource: celtypes.MapType,
     managed_resource_config: ManagedResource,
     on_create: celpy.Runner | None,
     inputs: dict[str, celtypes.Value],
@@ -350,7 +366,11 @@ async def _resource_crud(
 
         logging.info(f"Creating {resource_api} resource {resource_name}. ({location})")
         new_object = resource_class(
-            api=api, resource=managed_resource, namespace=resource_api_params.namespace
+            api=api,
+            resource=json.loads(
+                json.dumps(celpy.CELJSONEncoder.to_python(managed_resource))
+            ),
+            namespace=resource_api_params.namespace,
         )
         try:
             await new_object.create()
@@ -373,7 +393,10 @@ async def _resource_crud(
     if not resource:
         return None
 
-    if _validate_match(managed_resource, resource.raw):
+    py_managed_resource = json.loads(
+        json.dumps(celpy.CELJSONEncoder.to_python(managed_resource))
+    )
+    if _validate_match(py_managed_resource, resource.raw):
         logging.debug(
             f"{resource_api}/{resource_name} resource matched spec, skipping update. ({location})"
         )
@@ -387,7 +410,7 @@ async def _resource_crud(
         logging.info(
             f"Patching {resource_api}/{resource_name} to match spec. ({location})"
         )
-        await resource.patch(managed_resource)
+        await resource.patch(py_managed_resource)
         return Retry(
             message=f"Updating {resource_api} resource {resource_name} to match template.",
             delay=5,
@@ -439,8 +462,8 @@ def _validate_list_match(target: list | tuple, actual: list | tuple) -> bool:
     if len(target) != len(actual):
         return False
 
-    for target_value, source_value in zip(target, actual):
-        if not _validate_match(target_value, source_value):
+    for target_value, actual_value in zip(target, actual):
+        if not _validate_match(target_value, actual_value):
             return False
 
     return True

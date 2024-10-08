@@ -89,7 +89,6 @@ class TestReconcileFunction(unittest.IsolatedAsyncioTestCase):
                 managed_resource=None,
             ),
             input_validators=input_validators,
-            function_ready=Ok(None),
             outcome=function_structure.Outcome(tests=None, ok_value=source_ok_value),
             materializers=function_structure.Materializers(base=None, on_create=None),
         )
@@ -110,7 +109,7 @@ class TestReconcileFunction(unittest.IsolatedAsyncioTestCase):
                     ]
                 }
             ),
-            json.dumps(celpy.CELJSONEncoder.to_python(result.data)),
+            json.dumps(celpy.CELJSONEncoder.to_python(result)),
         )
 
 
