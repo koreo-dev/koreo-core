@@ -1,4 +1,5 @@
 from typing import Any
+import copy
 
 from celpy import celtypes
 import celpy
@@ -63,6 +64,41 @@ def _to_ref(
     kind = source.get(kind_key)
     if kind:
         reference[kind_key] = kind
+
+    if "external" in source:
+        external_key = celtypes.StringType("external")
+        external = source.get(external_key)
+        if not external:
+            return celpy.CELEvalError(f"`external` must contain a value.")
+
+        reference[external_key] = external
+        return reference
+
+    if "name" not in source:
+        return celpy.CELEvalError(
+            f"`external` or `name` are required to build a reference."
+        )
+
+    name_key = celtypes.StringType("name")
+    name = source.get(name_key)
+
+    if not name:
+        return celpy.CELEvalError(f"`name` must contain a value.")
+
+    reference[name_key] = name
+
+    namespace_key = celtypes.StringType("namespace")
+    namespace = source.get(namespace_key)
+    if namespace:
+        reference[namespace_key] = namespace
+
+    return reference
+
+
+def _kindless_ref(
+    source: celtypes.MapType,
+) -> celtypes.MapType | celpy.CELEvalError:
+    reference = celtypes.MapType()
 
     if "external" in source:
         external_key = celtypes.StringType("external")
@@ -174,6 +210,76 @@ def __build_overlay_structure(overlay: celtypes.MapType, base: str | None = None
     return output
 
 
+def _map_overlay(
+    resource: celtypes.MapType,
+    path: celtypes.StringType,
+    overlay: celtypes.MapType,
+) -> celtypes.MapType | celpy.CELEvalError:
+    if not resource:
+        return celpy.CELEvalError(f"Can not map-overlay an empty resource.")
+
+    if not isinstance(resource, celtypes.MapType):
+        return celpy.CELEvalError(f"Base resource must be an object.")
+
+    if not isinstance(overlay, celtypes.MapType):
+        return celpy.CELEvalError(f"Overlay must be an object.")
+
+    updated_resource = copy.deepcopy(resource)
+
+    path_expression = jsonpath_ng.parse(path)
+
+    for match in path_expression.find(resource):
+
+        value = copy.deepcopy(match.value) if match.value else celtypes.MapType()
+
+        new_value = _overlay(value, overlay)
+
+        match.full_path.update(updated_resource, new_value)
+
+    return updated_resource
+
+
+def _extract_vars(
+    resource: celtypes.MapType,
+    var_map: celtypes.MapType,
+) -> celtypes.MapType | celpy.CELEvalError:
+    if not resource:
+        return celpy.CELEvalError(f"Can not extract values from empty resource.")
+
+    if not isinstance(resource, celtypes.MapType):
+        return celpy.CELEvalError(f"Base resource must be an object.")
+
+    if not isinstance(var_map, celtypes.MapType):
+        return celpy.CELEvalError(f"Variable Map must be an object.")
+
+    variables = celtypes.MapType()
+
+    for variable, path in var_map.items():
+        path_expression = jsonpath_ng.parse(path)
+        values = [match.value for match in path_expression.find(resource)]
+        if len(values) == 1:
+            variables[variable] = values[0]
+        elif len(values) > 1:
+            variables[variable] = celtypes.ListType(values)
+
+    return variables
+
+
+def _flatten(resource: celtypes.ListType) -> celtypes.ListType | celpy.CELEvalError:
+    if not resource:
+        return celtypes.ListType()
+
+    if not isinstance(resource, celtypes.ListType):
+        return celpy.CELEvalError(f"Base resource must be a list of lists.")
+
+    merged = celtypes.ListType()
+
+    for nested in resource:
+        merged.extend(nested)
+
+    return merged
+
+
 def _template_name(
     resource: celtypes.MapType, name: celtypes.StringType
 ) -> celtypes.StringType | celpy.CELEvalError:
@@ -193,18 +299,32 @@ def _template_name(
     return celtypes.StringType(f"{kind}.{api_version}.{name}")
 
 
+def _lower(string: celtypes.StringType) -> celtypes.StringType | celpy.CELEvalError:
+    return celtypes.StringType(string.lower())
+
+
 koreo_function_annotations: dict[str, celpy.Annotation] = {
     "to_ref": celtypes.FunctionType,
     "self_ref": celtypes.FunctionType,
+    "kindless_ref": celtypes.FunctionType,
     "config_connect_ready": celtypes.FunctionType,
     "overlay": celtypes.FunctionType,
+    "map_overlay": celtypes.FunctionType,
     "template_name": celtypes.FunctionType,
+    "lower": celtypes.FunctionType,
+    "extract_vars": celtypes.FunctionType,
+    "flatten": celtypes.FunctionType,
 }
 
 koreo_cel_functions: dict[str, celpy.CELFunction] = {
     "to_ref": _to_ref,
     "self_ref": _self_ref,
+    "kindless_ref": _kindless_ref,
     "config_connect_ready": _config_connect_ready,
     "overlay": _overlay,
+    "map_overlay": _map_overlay,
     "template_name": _template_name,
+    "lower": _lower,
+    "extract_vars": _extract_vars,
+    "flatten": _flatten,
 }
