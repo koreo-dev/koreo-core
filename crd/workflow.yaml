@@ -70,6 +70,24 @@ spec:
                         type: object
                         x-kubernetes-preserve-unknown-fields: true
                         nullable: true
+                      condition:
+                        nullable: true
+                        type: object
+                        properties:
+                          type:
+                            type: string
+                            nullable: false
+                            maxLength: 40
+                            x-kubernetes-validations:
+                              - rule: self.matches("^[A-Z][a-zA-Z0-9]+$")
+                                message: "type must be CamelCase, and contain only alphanumeric chars"
+                          name:
+                            type: string
+                            nullable: false
+                            maxLength: 60
+                            x-kubernetes-validations:
+                              - rule: "!self.startsWith('=')"
+                                message: "name may not be a CEL expression."
                     required: [label, functionRef]
                 status:
                   type: object
@@ -92,7 +110,7 @@ spec:
                           name:
                             type: string
                             nullable: false
-                            maxLength: 40
+                            maxLength: 60
                             x-kubernetes-validations:
                               - rule: "!self.startsWith('=')"
                                 message: "name may not be a CEL expression."

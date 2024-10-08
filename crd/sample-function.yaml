@@ -226,6 +226,9 @@ spec:
         mapKey:
           name: some
           value: 10
+        bools:
+          aTrue: true
+          aFalse: false
 
   outcome:
     okValue: =resource.metadata.uid
@@ -253,6 +256,9 @@ spec:
     base:
       metadata:
         name: =parent.metadata.name + "-" + inputs.template_name
+      spec:
+        boolTrue: true
+        boolFalse: false
   outcome:
     okValue: =resource.metadata.uid
 ---

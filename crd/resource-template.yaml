@@ -63,6 +63,10 @@ spec:
                       type: boolean
                       default: true
                       nullable: false
+                context:
+                  type: object
+                  nullable: true
+                  x-kubernetes-preserve-unknown-fields: true
                 template:
                   type: object
                   nullable: false
