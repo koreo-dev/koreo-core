@@ -76,7 +76,18 @@ def start_controller(group: str, kind: str, version: str):
 
         workflow_keys = get_custom_crd_workflows(custom_crd=key)
 
-        trigger = celpy.json_to_cel({"metadata": dict(meta), "spec": dict(spec)})
+        owner_ref = {
+            "apiVersion": f"{group}/{version}",
+            "kind": kind,
+            "blockOwnerDeletion": True,
+            "controller": True,
+            "name": meta.name,
+            "uid": meta.uid,
+        }
+
+        trigger = celpy.json_to_cel(
+            {"ownerRef": owner_ref, "metadata": dict(meta), "spec": dict(spec)}
+        )
 
         conditions: list[Condition] = status.get("conditions", [])
         outcomes = {}
