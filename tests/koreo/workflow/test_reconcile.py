@@ -4,6 +4,8 @@ import celpy
 
 from koreo.result import Ok
 
+from koreo.cel.structure_extractor import extract_argument_structure
+
 from koreo.function import structure as function_structure
 
 from koreo.workflow import reconcile
@@ -16,7 +18,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
         source_ok_value = cel_env.program(
             cel_env.compile("{'resources': [{'bool': true}, {'bool': false}]}")
         )
-        print(source_ok_value.evaluate({}))
+        used_vars = set(extract_argument_structure(source_ok_value.ast))
 
         workflow = workflow_structure.Workflow(
             crd_ref=workflow_structure.ConfigCRDRef(
@@ -47,14 +49,21 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                         materializers=function_structure.Materializers(
                             base=None, on_create=None
                         ),
+                        dynamic_input_keys=used_vars,
                     ),
                     condition=None,
+                    provided_input_keys=set(),
                 )
             ],
         )
 
-        result = await reconcile.reconcile_workflow(
+        value, conditions = await reconcile.reconcile_workflow(
             api=None, workflow_key="test-case", trigger={}, workflow=workflow
         )
 
-        self.assertTrue(True)
+        self.maxDiff = None
+        self.assertDictEqual(
+            {"input_source": {"resources": [{"bool": True}, {"bool": False}]}}, value
+        )
+
+        # TODO: Check Condition

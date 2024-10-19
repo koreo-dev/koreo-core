@@ -17,7 +17,7 @@ class MappedInput(NamedTuple):
     input_key: str
 
 
-class FunctionConditionSpec(NamedTuple):
+class StepConditionSpec(NamedTuple):
     type_: str
     name: str
 
@@ -28,9 +28,11 @@ class FunctionRef(NamedTuple):
 
     mapped_input: MappedInput | None
     inputs: celpy.Runner | None
-    dynamic_input_keys: list[str]
 
-    condition: FunctionConditionSpec | None
+    dynamic_input_keys: list[str]
+    provided_input_keys: set[str]
+
+    condition: StepConditionSpec | None
 
 
 class ConditionSpec(NamedTuple):

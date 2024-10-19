@@ -187,17 +187,22 @@ def combine(outcomes: Iterable[Outcome]):
     return reduce(lambda acc, outcome: acc.combine(outcome), outcomes)
 
 
-def unwrapped_combine(outcomes: Iterable[UnwrappedOutcome]):
+def unwrapped_combine(outcomes: Iterable[UnwrappedOutcome]) -> UnwrappedOutcome:
     if not outcomes:
         return Skip()
 
-    return reduce(
+    outcome = reduce(
         lambda acc, outcome: acc.combine(
             Ok(outcome) if is_unwrapped_ok(outcome) else outcome
         ),
         outcomes,
         DepSkip(),  # The lowest priority in a combine flow
     )
+
+    if is_ok(outcome):
+        return outcome.data
+
+    return outcome
 
 
 def is_ok[T](candidate: Outcome[T]) -> TypeGuard[Ok[T]]:

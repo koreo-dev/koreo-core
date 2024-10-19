@@ -1,23 +1,38 @@
+from typing import Generator, Coroutine
 import logging
 import re
 
 import celpy
 
-from koreo.cache import get_resource_from_cache
+from koreo.cache import get_resource_from_cache, reprepare_and_update_cache
 from koreo.cel.encoder import encode_cel
 from koreo.cel.structure_extractor import extract_argument_structure
 from koreo.cel.functions import koreo_cel_functions, koreo_function_annotations
-from koreo.function.registry import index_workload_functions
+from koreo.function.registry import index_workflow_functions
 from koreo.function.structure import Function
-from koreo.result import Ok, Outcome, PermFail, Retry, combine, is_error
+from koreo.result import (
+    Ok,
+    Outcome,
+    PermFail,
+    Retry,
+    UnwrappedOutcome,
+    combine,
+    is_error,
+)
 
 from controller.custom_workflow import start_controller
 
 from . import structure
-from .registry import index_workload_custom_crd
+from .registry import (
+    index_workflow_custom_crd,
+    index_workflow_workflows,
+    get_workflow_workflows,
+)
 
 
-async def prepare_workflow(cache_key: str, spec: dict | None) -> structure.Workflow:
+async def prepare_workflow(
+    cache_key: str, spec: dict | None
+) -> UnwrappedOutcome[tuple[structure.Workflow, Generator[Coroutine, None, None]]]:
     logging.info(f"Prepare workflow {cache_key}")
 
     if not spec:
@@ -28,18 +43,24 @@ async def prepare_workflow(cache_key: str, spec: dict | None) -> structure.Workf
     spec_steps = spec.get("steps", [])
     steps, steps_ready = _load_functions(cel_env, spec_steps)
 
+    # Update cross-reference registries
     function_keys = []
+    workflow_keys = []
     for step in spec_steps:
-        ref = step.get("functionRef", {})
-        function_keys.append(ref.get("name"))
+        function_ref = step.get("functionRef")
+        if function_ref:
+            function_keys.append(function_ref.get("name"))
 
-    index_workload_functions(
-        workflow=cache_key,
-        functions=function_keys,
-    )
+        workflow_ref = step.get("workflowRef")
+        if workflow_ref:
+            workflow_keys.append(workflow_ref.get("name"))
 
+    index_workflow_functions(workflow=cache_key, functions=function_keys)
+    index_workflow_workflows(workflow=cache_key, workflows=workflow_keys)
+
+    # Update CRD registry and ensure controller is running for the CRD.
     crd_ref = _build_crd_ref(spec.get("crdRef", {}))
-    index_workload_custom_crd(
+    index_workflow_custom_crd(
         workflow=cache_key,
         custom_crd=f"{crd_ref.api_group}:{crd_ref.kind}:{crd_ref.version}",
     )
@@ -48,11 +69,24 @@ async def prepare_workflow(cache_key: str, spec: dict | None) -> structure.Workf
         group=crd_ref.api_group, kind=crd_ref.kind, version=crd_ref.version
     )
 
-    return structure.Workflow(
-        crd_ref=crd_ref,
-        steps_ready=steps_ready,
-        steps=steps,
-        status=_build_status(cel_env=cel_env, status_spec=spec.get("status")),
+    # Re-prepare any Workflows using this Workflow
+    updaters = (
+        reprepare_and_update_cache(
+            resource_class=structure.Workflow,
+            preparer=prepare_workflow,
+            cache_key=workflow_key,
+        )
+        for workflow_key in get_workflow_workflows(workflow=cache_key)
+    )
+
+    return (
+        structure.Workflow(
+            crd_ref=crd_ref,
+            steps_ready=steps_ready,
+            steps=steps,
+            status=_build_status(cel_env=cel_env, status_spec=spec.get("status")),
+        ),
+        updaters,
     )
 
 
@@ -105,6 +139,7 @@ def _load_functions(
             continue
 
         dynamic_input_keys = set()
+        provided_input_keys = set()
 
         mapped_input_spec = step.get("mappedInput")
         if not mapped_input_spec:
@@ -121,6 +156,7 @@ def _load_functions(
                 for key in used_vars
                 if key.startswith("steps.")
             )
+            provided_input_keys.add(mapped_input_spec.get("inputKey"))
 
             mapped_input = structure.MappedInput(
                 source_iterator=cel_env.program(
@@ -143,6 +179,7 @@ def _load_functions(
                 for key in used_vars
                 if key.startswith("steps.")
             )
+            provided_input_keys.update(input_mapper_spec.keys())
 
             input_mapper = cel_env.program(
                 input_mapper_expression, functions=koreo_cel_functions
@@ -162,9 +199,9 @@ def _load_functions(
         if not condition_spec:
             condition = None
         else:
-            condition = structure.FunctionConditionSpec(
-                type_=condition_spec.type,
-                name=condition_spec.name,
+            condition = structure.StepConditionSpec(
+                type_=condition_spec.get("type"),
+                name=condition_spec.get("name"),
             )
 
         known_steps.add(step_label)
@@ -182,6 +219,7 @@ def _load_functions(
                 mapped_input=mapped_input,
                 inputs=input_mapper,
                 dynamic_input_keys=list(dynamic_input_keys),
+                provided_input_keys=provided_input_keys,
                 condition=condition,
             )
         )
@@ -207,9 +245,9 @@ def _build_status(
     else:
         conditions = [
             structure.ConditionSpec(
-                type_=condition_spec.type,
-                name=condition_spec.name,
-                step=condition_spec.step,
+                type_=condition_spec.get("type"),
+                name=condition_spec.get("name"),
+                step=condition_spec.get("step"),
             )
             for condition_spec in conditions_spec
         ]

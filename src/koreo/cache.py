@@ -1,6 +1,8 @@
+import asyncio
 import logging
 from typing import Awaitable, Callable, NamedTuple
 
+from koreo.result import is_unwrapped_ok
 
 LABEL_NAMESPACE = "koreo.realkinetic.com"
 
@@ -42,18 +44,29 @@ async def prepare_and_cache[
     if cached and cached.resource_version == resource_metadata.resource_version:
         return cached.resource
 
-    prepared = await preparer(cache_key, spec)
+    preparer_outcome = await preparer(cache_key, spec)
+
+    if not is_unwrapped_ok(preparer_outcome):
+        prepared_resource = preparer_outcome
+        updaters = None
+    else:
+        prepared_resource, updaters = preparer_outcome
 
     __CACHE[resource_class_name][cache_key] = __CachedResource[T](
         spec=spec,
-        resource=prepared,
+        resource=prepared_resource,
         resource_version=resource_metadata.resource_version,
     )
     logging.debug(
         f"Updating {resource_class_name} cache for {cache_key} ({resource_metadata.resource_version})."
     )
 
-    return prepared
+    if updaters:
+        async with asyncio.TaskGroup() as tasks:
+            for updater in updaters:
+                tasks.create_task(updater)
+
+    return prepared_resource
 
 
 async def reprepare_and_update_cache[
@@ -72,11 +85,17 @@ async def reprepare_and_update_cache[
     if not cached:
         return None
 
-    prepared = await preparer(cache_key, cached.spec)
+    preparer_outcome = await preparer(cache_key, cached.spec)
+
+    if not is_unwrapped_ok(preparer_outcome):
+        prepared_resource = preparer_outcome
+        updaters = None
+    else:
+        prepared_resource, updaters = preparer_outcome
 
     __CACHE[resource_class_name][cache_key] = __CachedResource[T](
         spec=cached.spec,
-        resource=prepared,
+        resource=prepared_resource,
         resource_version=cached.resource_version,
     )
 
@@ -84,7 +103,12 @@ async def reprepare_and_update_cache[
         f"Repreparing {cache_key} ({cached.resource_version}) in {resource_class_name} cache."
     )
 
-    return prepared
+    if updaters:
+        async with asyncio.TaskGroup() as tasks:
+            for updater in updaters:
+                tasks.create_task(updater)
+
+    return prepared_resource
 
 
 class __CachedResource[T](NamedTuple):

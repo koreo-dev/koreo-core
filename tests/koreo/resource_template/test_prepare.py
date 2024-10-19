@@ -2,7 +2,7 @@ import unittest
 
 from celpy import celtypes
 
-from koreo.result import PermFail
+from koreo.result import PermFail, is_unwrapped_ok
 
 from koreo.resource_template.prepare import prepare_resource_template
 
@@ -128,9 +128,14 @@ class TestPrepareResourceTemplate(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-        self.assertEqual(prepared.template_name, "TestResource.api.group/v1.test")
-        self.assertIsInstance(
-            prepared.template.get("spec", {}).get("bool"), celtypes.BoolType
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_template, _ = prepared
+
+        self.assertEqual(
+            prepared_template.template_name, "TestResource.api.group/v1.test"
         )
-        self.assertEqual(prepared.managed_resource.api_version, "api.group/v1")
-        self.assertEqual(prepared.managed_resource.kind, "TestResource")
+        self.assertIsInstance(
+            prepared_template.template.get("spec", {}).get("bool"), celtypes.BoolType
+        )
+        self.assertEqual(prepared_template.managed_resource.api_version, "api.group/v1")
+        self.assertEqual(prepared_template.managed_resource.kind, "TestResource")

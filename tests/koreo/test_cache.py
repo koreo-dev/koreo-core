@@ -34,7 +34,7 @@ async def prepare_type_one(key: str, value_spec: dict):
     # This is insanely dirty, never do this for real.
     value_spec["prep_count"] = value_spec.get("prep_count", 0) + 1
 
-    return ResourceTypeOne(**value_spec)
+    return ResourceTypeOne(**value_spec), None
 
 
 class TestCache(unittest.IsolatedAsyncioTestCase):

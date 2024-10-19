@@ -5,7 +5,7 @@ import celpy
 import yaml
 
 from koreo.function import prepare
-from koreo.result import PermFail
+from koreo.result import PermFail, is_unwrapped_ok
 
 _functions = {}
 
@@ -33,14 +33,20 @@ class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
             cache_key="outcome-tests.v1",
             spec=_functions["outcome-tests.v1"].get("spec", {}),
         )
-        self.assertIsNone(prepared.input_validators)
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+        self.assertIsNone(prepared_function.input_validators)
 
     async def test_no_problems(self):
         prepared = await prepare.prepare_function(
             cache_key="input-validation-tests.v1",
             spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
-        result = prepared.input_validators.evaluate(
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        result = prepared_function.input_validators.evaluate(
             {"inputs": celpy.json_to_cel({"number": 6, "optional_skip_number": 3333})}
         )
 
@@ -51,7 +57,11 @@ class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
             cache_key="input-validation-tests.v1",
             spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
-        cel_result = prepared.input_validators.evaluate(
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        cel_result = prepared_function.input_validators.evaluate(
             {"inputs": celpy.json_to_cel({"number": 4})}
         )
 
@@ -69,7 +79,11 @@ class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
             cache_key="input-validation-tests.v1",
             spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
-        cel_result = prepared.input_validators.evaluate(
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        cel_result = prepared_function.input_validators.evaluate(
             {"inputs": celpy.json_to_cel({"number": 8, "optional_number": 250})}
         )
 
@@ -87,7 +101,11 @@ class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
             cache_key="input-validation-tests.v1",
             spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
-        cel_result = prepared.input_validators.evaluate(
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        cel_result = prepared_function.input_validators.evaluate(
             {"inputs": celpy.json_to_cel({"number": 15})}
         )
 
@@ -106,7 +124,11 @@ class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
             cache_key="input-validation-tests.v1",
             spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
-        result = prepared.input_validators.evaluate(
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        result = prepared_function.input_validators.evaluate(
             {"inputs": celpy.json_to_cel({"number": 0, "optional_retry_number": 7})}
         )
 
@@ -117,7 +139,11 @@ class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
             cache_key="input-validation-tests.v1",
             spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
-        cel_result = prepared.input_validators.evaluate(
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        cel_result = prepared_function.input_validators.evaluate(
             {
                 "inputs": celpy.json_to_cel(
                     {"number": 8, "value_for_message": "set within message"}
@@ -143,14 +169,20 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
             cache_key="input-validation-tests.v1",
             spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
-        self.assertIsNone(prepared.outcome.tests)
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        self.assertIsNone(prepared_function.outcome.tests)
 
     async def test_optional_perm_fail(self):
         prepared = await prepare.prepare_function(
             cache_key="outcome-tests.v1",
             spec=_functions["outcome-tests.v1"].get("spec", {}),
         )
-        cel_result = prepared.outcome.tests.evaluate(
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+        cel_result = prepared_function.outcome.tests.evaluate(
             {"inputs": celpy.json_to_cel({"number": 5, "optional_number": 250})}
         )
 
@@ -168,7 +200,11 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
             cache_key="outcome-tests.v1",
             spec=_functions["outcome-tests.v1"].get("spec", {}),
         )
-        cel_result = prepared.outcome.tests.evaluate(
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        cel_result = prepared_function.outcome.tests.evaluate(
             {"inputs": celpy.json_to_cel({"number": 15})}
         )
 
@@ -187,7 +223,11 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
             cache_key="outcome-tests.v1",
             spec=_functions["outcome-tests.v1"].get("spec", {}),
         )
-        result = prepared.outcome.tests.evaluate(
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        result = prepared_function.outcome.tests.evaluate(
             {
                 "inputs": celpy.json_to_cel(
                     {"number": 20, "optional_number": 7, "output": 12}
@@ -202,7 +242,11 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
             cache_key="outcome-tests.v1",
             spec=_functions["outcome-tests.v1"].get("spec", {}),
         )
-        results = prepared.outcome.tests.evaluate(
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        results = prepared_function.outcome.tests.evaluate(
             {
                 "inputs": celpy.json_to_cel(
                     {"number": 10, "optional_number": 3333, "output": 11221122}
@@ -223,14 +267,22 @@ class TestFunctionOutcomeOkValue(unittest.IsolatedAsyncioTestCase):
             cache_key="input-validation-tests.v1",
             spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
-        self.assertIsNone(prepared.outcome.ok_value)
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        self.assertIsNone(prepared_function.outcome.ok_value)
 
     async def test_value(self):
         prepared = await prepare.prepare_function(
             cache_key="outcome-ok-value.v1",
             spec=_functions["outcome-ok-value.v1"].get("spec", {}),
         )
-        cel_result = prepared.outcome.ok_value.evaluate(
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        cel_result = prepared_function.outcome.ok_value.evaluate(
             {"inputs": celpy.json_to_cel({"output": 19283746})}
         )
 
@@ -243,7 +295,11 @@ class TestFunctionOutcomeOkValue(unittest.IsolatedAsyncioTestCase):
             cache_key="outcome-ok-value.v1",
             spec=_functions["outcome-ok-value.v1"].get("spec", {}),
         )
-        cel_result = prepared.outcome.ok_value.evaluate({})
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        cel_result = prepared_function.outcome.ok_value.evaluate({})
 
         result: list = json.loads(json.dumps(cel_result))
 
@@ -256,14 +312,22 @@ class TestFunctionMaterializerBase(unittest.IsolatedAsyncioTestCase):
             cache_key="input-validation-tests.v1",
             spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
-        self.assertIsNone(prepared.materializers.base)
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        self.assertIsNone(prepared_function.materializers.base)
 
     async def test_base(self):
         prepared = await prepare.prepare_function(
             cache_key="materializers-base-flat.v1",
             spec=_functions["materializers-base-flat.v1"].get("spec", {}),
         )
-        cel_result = prepared.materializers.base.evaluate(
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        cel_result = prepared_function.materializers.base.evaluate(
             {
                 "inputs": celpy.json_to_cel(
                     {
@@ -295,7 +359,11 @@ class TestFunctionMaterializerBase(unittest.IsolatedAsyncioTestCase):
             cache_key="materializers-base-nested.v1",
             spec=_functions["materializers-base-nested.v1"].get("spec", {}),
         )
-        cel_result = prepared.materializers.base.evaluate(
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        cel_result = prepared_function.materializers.base.evaluate(
             {
                 "inputs": celpy.json_to_cel(
                     {
@@ -328,14 +396,22 @@ class TestFunctionMaterializerOnCreate(unittest.IsolatedAsyncioTestCase):
             cache_key="input-validation-tests.v1",
             spec=_functions["input-validation-tests.v1"].get("spec", {}),
         )
-        self.assertIsNone(prepared.materializers.on_create)
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        self.assertIsNone(prepared_function.materializers.on_create)
 
     async def test_flat(self):
         prepared = await prepare.prepare_function(
             cache_key="materializers-on-create-flat.v1",
             spec=_functions["materializers-on-create-flat.v1"].get("spec", {}),
         )
-        cel_result = prepared.materializers.on_create.evaluate(
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        cel_result = prepared_function.materializers.on_create.evaluate(
             {
                 "inputs": celpy.json_to_cel(
                     {
@@ -366,7 +442,11 @@ class TestFunctionMaterializerOnCreate(unittest.IsolatedAsyncioTestCase):
             cache_key="materializers-on-create-nested.v1",
             spec=_functions["materializers-on-create-nested.v1"].get("spec", {}),
         )
-        cel_result = prepared.materializers.on_create.evaluate(
+
+        self.assertTrue(is_unwrapped_ok(prepared))
+        prepared_function, _ = prepared
+
+        cel_result = prepared_function.materializers.on_create.evaluate(
             {
                 "inputs": celpy.json_to_cel(
                     {
@@ -379,7 +459,6 @@ class TestFunctionMaterializerOnCreate(unittest.IsolatedAsyncioTestCase):
 
         result: list = json.loads(json.dumps(cel_result))
 
-        print(result)
         self.maxDiff = None
         output = {
             "metadata.namespace": "my-test-namespace",
@@ -390,5 +469,4 @@ class TestFunctionMaterializerOnCreate(unittest.IsolatedAsyncioTestCase):
                 "age": 35,
             },
         }
-        print(result)
         self.assertDictEqual(output, result)

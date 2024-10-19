@@ -17,7 +17,7 @@ class TestRegistry(unittest.TestCase):
         workflow_name = _name_generator("workflow")
         functions = [_name_generator("function") for _ in range(random.randint(5, 25))]
 
-        registry.index_workload_functions(workflow=workflow_name, functions=functions)
+        registry.index_workflow_functions(workflow=workflow_name, functions=functions)
 
         for function in functions:
             self.assertListEqual(
@@ -44,11 +44,11 @@ class TestRegistry(unittest.TestCase):
         ]
 
         # Index everything
-        registry.index_workload_functions(
+        registry.index_workflow_functions(
             workflow=workflow_name_one, functions=workflow_one_original_functions
         )
 
-        registry.index_workload_functions(
+        registry.index_workflow_functions(
             workflow=workflow_name_two, functions=workflow_two_functions
         )
 
@@ -56,7 +56,7 @@ class TestRegistry(unittest.TestCase):
         workflow_one_new_functions = common_functions + [
             _name_generator("function") for _ in range(random.randint(2, 5))
         ]
-        registry.index_workload_functions(
+        registry.index_workflow_functions(
             workflow=workflow_name_one, functions=workflow_one_new_functions
         )
 

@@ -56,6 +56,14 @@ spec:
                             type: string
                             nullable: false
                         required: [name]
+                      workflowRef:
+                        type: object
+                        nullable: false
+                        properties:
+                          name:
+                            type: string
+                            nullable: false
+                        required: [name]
                       mappedInput:
                         type: object
                         nullable: true
@@ -66,6 +74,7 @@ spec:
                           inputKey:
                             type: string
                             nullable: false
+                        required: [source, inputKey]
                       inputs:
                         type: object
                         x-kubernetes-preserve-unknown-fields: true
@@ -88,7 +97,12 @@ spec:
                             x-kubernetes-validations:
                               - rule: "!self.startsWith('=')"
                                 message: "name may not be a CEL expression."
-                    required: [label, functionRef]
+                    required: [label]
+                    oneOf:
+                      - properties:
+                        required: [functionRef]
+                      - properties:
+                        required: [workflowRef]
                 status:
                   type: object
                   nullable: true

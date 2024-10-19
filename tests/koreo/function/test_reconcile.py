@@ -7,9 +7,9 @@ import unittest
 import celpy
 import jsonpath_ng
 
-from koreo.cel.encoder import encode_cel, encode_cel_template
+from koreo.cel.encoder import encode_cel
+from koreo.cel.structure_extractor import extract_argument_structure
 
-from koreo.result import Ok
 
 from koreo.function import structure as function_structure
 from koreo.function import reconcile
@@ -52,11 +52,14 @@ class TestReconcileFunction(unittest.IsolatedAsyncioTestCase):
 
         inputs = cel_env.program(cel_env.compile(encode_cel({"value": 7}))).evaluate({})
 
+        used_vars = set[str]()
+
         input_validators = cel_env.program(
             cel_env.compile(
                 f"{encode_cel([{'type': 'Skip', 'message': 'Bad input', 'test': '=!has(inputs.value)'}])}.filter(predicate, predicate.test)"
             )
         )
+        used_vars.update(extract_argument_structure(input_validators.ast))
 
         source_ok_value = cel_env.program(
             cel_env.compile(
@@ -77,6 +80,7 @@ class TestReconcileFunction(unittest.IsolatedAsyncioTestCase):
                 )
             )
         )
+        used_vars.update(extract_argument_structure(source_ok_value.ast))
 
         function = function_structure.Function(
             resource_config=function_structure.StaticResource(
@@ -91,6 +95,7 @@ class TestReconcileFunction(unittest.IsolatedAsyncioTestCase):
             input_validators=input_validators,
             outcome=function_structure.Outcome(tests=None, ok_value=source_ok_value),
             materializers=function_structure.Materializers(base=None, on_create=None),
+            dynamic_input_keys=used_vars,
         )
 
         result = await reconcile.reconcile_function(

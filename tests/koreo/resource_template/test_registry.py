@@ -12,7 +12,7 @@ def _name_generator(prefix):
 
 
 async def _fake_prepare(key, _):
-    return f"RESOURCE: {key}"
+    return f"RESOURCE: {key}", None
 
 
 class TestResourceTemplateRegistry(unittest.IsolatedAsyncioTestCase):
@@ -36,7 +36,10 @@ class TestResourceTemplateRegistry(unittest.IsolatedAsyncioTestCase):
         registry.index_resource_template(cache_key=cache_key, template_key=template_key)
         resource = registry.get_resource_template(template_key=template_key)
 
-        self.assertEqual(await _fake_prepare(cache_key, None), resource)
+        cached_resource, updaters = await _fake_prepare(cache_key, None)
+
+        self.assertEqual(cached_resource, resource)
+        self.assertIsNone(updaters)
 
     async def test_get_missing(self):
         template_key = _name_generator("template")

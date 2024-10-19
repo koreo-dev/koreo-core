@@ -18,10 +18,10 @@ class TestRegistry(unittest.TestCase):
         workflow_name_one = _name_generator("workflow")
         workflow_name_two = _name_generator("workflow")
 
-        registry.index_workload_custom_crd(
+        registry.index_workflow_custom_crd(
             workflow=workflow_name_one, custom_crd=custom_crd_name
         )
-        registry.index_workload_custom_crd(
+        registry.index_workflow_custom_crd(
             workflow=workflow_name_two, custom_crd=custom_crd_name
         )
 
@@ -34,10 +34,10 @@ class TestRegistry(unittest.TestCase):
 
         custom_crd_name = _name_generator("crd")
 
-        registry.index_workload_custom_crd(
+        registry.index_workflow_custom_crd(
             workflow=workflow_name, custom_crd=custom_crd_name
         )
-        registry.index_workload_custom_crd(
+        registry.index_workflow_custom_crd(
             workflow=workflow_name, custom_crd=custom_crd_name
         )
 
@@ -51,10 +51,10 @@ class TestRegistry(unittest.TestCase):
         custom_crd_name_one = _name_generator("crd")
         custom_crd_name_two = _name_generator("crd")
 
-        registry.index_workload_custom_crd(
+        registry.index_workflow_custom_crd(
             workflow=workflow_name, custom_crd=custom_crd_name_one
         )
-        registry.index_workload_custom_crd(
+        registry.index_workflow_custom_crd(
             workflow=workflow_name, custom_crd=custom_crd_name_two
         )
 

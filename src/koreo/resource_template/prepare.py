@@ -13,7 +13,7 @@ from .registry import index_resource_template
 
 async def prepare_resource_template(
     cache_key: str, spec: dict | None
-) -> UnwrappedOutcome[structure.ResourceTemplate]:
+) -> UnwrappedOutcome[tuple[structure.ResourceTemplate, None]]:
     logging.info(f"Prepare resource template {cache_key}")
 
     if not spec:
@@ -100,12 +100,15 @@ async def prepare_resource_template(
 
     index_resource_template(cache_key=cache_key, template_key=template_key)
 
-    return structure.ResourceTemplate(
-        template_name=template_key,
-        managed_resource=managed_resource,
-        behavior=behavior,
-        context=context,
-        template=template,
+    return (
+        structure.ResourceTemplate(
+            template_name=template_key,
+            managed_resource=managed_resource,
+            behavior=behavior,
+            context=context,
+            template=template,
+        ),
+        None,
     )
 
 

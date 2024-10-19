@@ -43,3 +43,5 @@ class Function(NamedTuple):
 
     materializers: Materializers
     outcome: Outcome
+
+    dynamic_input_keys: set[str]

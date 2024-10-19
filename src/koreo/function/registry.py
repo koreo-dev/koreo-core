@@ -5,7 +5,7 @@ __workflow_function_index = defaultdict(set[str])
 __function_wokflow_index = defaultdict(set[str])
 
 
-def index_workload_functions(workflow: str, functions: list[str]):
+def index_workflow_functions(workflow: str, functions: list[str]):
     old_functions = __workflow_function_index[workflow]
 
     new_functions = set(functions)

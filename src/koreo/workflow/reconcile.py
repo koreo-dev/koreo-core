@@ -23,7 +23,13 @@ async def reconcile_workflow(
     if not result.is_ok(workflow.steps_ready):
         updated_outcome = copy.deepcopy(workflow.steps_ready)
         updated_outcome.location = f"{workflow_key}:{updated_outcome.location}"
-        return (updated_outcome, [])
+        condition = _condition_helper(
+            condition_type=f"Ready:{workflow_key}",
+            thing_name=f"Workflow {workflow_key}",
+            outcome=updated_outcome,
+            workflow_key=workflow_key,
+        )
+        return (updated_outcome, [condition])
 
     task_map: dict[str, asyncio.Task[result.UnwrappedOutcome]] = {}
 
@@ -47,14 +53,19 @@ async def reconcile_workflow(
     done, pending = await asyncio.wait(tasks)
     if pending:
         timed_out_tasks = ", ".join(task.get_name() for task in pending)
-        return (
-            result.Retry(
-                message=f"Timeout running Workflow Steps ({timed_out_tasks}), will retry.",
-                delay=15,
-                location=workflow_key,
-            ),
-            [],
+
+        timeout_outcome = result.Retry(
+            message=f"Timeout running Workflow Steps ({timed_out_tasks}), will retry.",
+            delay=15,
+            location=workflow_key,
         )
+        condition = _condition_helper(
+            condition_type=f"Ready:{workflow_key}",
+            thing_name=f"Workflow {workflow_key}",
+            outcome=timeout_outcome,
+            workflow_key=workflow_key,
+        )
+        return (timeout_outcome, [condition])
 
     outcomes = {task.get_name(): task.result() for task in done}
 
@@ -94,23 +105,15 @@ async def reconcile_workflow(
     if result.is_error(overall_outcome):
         return (overall_outcome, conditions)
 
-    if not workflow.status.state:
-        return (
-            celtypes.MapType(
-                {
-                    celtypes.StringType(step): _outcome_encoder(outcome)
-                    for step, outcome in outcomes.items()
-                }
-            ),
-            conditions,
-        )
-
     ok_outcomes = celtypes.MapType(
         {
             celtypes.StringType(step): _outcome_encoder(outcome)
             for step, outcome in outcomes.items()
         }
     )
+
+    if not workflow.status.state:
+        return (ok_outcomes, conditions)
 
     try:
         state = workflow.status.state.evaluate(
