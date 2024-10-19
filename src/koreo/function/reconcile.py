@@ -10,6 +10,9 @@ import jsonpath_ng
 import celpy
 from celpy import celtypes
 
+import env
+
+
 from koreo.result import (
     DepSkip,
     Ok,
@@ -46,6 +49,7 @@ async def reconcile_function(
     base_inputs = {
         "inputs": inputs,
         "parent": trigger,
+        "env": env,
     }
 
     validation_outcome = _run_checks(
@@ -75,6 +79,21 @@ async def reconcile_function(
     )
 
     # TODO: Add owners, if behaviors.add-owner
+    if (
+        isinstance(managed_resource, celtypes.MapType)
+        and "metadata" in managed_resource
+        and managed_resource[celtypes.StringType("metadata")].get(
+            celtypes.StringType("metadata")
+        )
+        == trigger[celtypes.StringType("metadata")].get(celtypes.StringType("metadata"))
+    ):
+        owners = managed_resource[celtypes.StringType("metadata")].get(
+            celtypes.StringType("ownerReferences"), celtypes.ListType()
+        )
+        owners.append(trigger.get(celtypes.StringType("ownerRef")))
+        managed_resource[celtypes.StringType("metadata")][
+            celtypes.StringType("ownerReferences")
+        ] = owners
 
     resource = await _resource_crud(
         api=api,
