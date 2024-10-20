@@ -3,7 +3,7 @@ import os
 import celpy
 import requests
 
-if os.environ.get("UNITTEST", False):
+if os.environ.get("PYTEST_VERSION") is not None:
     PROJECT_NUMBER = "1234567890"
     PROJECT_ID = "unittest-project-id"
 elif os.environ.get("KOREO_DEV_TOOLING", False):
