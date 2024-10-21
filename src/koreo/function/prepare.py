@@ -71,11 +71,12 @@ async def prepare_function(
 
     used_vars = set[str]()
 
-    input_validators, validated_vars = _predicate_extractor(
+    input_validators = _predicate_extractor(
         cel_env=env,
         predicate_spec=spec.get("inputValidators"),
     )
-    used_vars.update(validated_vars)
+    if input_validators:
+        used_vars.update(extract_argument_structure(input_validators.ast))
 
     materializers, materializer_vars = _prepare_materializers(
         cel_env=env, materializers=spec.get("materializers")
@@ -141,17 +142,17 @@ def _prepare_materializers(
     if not materializers:
         return structure.Materializers(base=None, on_create=None), materializer_vars
 
-    base_materializer_spec = materializers.get("base")
-    base_materializer, base_vars = _template_extractor(
-        cel_env=cel_env, template_spec=base_materializer_spec
+    base_materializer = _template_extractor(
+        cel_env=cel_env, template_spec=materializers.get("base")
     )
-    materializer_vars.update(base_vars)
+    if base_materializer:
+        materializer_vars.update(extract_argument_structure(base_materializer.ast))
 
-    on_create_materializer_spec = materializers.get("onCreate")
-    on_create_materializer, on_create_vars = _template_extractor(
-        cel_env=cel_env, template_spec=on_create_materializer_spec
+    on_create_materializer = _template_extractor(
+        cel_env=cel_env, template_spec=materializers.get("onCreate")
     )
-    materializer_vars.update(on_create_vars)
+    if on_create_materializer:
+        materializer_vars.update(extract_argument_structure(on_create_materializer.ast))
 
     return (
         structure.Materializers(
@@ -168,25 +169,24 @@ def _prepare_outcome(
     if not outcome:
         return structure.Outcome(tests=None, ok_value=None), outcome_vars
 
-    tests = None
-    test_spec = outcome.get("tests")
-    if test_spec:
-        tests, test_vars = _predicate_extractor(
-            cel_env=cel_env,
-            predicate_spec=test_spec,
-        )
-        outcome_vars.update(test_vars)
+    tests = _predicate_extractor(
+        cel_env=cel_env,
+        predicate_spec=outcome.get("tests"),
+    )
+    if tests:
+        outcome_vars.update(extract_argument_structure(tests.ast))
 
     ok_value = None
     ok_value_spec = outcome.get("okValue")
     if ok_value_spec:
-        compiled = cel_env.compile(encode_cel(ok_value_spec))
+        ok_value = cel_env.program(
+            cel_env.compile(encode_cel(ok_value_spec)), functions=koreo_cel_functions
+        )
 
         # TODO: We should inspect this more to map the output structure vs
         # needed values.
-        outcome_vars.update(extract_argument_structure(compiled=compiled))
+        outcome_vars.update(extract_argument_structure(ok_value.ast))
 
-        ok_value = cel_env.program(compiled, functions=koreo_cel_functions)
         ok_value.logger.setLevel(logging.WARNING)
 
     return structure.Outcome(tests=tests, ok_value=ok_value), outcome_vars
@@ -195,37 +195,27 @@ def _prepare_outcome(
 def _template_extractor(
     cel_env: celpy.Environment,
     template_spec: dict | None,
-) -> tuple[celpy.Runner | None, set[str]]:
-    template_vars = set[str]()
+) -> celpy.Runner | None:
     if not template_spec:
-        return None, template_vars
+        return None
 
-    materializer = encode_cel_template(template_spec=template_spec)
-
-    compiled = cel_env.compile(materializer)
-
-    template_vars.update(extract_argument_structure(compiled=compiled))
-
-    program = cel_env.program(compiled, functions=koreo_cel_functions)
+    program = cel_env.program(
+        cel_env.compile(encode_cel_template(template_spec=template_spec)),
+        functions=koreo_cel_functions,
+    )
     program.logger.setLevel(logging.WARNING)
-    return program, template_vars
+    return program
 
 
 def _predicate_extractor(
     cel_env: celpy.Environment,
     predicate_spec: list[dict] | None,
-) -> tuple[celpy.Runner | None, set[str]]:
-    predicate_vars = set[str]()
+) -> celpy.Runner | None:
     if not predicate_spec:
-        return None, predicate_vars
+        return None
 
     predicates = encode_cel(predicate_spec)
-
     tests = f"{predicates}.filter(predicate, predicate.test)"
-    compiled = cel_env.compile(tests)
-
-    predicate_vars.update(extract_argument_structure(compiled=compiled))
-
-    program = cel_env.program(compiled, functions=koreo_cel_functions)
+    program = cel_env.program(cel_env.compile(tests), functions=koreo_cel_functions)
     program.logger.setLevel(logging.WARNING)
-    return program, predicate_vars
+    return program

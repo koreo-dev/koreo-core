@@ -146,10 +146,33 @@ def _outcome_encoder(outcome: result.UnwrappedOutcome):
     return outcome
 
 
+async def _reconcile_step_logic(
+    api: kr8s.Api,
+    workflow_key: str,
+    trigger: celtypes.Value,
+    inputs: celtypes.Value,
+    location: str,
+    logic: structure.Function | structure.Workflow,
+):
+    if isinstance(logic, structure.Workflow):
+        workflow, _ = await reconcile_workflow(
+            api=api, workflow_key=workflow_key, trigger=inputs, workflow=logic
+        )
+        return workflow
+
+    return await reconcile_function(
+        api=api,
+        location=location,
+        function=logic,
+        trigger=trigger,
+        inputs=inputs,
+    )
+
+
 async def _reconcile_step(
     api: kr8s.Api,
     workflow_key: str,
-    step: structure.FunctionRef,
+    step: structure.Step,
     dependencies: list[asyncio.Task[result.UnwrappedOutcome]],
     trigger: celtypes.Value,
 ):
@@ -161,10 +184,11 @@ async def _reconcile_step(
         else:
             inputs = celtypes.MapType()
 
-        return await reconcile_function(
+        return await _reconcile_step_logic(
             api=api,
+            workflow_key=workflow_key,
             location=location,
-            function=step.function,
+            logic=step.logic,
             trigger=trigger,
             inputs=inputs,
         )
@@ -223,6 +247,7 @@ async def _reconcile_step(
     if step.mapped_input:
         return await _reconcile_mapped_function(
             api=api,
+            workflow_key=workflow_key,
             location=location,
             step=step,
             steps=ok_outcomes,
@@ -230,10 +255,11 @@ async def _reconcile_step(
             inputs=inputs,
         )
     else:
-        return await reconcile_function(
+        return await _reconcile_step_logic(
             api=api,
+            workflow_key=workflow_key,
             location=location,
-            function=step.function,
+            logic=step.logic,
             trigger=trigger,
             inputs=inputs,
         )
@@ -241,7 +267,8 @@ async def _reconcile_step(
 
 async def _reconcile_mapped_function(
     api: kr8s.Api,
-    step: structure.FunctionRef,
+    step: structure.Step,
+    workflow_key: str,
     location: str,
     steps: celtypes.MapType,
     inputs: celtypes.Value,
@@ -265,10 +292,11 @@ async def _reconcile_mapped_function(
             iterated_inputs.update({step.mapped_input.input_key: map_value})
             tasks.append(
                 task_group.create_task(
-                    reconcile_function(
+                    _reconcile_step_logic(
                         api=api,
+                        workflow_key=workflow_key,
                         location=f"{location}[{idx}]",
-                        function=step.function,
+                        logic=step.logic,
                         trigger=trigger,
                         inputs=iterated_inputs,
                     ),

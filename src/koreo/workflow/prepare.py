@@ -11,13 +11,13 @@ from koreo.cel.functions import koreo_cel_functions, koreo_function_annotations
 from koreo.function.registry import index_workflow_functions
 from koreo.function.structure import Function
 from koreo.result import (
-    Ok,
     Outcome,
     PermFail,
     Retry,
     UnwrappedOutcome,
-    combine,
     is_error,
+    is_unwrapped_ok,
+    unwrapped_combine,
 )
 
 from controller.custom_workflow import start_controller
@@ -41,7 +41,7 @@ async def prepare_workflow(
     cel_env = celpy.Environment(annotations=koreo_function_annotations)
 
     spec_steps = spec.get("steps", [])
-    steps, steps_ready = _load_functions(cel_env, spec_steps)
+    steps, steps_ready = _load_steps(cel_env, spec_steps)
 
     # Update cross-reference registries
     function_keys = []
@@ -101,130 +101,177 @@ def _build_crd_ref(crd_ref_spec: dict) -> structure.ConfigCRDRef:
 INPUT_NAME_PATTERN = re.compile("steps.([^.]+).?")
 
 
-def _load_functions(
-    cel_env: celpy.Environment, step_spec: list[dict]
-) -> tuple[list[structure.FunctionRef], Outcome]:
+def _load_steps(
+    cel_env: celpy.Environment, steps_spec: list[dict]
+) -> tuple[list[structure.Step], Outcome]:
+
     known_steps: set[str] = set()
 
-    outcomes: list[Outcome] = []
-
-    functions = []
-    for step in step_spec:
-        step_label = step.get("label")
-
-        function_ref = step.get("functionRef", {})
-        function_cache_key = function_ref.get("name")
-        function = get_resource_from_cache(
-            resource_class=Function,
-            cache_key=function_cache_key,
-        )
-        if not function:
-            outcomes.append(
-                Retry(
-                    message=f"Missing Function ({function_cache_key}), can not prepare Workflow.",
-                    delay=15,
-                    location=f"{step_label}:{function_cache_key}",
-                )
-            )
-            continue
-
-        if is_error(function):
-            outcomes.append(
-                Retry(
-                    message=f"Function ({function_cache_key}) is not healthy ({function.message}). Workflow prepare will retry.",
-                    delay=180,
-                    location=f"{step_label}:{function_cache_key}",
-                )
-            )
-            continue
-
-        dynamic_input_keys = set()
-        provided_input_keys = set()
-
-        mapped_input_spec = step.get("mappedInput")
-        if not mapped_input_spec:
-            mapped_input = None
-        else:
-            source_iterator = mapped_input_spec.get("source")
-            encoded_source_iterator = encode_cel(source_iterator)
-
-            source_iterator_expression = cel_env.compile(encoded_source_iterator)
-            used_vars = extract_argument_structure(source_iterator_expression)
-
-            dynamic_input_keys.update(
-                INPUT_NAME_PATTERN.match(key).group(1)
-                for key in used_vars
-                if key.startswith("steps.")
-            )
-            provided_input_keys.add(mapped_input_spec.get("inputKey"))
-
-            mapped_input = structure.MappedInput(
-                source_iterator=cel_env.program(
-                    source_iterator_expression, functions=koreo_cel_functions
-                ),
-                input_key=mapped_input_spec.get("inputKey"),
-            )
-
-        input_mapper_spec = step.get("inputs")
-        if not input_mapper_spec:
-            input_mapper = None
-        else:
-            encoded_input_extractor = encode_cel(input_mapper_spec)
-
-            input_mapper_expression = cel_env.compile(encoded_input_extractor)
-            used_vars = extract_argument_structure(input_mapper_expression)
-
-            dynamic_input_keys.update(
-                INPUT_NAME_PATTERN.match(key).group(1)
-                for key in used_vars
-                if key.startswith("steps.")
-            )
-            provided_input_keys.update(input_mapper_spec.keys())
-
-            input_mapper = cel_env.program(
-                input_mapper_expression, functions=koreo_cel_functions
-            )
-
-        out_of_order_steps = dynamic_input_keys.difference(known_steps)
-        if out_of_order_steps:
-            outcomes.append(
-                PermFail(
-                    message=f"Function ({function_cache_key}), must come after {', '.join(out_of_order_steps)}.",
-                    location=f"{step_label}:{function_cache_key}",
-                )
-            )
-            continue
-
-        condition_spec = step.get("condition")
-        if not condition_spec:
-            condition = None
-        else:
-            condition = structure.StepConditionSpec(
-                type_=condition_spec.get("type"),
-                name=condition_spec.get("name"),
-            )
-
+    step_outcomes: list[UnwrappedOutcome] = []
+    for step_spec in steps_spec:
+        step_label = step_spec.get("label")
+        step_outcomes.append(_load_step(cel_env, step_spec))
         known_steps.add(step_label)
 
-        outcomes.append(
-            Ok(
-                data=None,
-                location=f"{step_label}:{function_cache_key}",
-            )
-        )
-        functions.append(
-            structure.FunctionRef(
-                label=step_label,
-                function=function,
-                mapped_input=mapped_input,
-                inputs=input_mapper,
-                dynamic_input_keys=list(dynamic_input_keys),
-                provided_input_keys=provided_input_keys,
-                condition=condition,
-            )
+    steps: list[structure.Step] = [
+        step_outcome for step_outcome in step_outcomes if is_unwrapped_ok(step_outcome)
+    ]
+
+    return steps, unwrapped_combine(step_outcomes)
+
+
+def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str]):
+    step_label = step_spec.get("label")
+    if not step_label:
+        return PermFail(message=f"Missing step-label can not prepare Workflow.")
+
+    logic_cache_key = None
+    logic = None
+
+    function_ref = step_spec.get("functionRef")
+    if function_ref:
+        logic_cache_key, logic = _load_function(step_label, function_ref)
+
+    workflow_ref = step_spec.get("workflowRef")
+    if workflow_ref:
+        logic_cache_key, logic = _load_workflow(step_label, workflow_ref)
+
+    if is_error(logic):
+        return logic
+
+    if not (logic_cache_key and logic):
+        return PermFail(
+            message=f"Unable to load step ({step_label}), can not prepare Workflow."
         )
 
-    return functions, combine(outcomes)
+    dynamic_input_keys = set()
+    provided_input_keys = set()
+
+    mapped_input_spec = step_spec.get("mappedInput")
+    if not mapped_input_spec:
+        mapped_input = None
+    else:
+        source_iterator = mapped_input_spec.get("source")
+        encoded_source_iterator = encode_cel(source_iterator)
+
+        source_iterator_expression = cel_env.compile(encoded_source_iterator)
+        used_vars = extract_argument_structure(source_iterator_expression)
+
+        dynamic_input_keys.update(
+            INPUT_NAME_PATTERN.match(key).group(1)
+            for key in used_vars
+            if key.startswith("steps.")
+        )
+        provided_input_keys.add(mapped_input_spec.get("inputKey"))
+
+        mapped_input = structure.MappedInput(
+            source_iterator=cel_env.program(
+                source_iterator_expression, functions=koreo_cel_functions
+            ),
+            input_key=mapped_input_spec.get("inputKey"),
+        )
+
+    input_mapper_spec = step_spec.get("inputs")
+    if not input_mapper_spec:
+        input_mapper = None
+    else:
+        encoded_input_extractor = encode_cel(input_mapper_spec)
+
+        input_mapper_expression = cel_env.compile(encoded_input_extractor)
+        used_vars = extract_argument_structure(input_mapper_expression)
+
+        dynamic_input_keys.update(
+            INPUT_NAME_PATTERN.match(key).group(1)
+            for key in used_vars
+            if key.startswith("steps.")
+        )
+        provided_input_keys.update(input_mapper_spec.keys())
+
+        input_mapper = cel_env.program(
+            input_mapper_expression, functions=koreo_cel_functions
+        )
+
+    out_of_order_steps = dynamic_input_keys.difference(known_steps)
+    if out_of_order_steps:
+        return PermFail(
+            message=f"Function ({logic_cache_key}), must come after {', '.join(out_of_order_steps)}.",
+            location=f"{step_label}:{logic_cache_key}",
+        )
+
+    condition_spec = step_spec.get("condition")
+    if not condition_spec:
+        condition = None
+    else:
+        condition = structure.StepConditionSpec(
+            type_=condition_spec.get("type"),
+            name=condition_spec.get("name"),
+        )
+
+    return structure.Step(
+        label=step_label,
+        logic=logic,
+        mapped_input=mapped_input,
+        inputs=input_mapper,
+        dynamic_input_keys=list(dynamic_input_keys),
+        provided_input_keys=provided_input_keys,
+        condition=condition,
+    )
+
+
+def _load_function(step_label: str, function_ref: dict):
+    function_cache_key = function_ref.get("name")
+    if not function_cache_key:
+        return function_cache_key, PermFail(
+            message=f"Missing Function name, can not prepare Workflow.",
+            location=f"{step_label}",
+        )
+
+    function = get_resource_from_cache(
+        resource_class=Function,
+        cache_key=function_cache_key,
+    )
+    if not function:
+        return function_cache_key, Retry(
+            message=f"Missing Function ({function_cache_key}), can not prepare Workflow.",
+            delay=15,
+            location=f"{step_label}:{function_cache_key}",
+        )
+
+    if is_error(function):
+        return function_cache_key, Retry(
+            message=f"Function ({function_cache_key}) is not healthy ({function.message}). Workflow prepare will retry.",
+            delay=180,
+            location=f"{step_label}:{function_cache_key}",
+        )
+    return function_cache_key, function
+
+
+def _load_workflow(step_label: str, workflow_ref: dict):
+    workflow_cache_key = workflow_ref.get("name")
+    if not workflow_cache_key:
+        return workflow_cache_key, PermFail(
+            message=f"Missing Workflow name, can not prepare Workflow.",
+            location=f"{step_label}",
+        )
+
+    workflow = get_resource_from_cache(
+        resource_class=structure.Workflow,
+        cache_key=workflow_cache_key,
+    )
+    if not workflow:
+        return workflow_cache_key, Retry(
+            message=f"Missing Function ({workflow_cache_key}), can not prepare Workflow.",
+            delay=15,
+            location=f"{step_label}:{workflow_cache_key}",
+        )
+
+    if is_error(workflow.steps_ready):
+        return workflow_cache_key, Retry(
+            message=f"Workflow ({workflow_cache_key}) is not healthy ({workflow.steps_ready.message}). Workflow prepare will retry.",
+            delay=180,
+            location=f"{step_label}:{workflow_cache_key}",
+        )
+    return workflow_cache_key, workflow
 
 
 def _build_status(

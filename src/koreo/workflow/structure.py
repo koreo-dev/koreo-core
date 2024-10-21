@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import NamedTuple
 
 import celpy
@@ -22,9 +23,9 @@ class StepConditionSpec(NamedTuple):
     name: str
 
 
-class FunctionRef(NamedTuple):
+class Step(NamedTuple):
     label: str
-    function: Function
+    logic: Function | Workflow
 
     mapped_input: MappedInput | None
     inputs: celpy.Runner | None
@@ -50,6 +51,6 @@ class Workflow(NamedTuple):
     crd_ref: ConfigCRDRef
 
     steps_ready: Outcome
-    steps: list[FunctionRef]
+    steps: list[Step]
 
     status: Status
