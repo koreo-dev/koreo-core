@@ -11,6 +11,7 @@ from koreo.cel.functions import koreo_cel_functions, koreo_function_annotations
 from koreo.function.registry import index_workflow_functions
 from koreo.function.structure import Function
 from koreo.result import (
+    Ok,
     Outcome,
     PermFail,
     Retry,
@@ -110,14 +111,19 @@ def _load_steps(
     step_outcomes: list[UnwrappedOutcome] = []
     for step_spec in steps_spec:
         step_label = step_spec.get("label")
-        step_outcomes.append(_load_step(cel_env, step_spec))
+        step_outcomes.append(_load_step(cel_env, step_spec, known_steps))
         known_steps.add(step_label)
 
     steps: list[structure.Step] = [
         step_outcome for step_outcome in step_outcomes if is_unwrapped_ok(step_outcome)
     ]
 
-    return steps, unwrapped_combine(step_outcomes)
+    overall_outcome = unwrapped_combine(step_outcomes)
+
+    if is_unwrapped_ok(overall_outcome):
+        return steps, Ok(None)
+
+    return steps, overall_outcome
 
 
 def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str]):
