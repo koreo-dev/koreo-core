@@ -36,6 +36,13 @@ class Step(NamedTuple):
     condition: StepConditionSpec | None
 
 
+class ErrorStep(NamedTuple):
+    label: str
+    outcome: Outcome
+
+    condition: StepConditionSpec | None
+
+
 class ConditionSpec(NamedTuple):
     type_: str
     name: str
@@ -51,6 +58,6 @@ class Workflow(NamedTuple):
     crd_ref: ConfigCRDRef
 
     steps_ready: Outcome
-    steps: list[Step]
+    steps: list[Step | ErrorStep]
 
     status: Status

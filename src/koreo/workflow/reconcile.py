@@ -172,11 +172,14 @@ async def _reconcile_step_logic(
 async def _reconcile_step(
     api: kr8s.Api,
     workflow_key: str,
-    step: structure.Step,
+    step: structure.Step | structure.ErrorStep,
     dependencies: list[asyncio.Task[result.UnwrappedOutcome]],
     trigger: celtypes.Value,
 ):
     location = f"{workflow_key}.{step.label}"
+
+    if isinstance(step, structure.ErrorStep):
+        return step.outcome
 
     if not dependencies:
         if step.inputs:

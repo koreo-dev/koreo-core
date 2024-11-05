@@ -114,22 +114,22 @@ def _load_steps(
         step_outcomes.append(_load_step(cel_env, step_spec, known_steps))
         known_steps.add(step_label)
 
-    steps: list[structure.Step] = [
-        step_outcome for step_outcome in step_outcomes if is_unwrapped_ok(step_outcome)
-    ]
-
     overall_outcome = unwrapped_combine(step_outcomes)
 
     if is_unwrapped_ok(overall_outcome):
-        return steps, Ok(None)
+        return step_outcomes, Ok(None)
 
-    return steps, overall_outcome
+    return step_outcomes, overall_outcome
 
 
 def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str]):
     step_label = step_spec.get("label")
     if not step_label:
-        return PermFail(message=f"Missing step-label can not prepare Workflow.")
+        return structure.ErrorStep(
+            label=step_label,
+            outcome=PermFail(message=f"Missing step-label can not prepare Workflow."),
+            condition=None,
+        )
 
     logic_cache_key = None
     logic = None
@@ -143,11 +143,15 @@ def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str
         logic_cache_key, logic = _load_workflow(step_label, workflow_ref)
 
     if is_error(logic):
-        return logic
+        return structure.ErrorStep(label=step_label, outcome=logic, condition=None)
 
     if not (logic_cache_key and logic):
-        return PermFail(
-            message=f"Unable to load step ({step_label}), can not prepare Workflow."
+        return structure.ErrorStep(
+            label=step_label,
+            outcome=PermFail(
+                message=f"Unable to load step ({step_label}), can not prepare Workflow."
+            ),
+            condition=None,
         )
 
     dynamic_input_keys = set()
@@ -199,9 +203,13 @@ def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str
 
     out_of_order_steps = dynamic_input_keys.difference(known_steps)
     if out_of_order_steps:
-        return PermFail(
-            message=f"Function ({logic_cache_key}), must come after {', '.join(out_of_order_steps)}.",
-            location=f"{step_label}:{logic_cache_key}",
+        return structure.ErrorStep(
+            label=step_label,
+            outcome=PermFail(
+                message=f"Function ({logic_cache_key}), must come after {', '.join(out_of_order_steps)}.",
+                location=f"{step_label}:{logic_cache_key}",
+            ),
+            condition=None,
         )
 
     condition_spec = step_spec.get("condition")
