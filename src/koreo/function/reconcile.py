@@ -28,7 +28,8 @@ from koreo.result import (
     is_unwrapped_ok,
 )
 
-from koreo.resource_template.registry import get_resource_template
+from koreo.cache import get_resource_from_cache
+from koreo.resource_template.structure import ResourceTemplate
 
 from .structure import (
     Behavior,
@@ -156,7 +157,9 @@ def _load_resource_config(
 
         case DynamicResource(key=key):
             template_key = key.evaluate(inputs)
-            resource_template = get_resource_template(template_key=template_key)
+            resource_template = get_resource_from_cache(
+                resource_class=ResourceTemplate, cache_key=f"{template_key}"
+            )
             if not resource_template:
                 return Retry(
                     message=f'ResourceTemplate ("{template_key}") not found, will retry.',

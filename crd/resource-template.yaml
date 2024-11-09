@@ -20,9 +20,6 @@ spec:
             spec:
               type: object
               properties:
-                templateName:
-                  type: string
-                  nullable: false
                 behavior:
                   type: object
                   nullable: false
@@ -72,7 +69,7 @@ spec:
                   nullable: false
                   x-kubernetes-embedded-resource: true
                   x-kubernetes-preserve-unknown-fields: true
-              required: [templateName, managedResource, template]
+              required: [managedResource, template]
             status:
               x-kubernetes-preserve-unknown-fields: true
               type: object

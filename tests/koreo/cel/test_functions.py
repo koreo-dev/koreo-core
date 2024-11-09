@@ -379,7 +379,7 @@ class TestTemplateName(unittest.TestCase):
         compiled = cel_env.compile(test_cel_expression)
         program = cel_env.program(compiled, functions=koreo_cel_functions)
 
-        self.assertEqual("TestCase.api.group/v5.template", program.evaluate(inputs))
+        self.assertEqual("testcase.api.group.v5.template", program.evaluate(inputs))
 
 
 class TestOverlay(unittest.TestCase):

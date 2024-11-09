@@ -251,7 +251,7 @@ metadata:
   namespace: koreo-testing
 spec:
   dynamicResource:
-    key: ="TestDummy.koreo.realkinetic.com/v1alpha8." + inputs.template_name
+    key: ="testdummy.koreo.realkinetic.com/v1alpha8." + inputs.template_name
   materializers:
     base:
       metadata:

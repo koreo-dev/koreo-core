@@ -4,11 +4,8 @@ import celpy
 from celpy import celtypes
 
 from koreo.result import PermFail, UnwrappedOutcome
-from koreo.cel.encoder import encode_cel
-from koreo.cel.functions import koreo_cel_functions, koreo_function_annotations
 
 from . import structure
-from .registry import index_resource_template
 
 
 async def prepare_resource_template(
@@ -19,14 +16,6 @@ async def prepare_resource_template(
     if not spec:
         return PermFail(
             message=f"Missing `spec` for ResourceTemplate '{cache_key}'.",
-            location=f"prepare:ResourceTemplate:{cache_key}",
-        )
-
-    template_name_exp_str = spec.get("templateName")
-
-    if not template_name_exp_str:
-        return PermFail(
-            message=f"Missing `spec.templateName` for ResourceTemplate '{cache_key}'.",
             location=f"prepare:ResourceTemplate:{cache_key}",
         )
 
@@ -74,35 +63,8 @@ async def prepare_resource_template(
             location=f"prepare:ResourceTemplate:{cache_key}",
         )
 
-    cel_env = celpy.Environment(annotations=koreo_function_annotations)
-
-    template_name_expression = cel_env.program(
-        cel_env.compile(encode_cel(template_name_exp_str)),
-        functions=koreo_cel_functions,
-    )
-    template_key = celpy.CELJSONEncoder.to_python(
-        template_name_expression.evaluate(
-            {
-                "managedResource": celpy.json_to_cel(managed_resource_spec),
-                "template": template,
-            }
-        )
-    )
-
-    if not isinstance(template_key, celtypes.StringType):
-        return PermFail(
-            message=(
-                f"ResourceTemplate '{cache_key}' `spec.templateName` "
-                f"('{template_name_exp_str}') must evaluate to a string ('{template_key}')."
-            ),
-            location=f"prepare:ResourceTemplate:{cache_key}",
-        )
-
-    index_resource_template(cache_key=cache_key, template_key=template_key)
-
     return (
         structure.ResourceTemplate(
-            template_name=template_key,
             managed_resource=managed_resource,
             behavior=behavior,
             context=context,

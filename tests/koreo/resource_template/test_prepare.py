@@ -13,15 +13,8 @@ class TestPrepareResourceTemplate(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(prepared, PermFail)
         self.assertIn("Missing `spec`", prepared.message)
 
-    async def test_missing_template_name(self):
-        prepared = await prepare_resource_template("test-case", {"managedResource": {}})
-        self.assertIsInstance(prepared, PermFail)
-        self.assertIn("Missing `spec.templateName`", prepared.message)
-
     async def test_missing_managed_resource(self):
-        prepared = await prepare_resource_template(
-            "test-case", {"templateName": "hard-coded"}
-        )
+        prepared = await prepare_resource_template("test-case", {"fake": True})
         self.assertIsInstance(prepared, PermFail)
         self.assertIn("Missing `spec.managedResource`", prepared.message)
 
@@ -29,7 +22,6 @@ class TestPrepareResourceTemplate(unittest.IsolatedAsyncioTestCase):
         prepared = await prepare_resource_template(
             "test-case",
             {
-                "templateName": "hard-coded",
                 "managedResource": {
                     "apiVersion": "api.group/v1",
                     "kind": "TestResource",
@@ -43,7 +35,6 @@ class TestPrepareResourceTemplate(unittest.IsolatedAsyncioTestCase):
         prepared = await prepare_resource_template(
             "test-case",
             {
-                "templateName": "hard-coded",
                 "managedResource": {
                     "apiVersion": "api.group/v1",
                     "kind": "TestResource",
@@ -58,7 +49,6 @@ class TestPrepareResourceTemplate(unittest.IsolatedAsyncioTestCase):
         prepared = await prepare_resource_template(
             "test-case",
             {
-                "templateName": "hard-coded",
                 "managedResource": {
                     "apiVersion": "api.group/v1",
                     "kind": "TestResource",
@@ -76,7 +66,6 @@ class TestPrepareResourceTemplate(unittest.IsolatedAsyncioTestCase):
         prepared = await prepare_resource_template(
             "test-case",
             {
-                "templateName": "hard-coded",
                 "managedResource": {
                     "apiVersion": "api.group/v1",
                     "kind": "TestResource",
@@ -91,30 +80,10 @@ class TestPrepareResourceTemplate(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(prepared, PermFail)
         self.assertIn("must be an object.", prepared.message)
 
-    async def test_template_name_type(self):
-        prepared = await prepare_resource_template(
-            "test-case",
-            {
-                "templateName": "=[1, 2, 3]",
-                "managedResource": {
-                    "apiVersion": "api.group/v1",
-                    "kind": "TestResource",
-                },
-                "template": {
-                    "apiVersion": "api.group/v1",
-                    "kind": "TestResource",
-                },
-                "context": {"values": "ok"},
-            },
-        )
-        self.assertIsInstance(prepared, PermFail)
-        self.assertIn("must evaluate to a string", prepared.message)
-
     async def test_good_config(self):
         prepared = await prepare_resource_template(
             "test-case",
             {
-                "templateName": "=managedResource.template_name('test')",
                 "managedResource": {
                     "apiVersion": "api.group/v1",
                     "kind": "TestResource",
@@ -131,9 +100,6 @@ class TestPrepareResourceTemplate(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(is_unwrapped_ok(prepared))
         prepared_template, _ = prepared
 
-        self.assertEqual(
-            prepared_template.template_name, "TestResource.api.group/v1.test"
-        )
         self.assertIsInstance(
             prepared_template.template.get("spec", {}).get("bool"), celtypes.BoolType
         )

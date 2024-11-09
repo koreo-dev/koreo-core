@@ -288,10 +288,14 @@ def _template_name(
     if not api_version:
         return celpy.CELEvalError(f"Missing `apiVersion`.")
 
+    api_version = api_version.replace("/", ".")
+
     kind_key = celtypes.StringType("kind")
     kind = resource.get(kind_key)
     if not kind:
         return celpy.CELEvalError(f"Missing `kind`.")
+
+    kind = kind.lower()
 
     if not name:
         return celpy.CELEvalError(f"Missing `name`.")
