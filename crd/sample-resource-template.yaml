@@ -18,11 +18,12 @@ spec:
     apiVersion: koreo.realkinetic.com/v1alpha8
     kind: TestDummy
     metadata:
-      name: simple-test-resource
+      name: simple-test-resource-simple
       namespace: koreo-testing
       labels:
         testing.realkinetic.com/a-label: some-forced-label
     spec:
+      aTrue: true
       aNumber: 18
       aString: This is a test.
       aList:
@@ -49,7 +50,7 @@ spec:
     apiVersion: koreo.realkinetic.com/v1alpha8
     kind: TestDummy
     metadata:
-      name: simple-test-resource
+      name: simple-test-resource-template-a
       namespace: koreo-testing
       labels:
         testing.realkinetic.com/a-label: some-forced-label
@@ -73,7 +74,7 @@ spec:
     apiVersion: koreo.realkinetic.com/v1alpha8
     kind: TestDummy
     metadata:
-      name: simple-test-resource
+      name: simple-test-resource-template-b
       namespace: koreo-testing
       labels:
         testing.realkinetic.com/a-label: some-forced-label

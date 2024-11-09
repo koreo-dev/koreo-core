@@ -84,9 +84,11 @@ async def reconcile_function(
         isinstance(managed_resource, celtypes.MapType)
         and "metadata" in managed_resource
         and managed_resource[celtypes.StringType("metadata")].get(
-            celtypes.StringType("metadata")
+            celtypes.StringType("namespace")
         )
-        == trigger[celtypes.StringType("metadata")].get(celtypes.StringType("metadata"))
+        == trigger[celtypes.StringType("metadata")].get(
+            celtypes.StringType("namespace")
+        )
     ):
         owners = managed_resource[celtypes.StringType("metadata")].get(
             celtypes.StringType("ownerReferences"), celtypes.ListType()
@@ -386,14 +388,27 @@ async def _resource_crud(
             location=location,
         )
 
+        # TODO: For some reason, bools aren't being encoded correctly here.
+        # I have seen this before, but I thought I'd fully resolved it.
+        # Note the differnces in the log outputs.
+
+        # Bools are CEL-type bools in both of these:
+        logging.error(f"CEL raw: {managed_resource}")
+        logging.error(f"CEL-only: {celpy.CELJSONEncoder.to_python(managed_resource)}")
+
+        # Whic results in any JSON encoding casting them to int.
+        logging.error(
+            f"CELed: {json.loads(json.dumps(celpy.CELJSONEncoder.to_python(managed_resource)))}"
+        )
+        logging.error(f"Non-CELed: {json.loads(json.dumps(managed_resource))}")
+
         logging.info(f"Creating {resource_api} resource {resource_name}. ({location})")
         new_object = resource_class(
             api=api,
-            resource=json.loads(
-                json.dumps(celpy.CELJSONEncoder.to_python(managed_resource))
-            ),
+            resource=celpy.CELJSONEncoder.to_python(managed_resource),
             namespace=resource_api_params.namespace,
         )
+
         try:
             await new_object.create()
         except TypeError as err:

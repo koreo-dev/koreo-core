@@ -9,7 +9,7 @@ metadata:
   name: fully-built-trigger
   namespace: koreo-testing
   labels:
-    koreo.realkinetic.com/bumper: "1"
+    koreo.realkinetic.com/bumper: "4"
 spec:
   domainName: Testing
 ---
