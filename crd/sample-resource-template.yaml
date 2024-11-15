@@ -9,7 +9,6 @@ metadata:
   name: simple-template.v1
   namespace: koreo-testing
 spec:
-  templateName: =managedResource.template_name("simple-test.v1")
   managedResource:
     apiVersion: koreo.realkinetic.com/v1alpha8
     kind: TestDummy
@@ -19,11 +18,12 @@ spec:
     apiVersion: koreo.realkinetic.com/v1alpha8
     kind: TestDummy
     metadata:
-      name: simple-test-resource
+      name: simple-test-resource-simple
       namespace: koreo-testing
       labels:
         testing.realkinetic.com/a-label: some-forced-label
     spec:
+      aTrue: true
       aNumber: 18
       aString: This is a test.
       aList:
@@ -41,7 +41,6 @@ metadata:
   name: template-a.v1
   namespace: koreo-testing
 spec:
-  templateName: =managedResource.template_name("template-a.v1")
   managedResource:
     apiVersion: koreo.realkinetic.com/v1alpha8
     kind: TestDummy
@@ -51,7 +50,7 @@ spec:
     apiVersion: koreo.realkinetic.com/v1alpha8
     kind: TestDummy
     metadata:
-      name: simple-test-resource
+      name: simple-test-resource-template-a
       namespace: koreo-testing
       labels:
         testing.realkinetic.com/a-label: some-forced-label
@@ -66,7 +65,6 @@ metadata:
   name: template-b.v1
   namespace: koreo-testing
 spec:
-  templateName: =managedResource.template_name("template-b.v1")
   managedResource:
     apiVersion: koreo.realkinetic.com/v1alpha8
     kind: TestDummy
@@ -76,7 +74,7 @@ spec:
     apiVersion: koreo.realkinetic.com/v1alpha8
     kind: TestDummy
     metadata:
-      name: simple-test-resource
+      name: simple-test-resource-template-b
       namespace: koreo-testing
       labels:
         testing.realkinetic.com/a-label: some-forced-label

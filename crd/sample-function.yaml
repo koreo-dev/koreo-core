@@ -240,7 +240,11 @@ metadata:
   namespace: koreo-testing
 spec:
   dynamicResource:
-    key: TestDummy.koreo.realkinetic.com/v1alpha8.simple-test.v1
+    key: simple-template.v1
+  materializers:
+    base:
+      metadata:
+        name: =parent.metadata.name + "-simple"
   outcome:
     okValue: =resource.metadata.uid
 ---
@@ -251,7 +255,7 @@ metadata:
   namespace: koreo-testing
 spec:
   dynamicResource:
-    key: ="TestDummy.koreo.realkinetic.com/v1alpha8." + inputs.template_name
+    key: =inputs.template_name
   materializers:
     base:
       metadata:

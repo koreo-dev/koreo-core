@@ -1,7 +1,6 @@
-from typing import NamedTuple
+from typing import Any, Dict, List, NamedTuple, Union
 
 import copy
-import json
 import logging
 
 import kr8s
@@ -28,7 +27,8 @@ from koreo.result import (
     is_unwrapped_ok,
 )
 
-from koreo.resource_template.registry import get_resource_template
+from koreo.cache import get_resource_from_cache
+from koreo.resource_template.structure import ResourceTemplate
 
 from .structure import (
     Behavior,
@@ -83,9 +83,11 @@ async def reconcile_function(
         isinstance(managed_resource, celtypes.MapType)
         and "metadata" in managed_resource
         and managed_resource[celtypes.StringType("metadata")].get(
-            celtypes.StringType("metadata")
+            celtypes.StringType("namespace")
         )
-        == trigger[celtypes.StringType("metadata")].get(celtypes.StringType("metadata"))
+        == trigger[celtypes.StringType("metadata")].get(
+            celtypes.StringType("namespace")
+        )
     ):
         owners = managed_resource[celtypes.StringType("metadata")].get(
             celtypes.StringType("ownerReferences"), celtypes.ListType()
@@ -156,7 +158,9 @@ def _load_resource_config(
 
         case DynamicResource(key=key):
             template_key = key.evaluate(inputs)
-            resource_template = get_resource_template(template_key=template_key)
+            resource_template = get_resource_from_cache(
+                resource_class=ResourceTemplate, cache_key=f"{template_key}"
+            )
             if not resource_template:
                 return Retry(
                     message=f'ResourceTemplate ("{template_key}") not found, will retry.',
@@ -307,6 +311,30 @@ def _build_resource_config(
     )
 
 
+def _convert_bools(
+    cel_object: celtypes.Value,
+) -> Union[celtypes.Value, List[Any], Dict[Any, Any], bool]:
+    """Recursive walk through the CEL object, replacing BoolType with native bool instances.
+    This lets the :py:mod:`json` module correctly represent the obects
+    with JSON ``true`` and ``false``.
+
+    This will also replace ListType and MapType with native ``list`` and ``dict``.
+    All other CEL objects will be left intact. This creates an intermediate hybrid
+    beast that's not quite a :py:class:`celtypes.Value` because a few things have been replaced.
+    """
+    if isinstance(cel_object, celtypes.BoolType):
+        return True if cel_object else False
+    elif isinstance(cel_object, (celtypes.ListType, list)):
+        return [_convert_bools(item) for item in cel_object]
+    elif isinstance(cel_object, (celtypes.MapType, dict)):
+        return {
+            _convert_bools(key): _convert_bools(value)
+            for key, value in cel_object.items()
+        }
+    else:
+        return cel_object
+
+
 async def _resource_crud(
     api: kr8s.Api,
     location: str,
@@ -383,14 +411,12 @@ async def _resource_crud(
             location=location,
         )
 
-        logging.info(f"Creating {resource_api} resource {resource_name}. ({location})")
         new_object = resource_class(
             api=api,
-            resource=json.loads(
-                json.dumps(celpy.CELJSONEncoder.to_python(managed_resource))
-            ),
+            resource=_convert_bools(managed_resource),
             namespace=resource_api_params.namespace,
         )
+
         try:
             await new_object.create()
         except TypeError as err:
@@ -412,9 +438,7 @@ async def _resource_crud(
     if not resource:
         return None
 
-    py_managed_resource = json.loads(
-        json.dumps(celpy.CELJSONEncoder.to_python(managed_resource))
-    )
+    py_managed_resource = _convert_bools(managed_resource)
     if _validate_match(py_managed_resource, resource.raw):
         logging.debug(
             f"{resource_api}/{resource_name} resource matched spec, skipping update. ({location})"

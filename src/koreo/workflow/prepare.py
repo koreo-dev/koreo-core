@@ -104,22 +104,24 @@ INPUT_NAME_PATTERN = re.compile("steps.([^.]+).?")
 
 def _load_steps(
     cel_env: celpy.Environment, steps_spec: list[dict]
-) -> tuple[list[structure.Step], Outcome]:
+) -> tuple[list[structure.Step | structure.ErrorStep], Outcome]:
 
     known_steps: set[str] = set()
 
-    step_outcomes: list[UnwrappedOutcome] = []
+    step_outcomes: list[structure.Step | structure.ErrorStep] = []
     for step_spec in steps_spec:
         step_label = step_spec.get("label")
         step_outcomes.append(_load_step(cel_env, step_spec, known_steps))
         known_steps.add(step_label)
 
-    overall_outcome = unwrapped_combine(step_outcomes)
+    error_outcomes = [
+        step.outcome for step in step_outcomes if isinstance(step, structure.ErrorStep)
+    ]
 
-    if is_unwrapped_ok(overall_outcome):
+    if not error_outcomes:
         return step_outcomes, Ok(None)
 
-    return step_outcomes, overall_outcome
+    return step_outcomes, unwrapped_combine(error_outcomes)
 
 
 def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str]):
