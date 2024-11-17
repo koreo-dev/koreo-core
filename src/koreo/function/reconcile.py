@@ -81,6 +81,7 @@ async def reconcile_function(
     # TODO: Add owners, if behaviors.add-owner
     if (
         isinstance(managed_resource, celtypes.MapType)
+        and "metadata" in trigger
         and "metadata" in managed_resource
         and managed_resource[celtypes.StringType("metadata")].get(
             celtypes.StringType("namespace")
