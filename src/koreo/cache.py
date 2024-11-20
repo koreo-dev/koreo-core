@@ -24,7 +24,7 @@ def get_resource_from_cache[T](resource_class: type[T], cache_key: str) -> T | N
 
 def get_resource_system_data_from_cache(
     resource_class: type, cache_key: str
-) -> dict | None:
+) -> tuple[str, dict | None] | None:
     resource_class_name = resource_class.__name__
     if not __CACHE.get(resource_class_name):
         __CACHE[resource_class_name] = {}
@@ -32,7 +32,7 @@ def get_resource_system_data_from_cache(
     cached = __CACHE[resource_class.__name__].get(cache_key)
 
     if cached:
-        return cached.system_data
+        return (cached.resource_version, cached.system_data)
 
     return None
 
