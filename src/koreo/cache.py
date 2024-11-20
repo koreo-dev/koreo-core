@@ -1,8 +1,8 @@
 import asyncio
 import logging
-from typing import Awaitable, Callable, NamedTuple
+from typing import Awaitable, Callable, Coroutine, Generator, NamedTuple
 
-from koreo.result import is_unwrapped_ok
+from koreo.result import UnwrappedOutcome, is_unwrapped_ok
 
 LABEL_NAMESPACE = "koreo.realkinetic.com"
 
@@ -22,13 +22,32 @@ def get_resource_from_cache[T](resource_class: type[T], cache_key: str) -> T | N
     return None
 
 
+def get_resource_system_data_from_cache(
+    resource_class: type, cache_key: str
+) -> dict | None:
+    resource_class_name = resource_class.__name__
+    if not __CACHE.get(resource_class_name):
+        __CACHE[resource_class_name] = {}
+
+    cached = __CACHE[resource_class.__name__].get(cache_key)
+
+    if cached:
+        return cached.system_data
+
+    return None
+
+
 async def prepare_and_cache[
     T
 ](
     resource_class: type[T],
-    preparer: Callable[[str, dict], Awaitable[T]],
+    preparer: Callable[
+        [str, dict],
+        Awaitable[UnwrappedOutcome[tuple[T, Generator[Coroutine, None, None]]]],
+    ],
     metadata: dict,
     spec: dict,
+    _system_data: dict | None = None,
 ) -> T:
     resource_metadata = _extract_meta(metadata=metadata)
 
@@ -46,16 +65,17 @@ async def prepare_and_cache[
 
     preparer_outcome = await preparer(cache_key, spec)
 
-    if not is_unwrapped_ok(preparer_outcome):
+    if is_unwrapped_ok(preparer_outcome):
+        prepared_resource, updaters = preparer_outcome
+    else:
         prepared_resource = preparer_outcome
         updaters = None
-    else:
-        prepared_resource, updaters = preparer_outcome
 
     __CACHE[resource_class_name][cache_key] = __CachedResource[T](
         spec=spec,
         resource=prepared_resource,
         resource_version=resource_metadata.resource_version,
+        system_data=_system_data,
     )
     logging.debug(
         f"Updating {resource_class_name} cache for {cache_key} ({resource_metadata.resource_version})."
@@ -73,8 +93,12 @@ async def reprepare_and_update_cache[
     T
 ](
     resource_class: type[T],
-    preparer: Callable[[str, dict], Awaitable[T]],
+    preparer: Callable[
+        [str, dict],
+        Awaitable[UnwrappedOutcome[tuple[T, Generator[Coroutine, None, None]]]],
+    ],
     cache_key: str,
+    _system_data: dict | None = None,
 ) -> (T | None):
     resource_class_name = resource_class.__name__
 
@@ -87,16 +111,17 @@ async def reprepare_and_update_cache[
 
     preparer_outcome = await preparer(cache_key, cached.spec)
 
-    if not is_unwrapped_ok(preparer_outcome):
+    if is_unwrapped_ok(preparer_outcome):
+        prepared_resource, updaters = preparer_outcome
+    else:
         prepared_resource = preparer_outcome
         updaters = None
-    else:
-        prepared_resource, updaters = preparer_outcome
 
     __CACHE[resource_class_name][cache_key] = __CachedResource[T](
         spec=cached.spec,
         resource=prepared_resource,
         resource_version=cached.resource_version,
+        system_data=_system_data,
     )
 
     logging.debug(
@@ -115,6 +140,7 @@ class __CachedResource[T](NamedTuple):
     spec: dict
     resource: T
     resource_version: str
+    system_data: dict | None
 
 
 __CACHE: dict[str, dict[str, __CachedResource]] = {}
