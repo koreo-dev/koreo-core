@@ -32,11 +32,41 @@ def _process_member_dot(tree: Tree):
     if root.data == "member_index":
         return f"{_process_member_index(root)}.{terminal}"
 
+    if root.data == "member_dot_arg":
+        return f"{_process_member_dot_arg(root)}.{terminal}"
+
     if root.data == "primary":
         return f"{_process_primary(root)}.{terminal}"
 
     # TODO: Is this possible?
     raise Exception(f"UNKNOWN MEMBER_DOT ROOT TYPE! {root}")
+
+
+def _process_member_dot_arg(tree: Tree):
+    if len(tree.children) != 3:
+        # TODO: Not sure this is possible?
+        raise Exception(f"UNKNOWN MEMBER_DOT_ARG LENGTH! {len(tree.children)}: {tree}")
+
+    # print(f"{len(tree.children)}: {tree.children[0]}")
+
+    terminal = f"{tree.children[1]}"
+
+    root: Tree = tree.children[0].children[0]
+
+    if root.data == "member_dot":
+        return f"{_process_member_dot(root)}.{terminal}"
+
+    if root.data == "member_index":
+        return f"{_process_member_index(root)}.{terminal}"
+
+    if root.data == "member_dot_arg":
+        return f"{_process_member_dot_arg(root)}.{terminal}"
+
+    if root.data == "primary":
+        return f"{_process_primary(root)}.{terminal}"
+
+    # TODO: Is this possible?
+    raise Exception(f"UNKNOWN MEMBER_DOT_ARG ROOT TYPE! {root}")
 
 
 def _process_member_index(tree: Tree):
@@ -72,6 +102,8 @@ def _process_member_index(tree: Tree):
         root_value = _process_member_dot(root)
     elif root.data == "member_index":
         root_value = _process_member_index(root)
+    elif root.data == "member_dot_arg":
+        root_value = _process_member_dot_arg(root)
     elif root.data == "primary":
         root_value: str = _process_primary(root)
     else:
