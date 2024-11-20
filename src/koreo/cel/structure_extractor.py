@@ -93,6 +93,8 @@ def _process_primary(tree: Tree) -> str:
 
     if primary.data == "literal":
         literal: Token = primary.children[0]
+        if literal.type == "INT_LIT":
+            return literal.value
         return literal.strip(literal[0])
 
     raise Exception(f"UNKNOWN PRIMARY DATA TYPE! {primary}")

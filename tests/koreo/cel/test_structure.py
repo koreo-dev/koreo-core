@@ -40,6 +40,35 @@ class TestArgumentStructureExtractor(unittest.TestCase):
 
         self.assertListEqual(expected, sorted_result)
 
+    def test_numeric_indexes(self):
+        env = celpy.Environment()
+
+        cel_str = """{
+            "simple_index": steps[0],
+            "nested_index_dot": steps[2].two,
+            "nested_index_index": steps[3][1],
+            "nested_dot_index": steps.nested4[4]
+        }
+        """
+
+        result = extract_argument_structure(env.compile(cel_str))
+
+        sorted_result = sorted(result)
+
+        expected = sorted(
+            [
+                "steps.0",
+                "steps.2",
+                "steps.2.two",
+                "steps.3",
+                "steps.3.1",
+                "steps.nested4",
+                "steps.nested4.4",
+            ]
+        )
+
+        self.assertListEqual(expected, sorted_result)
+
     def test_formula_args(self):
         env = celpy.Environment()
 
