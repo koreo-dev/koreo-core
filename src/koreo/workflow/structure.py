@@ -55,7 +55,7 @@ class Status(NamedTuple):
 
 
 class Workflow(NamedTuple):
-    crd_ref: ConfigCRDRef
+    crd_ref: ConfigCRDRef | None
 
     steps_ready: Outcome
     steps: list[Step | ErrorStep]

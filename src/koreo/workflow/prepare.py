@@ -17,7 +17,6 @@ from koreo.result import (
     Retry,
     UnwrappedOutcome,
     is_error,
-    is_unwrapped_ok,
     unwrapped_combine,
 )
 
@@ -28,6 +27,7 @@ from .registry import (
     index_workflow_custom_crd,
     index_workflow_workflows,
     get_workflow_workflows,
+    unindex_workflow_custom_crd,
 )
 
 
@@ -61,14 +61,17 @@ async def prepare_workflow(
 
     # Update CRD registry and ensure controller is running for the CRD.
     crd_ref = _build_crd_ref(spec.get("crdRef", {}))
-    index_workflow_custom_crd(
-        workflow=cache_key,
-        custom_crd=f"{crd_ref.api_group}:{crd_ref.kind}:{crd_ref.version}",
-    )
+    if not crd_ref:
+        unindex_workflow_custom_crd(workflow=cache_key)
+    else:
+        index_workflow_custom_crd(
+            workflow=cache_key,
+            custom_crd=f"{crd_ref.api_group}:{crd_ref.kind}:{crd_ref.version}",
+        )
 
-    start_controller(
-        group=crd_ref.api_group, kind=crd_ref.kind, version=crd_ref.version
-    )
+        start_controller(
+            group=crd_ref.api_group, kind=crd_ref.kind, version=crd_ref.version
+        )
 
     # Re-prepare any Workflows using this Workflow
     updaters = (
@@ -91,12 +94,15 @@ async def prepare_workflow(
     )
 
 
-def _build_crd_ref(crd_ref_spec: dict) -> structure.ConfigCRDRef:
-    return structure.ConfigCRDRef(
-        api_group=crd_ref_spec.get("apiGroup"),
-        version=crd_ref_spec.get("version"),
-        kind=crd_ref_spec.get("kind"),
-    )
+def _build_crd_ref(crd_ref_spec: dict) -> structure.ConfigCRDRef | None:
+    api_group = crd_ref_spec.get("apiGroup")
+    version = crd_ref_spec.get("version")
+    kind = crd_ref_spec.get("kind")
+
+    if not (api_group and version and kind):
+        return None
+
+    return structure.ConfigCRDRef(api_group=api_group, version=version, kind=kind)
 
 
 INPUT_NAME_PATTERN = re.compile("steps.([^.]+).?")

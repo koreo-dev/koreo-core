@@ -22,6 +22,16 @@ def index_workflow_custom_crd(workflow: str, custom_crd: str):
     __workflow_custom_crd_index[workflow] = custom_crd
 
 
+def unindex_workflow_custom_crd(workflow: str):
+    prior_custom_crd = __workflow_custom_crd_index[workflow]
+
+    if not prior_custom_crd:
+        return
+
+    if workflow in __custom_crd_wokflow_index[prior_custom_crd]:
+        __custom_crd_wokflow_index[prior_custom_crd].remove(workflow)
+
+
 def get_custom_crd_workflows(custom_crd: str) -> list[str]:
     return list(__custom_crd_wokflow_index[custom_crd])
 
