@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
 
+import kr8s
+
 from typing import NamedTuple
 
 import json
@@ -34,7 +36,27 @@ class MockApi:
 
     async def async_get(self, *args, **kwargs):
         if self._current_resource:
-            return [self._current_resource]
+            # TODO: This should probably be loaded and built from the Function,
+            # using _build_resource_config
+
+            resource_class = kr8s.objects.new_class(
+                version=self._current_resource.get("apiVersion"),
+                kind=self._current_resource.get("kind"),
+                namespaced=(
+                    True
+                    if self._current_resource.get("metadata", {}).get("namespace")
+                    else False
+                ),
+                asyncio=True,
+            )
+            return [
+                resource_class(
+                    self._current_resource,
+                    namespace=self._current_resource.get("metadata", {}).get(
+                        "namespace"
+                    ),
+                )
+            ]
         else:
             return []
 

@@ -3,8 +3,8 @@ from typing import Any, Dict, List, NamedTuple, Union
 import copy
 import logging
 
-import kr8s
 import jsonpath_ng
+import kr8s
 
 import celpy
 from celpy import celtypes
