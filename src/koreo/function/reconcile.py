@@ -8,6 +8,7 @@ import jsonpath_ng
 
 import celpy
 from celpy import celtypes
+from celpy.celparser import tree_dump
 
 import env
 
@@ -125,6 +126,11 @@ async def reconcile_function(
 
     try:
         ok_value = function.outcome.ok_value.evaluate(full_inputs)
+
+        eval_errors = _check_for_celevalerror(ok_value)
+        if is_not_ok(eval_errors):
+            return eval_errors
+
         return ok_value
     except celpy.CELEvalError as err:
         msg = f"CEL Eval Error computing OK value. {err.tree}"
@@ -134,6 +140,32 @@ async def reconcile_function(
         msg = "Failure computing OK value."
         logging.exception(msg)
         return PermFail(msg, location=location)
+
+
+def _check_for_celevalerror(value: celtypes.Value) -> Outcome[None]:
+    if isinstance(value, celpy.CELEvalError):
+        return PermFail(
+            message=f"CELEvalError (at {tree_dump(value.tree)}) {value.args}",
+            location=tree_dump(value.tree),
+        )
+
+    if isinstance(value, celtypes.MapType):
+        for key, subvalue in value.items():
+            key_ok = _check_for_celevalerror(key)
+            if is_not_ok(key_ok):
+                return key_ok
+
+            subvalue_ok = _check_for_celevalerror(subvalue)
+            if is_not_ok(subvalue_ok):
+                return subvalue_ok
+
+    if isinstance(value, celtypes.ListType):
+        for subvalue in value:
+            subvalue_ok = _check_for_celevalerror(subvalue)
+            if is_not_ok(subvalue_ok):
+                return subvalue_ok
+
+    return Ok(None)
 
 
 class _ResourceConfig(NamedTuple):
