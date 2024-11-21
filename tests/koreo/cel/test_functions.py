@@ -492,3 +492,235 @@ class TestOverlay(unittest.TestCase):
             },
             program.evaluate(inputs),
         )
+
+
+class TestFlatten(unittest.TestCase):
+    def test_invalid_type(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "1.flatten()"
+
+        with self.assertRaises(celpy.CELParseError):
+            cel_env.compile(test_cel_expression)
+
+    def test_empty_list(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "[].flatten()"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        flattened = program.evaluate(inputs)
+        self.assertListEqual([], flattened)
+
+    def test_flat(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "[1, 2, 3].flatten()"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_single(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "[[1, 2, 3]].flatten()"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        flattened = program.evaluate(inputs)
+        self.assertListEqual([1, 2, 3], flattened)
+
+    def test_multiple(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = '[[1, 2, 3], ["a", "b", "c"]].flatten()'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        flattened = program.evaluate(inputs)
+        self.assertListEqual([1, 2, 3, "a", "b", "c"], flattened)
+
+
+class TestSplit(unittest.TestCase):
+    def test_invalid_type(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "1.split('.')"
+
+        with self.assertRaises(celpy.CELParseError):
+            cel_env.compile(test_cel_expression)
+
+    def test_empty_seperator(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "''.split('')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_empty_target(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "''.split('.')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        flattened = program.evaluate(inputs)
+        self.assertListEqual([""], flattened)
+
+    def test_no_spilt(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "'test-ing-is-fun'.split('.')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertListEqual(result, ["test-ing-is-fun"])
+
+    def test_spilt(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "'test.ing.is.fun'.split('.')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertListEqual(result, ["test", "ing", "is", "fun"])
+
+
+class TestSplitFirst(unittest.TestCase):
+    def test_invalid_type(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "1.split_first('.')"
+
+        with self.assertRaises(celpy.CELParseError):
+            cel_env.compile(test_cel_expression)
+
+    def test_empty_seperator(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "''.split_first('')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_empty_target(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "''.split_first('.')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        flattened = program.evaluate(inputs)
+        self.assertEqual("", flattened)
+
+    def test_no_spilt(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "'test-ing-is-fun'.split_first('.')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual("test-ing-is-fun", result)
+
+    def test_spilt(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "'test.ing.is.fun'.split_first('.')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual("test", result)
+
+
+class TestSplitLast(unittest.TestCase):
+    def test_invalid_type(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "1.split_last('.')"
+
+        with self.assertRaises(celpy.CELParseError):
+            cel_env.compile(test_cel_expression)
+
+    def test_empty_seperator(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "''.split_last('')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_empty_target(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "''.split_last('.')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        flattened = program.evaluate(inputs)
+        self.assertEqual("", flattened)
+
+    def test_no_spilt(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "'test-ing-is-fun'.split_last('.')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual("test-ing-is-fun", result)
+
+    def test_spilt(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "'test.ing.is.fun'.split_last('.')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual("fun", result)

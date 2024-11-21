@@ -246,12 +246,6 @@ def _extract_vars(
     if not resource:
         return celpy.CELEvalError(f"Can not extract values from empty resource.")
 
-    if not isinstance(resource, celtypes.MapType):
-        return celpy.CELEvalError(f"Base resource must be an object.")
-
-    if not isinstance(var_map, celtypes.MapType):
-        return celpy.CELEvalError(f"Variable Map must be an object.")
-
     variables = celtypes.MapType()
 
     for variable, path in var_map.items():
@@ -268,9 +262,6 @@ def _extract_vars(
 def _flatten(resource: celtypes.ListType) -> celtypes.ListType | celpy.CELEvalError:
     if not resource:
         return celtypes.ListType()
-
-    if not isinstance(resource, celtypes.ListType):
-        return celpy.CELEvalError(f"Base resource must be a list of lists.")
 
     merged = celtypes.ListType()
 
@@ -307,6 +298,39 @@ def _lower(string: celtypes.StringType) -> celtypes.StringType | celpy.CELEvalEr
     return celtypes.StringType(string.lower())
 
 
+def _split(
+    string: celtypes.StringType, on: celtypes.StringType
+) -> celtypes.ListType | celpy.CELEvalError:
+    if not on:
+        return celpy.CELEvalError(f"split separator may not be empty")
+
+    return celtypes.ListType(celtypes.StringType(part) for part in string.split(on))
+
+
+def _split_first(
+    string: celtypes.StringType, on: celtypes.StringType
+) -> celtypes.StringType | celpy.CELEvalError:
+    if not on:
+        return celpy.CELEvalError(f"split separator may not be empty")
+
+    if not string:
+        return celtypes.StringType("")
+
+    return celtypes.StringType(string.split(on, 1)[0])
+
+
+def _split_last(
+    string: celtypes.StringType, on: celtypes.StringType
+) -> celtypes.StringType | celpy.CELEvalError:
+    if not on:
+        return celpy.CELEvalError(f"split separator may not be empty")
+
+    if not string:
+        return celtypes.StringType("")
+
+    return celtypes.StringType(string.rsplit(on, 1)[-1])
+
+
 koreo_function_annotations: dict[str, celpy.Annotation] = {
     "to_ref": celtypes.FunctionType,
     "self_ref": celtypes.FunctionType,
@@ -318,6 +342,9 @@ koreo_function_annotations: dict[str, celpy.Annotation] = {
     "lower": celtypes.FunctionType,
     "extract_vars": celtypes.FunctionType,
     "flatten": celtypes.FunctionType,
+    "split": celtypes.FunctionType,
+    "split_first": celtypes.FunctionType,
+    "split_last": celtypes.FunctionType,
 }
 
 koreo_cel_functions: dict[str, celpy.CELFunction] = {
@@ -331,4 +358,7 @@ koreo_cel_functions: dict[str, celpy.CELFunction] = {
     "lower": _lower,
     "extract_vars": _extract_vars,
     "flatten": _flatten,
+    "split": _split,
+    "split_first": _split_first,
+    "split_last": _split_last,
 }
