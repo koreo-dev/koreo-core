@@ -39,11 +39,45 @@ spec:
                   x-kubernetes-preserve-unknown-fields: true
                   nullable: true
 
+                currentResource:
+                  type: object
+                  nullable: true
+                  x-kubernetes-embedded-resource: true
+                  x-kubernetes-preserve-unknown-fields: true
+
                 expectedResource:
                   type: object
                   nullable: true
                   x-kubernetes-embedded-resource: true
                   x-kubernetes-preserve-unknown-fields: true
+
+                expectedOkValue:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                  nullable: true
+
+                expectedOutcome:
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: (self.type == 'Retry' && has(self.delay) && self.delay > 0) || self.type != 'Retry'
+                      message: "Retry validators must provide delay-seconds."
+                    - rule: (self.type != 'Retry' && !has(self.delay)) || self.type == 'Retry'
+                      message: "Non-retry validators must not provide delay-seconds."
+                    - rule: (self.type == 'Ok' && !has(self.message)) || self.type != 'Ok'
+                      message: "Ok validators should not provide a message."
+
+                  properties:
+                    type:
+                      type: string
+                      nullable: false
+                      enum: [Ok, PermFail, Retry]
+                    message:
+                      type: string
+                      nullable: true
+                    delay:
+                      type: integer
+                      nullable: true
+                  required: [type]
 
             status:
               x-kubernetes-preserve-unknown-fields: true
