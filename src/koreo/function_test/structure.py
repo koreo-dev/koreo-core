@@ -2,6 +2,7 @@ from typing import NamedTuple
 
 from celpy import celtypes
 
+from koreo.result import Outcome
 from koreo.function.structure import Function
 
 
@@ -11,4 +12,8 @@ class FunctionTest(NamedTuple):
     parent: celtypes.MapType | None
     inputs: celtypes.MapType | None
 
-    expected_resource: celtypes.MapType | None
+    expected_outcome: Outcome | None
+    expected_ok_value: dict | None
+
+    current_resource: dict | None
+    expected_resource: dict | None

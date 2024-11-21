@@ -4,6 +4,7 @@ from celpy import celtypes
 from koreo.cache import get_resource_from_cache
 from koreo.result import PermFail, UnwrappedOutcome
 
+from koreo.function.reconcile import _predicate_to_koreo_result
 
 from . import structure
 from .registry import index_test_function
@@ -32,10 +33,15 @@ async def prepare_function_test(
             location=f"prepare:FunctionTest:{cache_key}",
         )
 
-    expected_resource_spec = spec.get("expectedResource", {})
-    expected_resource = celpy.json_to_cel(expected_resource_spec)
+    current_resource = spec.get("currentResource")
+    if current_resource is not None and not isinstance(current_resource, dict):
+        return PermFail(
+            message=f"FunctionTest '{cache_key}' `spec.currentResource` must be an object.",
+            location=f"prepare:FunctionTest:{cache_key}",
+        )
 
-    if expected_resource and not isinstance(expected_resource, celtypes.MapType):
+    expected_resource = spec.get("expectedResource")
+    if expected_resource is not None and not isinstance(expected_resource, dict):
         return PermFail(
             message=f"FunctionTest '{cache_key}' `spec.expectedResource` must be an object.",
             location=f"prepare:FunctionTest:{cache_key}",
@@ -55,6 +61,16 @@ async def prepare_function_test(
             location=f"prepare:FunctionTest:{cache_key}",
         )
 
+    expected_outcome_spec = spec.get("expectedOutcome")
+    if expected_outcome_spec:
+        expected_outcome = _predicate_to_koreo_result(
+            [expected_outcome_spec], location=cache_key
+        )
+    else:
+        expected_outcome = None
+
+    expected_ok_value = spec.get("expectedOkValue")
+
     index_test_function(test=cache_key, function=function_ref_name)
 
     return (
@@ -62,7 +78,10 @@ async def prepare_function_test(
             function_under_test=function_under_test,
             parent=parent,
             inputs=inputs,
+            current_resource=current_resource,
             expected_resource=expected_resource,
+            expected_outcome=expected_outcome,
+            expected_ok_value=expected_ok_value,
         ),
         None,
     )
