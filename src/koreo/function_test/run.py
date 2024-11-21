@@ -51,7 +51,8 @@ class MockApi:
             )
             return [
                 resource_class(
-                    self._current_resource,
+                    api=self,
+                    resource=self._current_resource,
                     namespace=self._current_resource.get("metadata", {}).get(
                         "namespace"
                     ),
