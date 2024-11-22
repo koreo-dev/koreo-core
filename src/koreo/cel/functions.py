@@ -218,12 +218,6 @@ def _map_overlay(
     if not resource:
         return celpy.CELEvalError(f"Can not map-overlay an empty resource.")
 
-    if not isinstance(resource, celtypes.MapType):
-        return celpy.CELEvalError(f"Base resource must be an object.")
-
-    if not isinstance(overlay, celtypes.MapType):
-        return celpy.CELEvalError(f"Overlay must be an object.")
-
     updated_resource = copy.deepcopy(resource)
 
     path_expression = jsonpath_ng.parse(path)
