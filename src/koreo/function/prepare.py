@@ -51,11 +51,20 @@ async def prepare_function(
 
     dynamic_resource_spec = spec.get("dynamicResource")
     if dynamic_resource_spec:
-        resource_config = structure.DynamicResource(
-            key=env.program(
-                env.compile(encode_cel(dynamic_resource_spec.get("key"))),
+        key_spec = dynamic_resource_spec.get("key")
+        try:
+            dynamic_resource_key = env.program(
+                env.compile(encode_cel(key_spec)),
                 functions=koreo_cel_functions,
             )
+        except celpy.CELParseError as err:
+            return PermFail(
+                message=f"CELParseError {key_spec}",
+                location=f"prepare:Function:{cache_key}.dynamicResource.key",
+            )
+
+        resource_config = structure.DynamicResource(
+            key=dynamic_resource_key,
         )
 
     if static_resource_spec and dynamic_resource_spec:
@@ -78,9 +87,16 @@ async def prepare_function(
     if input_validators:
         used_vars.update(extract_argument_structure(input_validators.ast))
 
-    materializers, materializer_vars = _prepare_materializers(
-        cel_env=env, materializers=spec.get("materializers")
-    )
+    try:
+        materializers, materializer_vars = _prepare_materializers(
+            cel_env=env, materializers=spec.get("materializers")
+        )
+    except celpy.CELParseError as err:
+        return PermFail(
+            message=f"CELParseError {spec.get("materializers")}",
+            location=f"prepare:Function:{cache_key}.materializers",
+        )
+
     used_vars.update(materializer_vars)
 
     outcome, outcome_vars = _prepare_outcome(cel_env=env, outcome=spec.get("outcome"))
