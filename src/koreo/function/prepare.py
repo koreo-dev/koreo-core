@@ -93,13 +93,21 @@ async def prepare_function(
         )
     except celpy.CELParseError as err:
         return PermFail(
-            message=f"CELParseError {spec.get("materializers")}",
+            message=f"CELParseError {err} {spec.get("materializers")}",
             location=f"prepare:Function:{cache_key}.materializers",
         )
 
     used_vars.update(materializer_vars)
 
-    outcome, outcome_vars = _prepare_outcome(cel_env=env, outcome=spec.get("outcome"))
+    try:
+        outcome, outcome_vars = _prepare_outcome(
+            cel_env=env, outcome=spec.get("outcome")
+        )
+    except celpy.CELParseError as err:
+        return PermFail(
+            message=f"CELParseError {err} {spec.get("outcome")}",
+            location=f"prepare:Function:{cache_key}.outcome",
+        )
     used_vars.update(outcome_vars)
 
     # Update Workflows using this Function.
