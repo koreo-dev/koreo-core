@@ -181,12 +181,14 @@ def _load_resource_config(
     location: str,
 ) -> UnwrappedOutcome[_ResourceConfig]:
     match resource_config:
-        case StaticResource(behavior=behavior, managed_resource=managed_resource):
+        case StaticResource(
+            behavior=behavior, managed_resource=managed_resource, context=context
+        ):
             return _ResourceConfig(
                 behavior=behavior,
                 managed_resource=managed_resource,
                 base_template=celtypes.MapType(),
-                context=celtypes.MapType(),
+                context=context,
             )
 
         case DynamicResource(key=key):
