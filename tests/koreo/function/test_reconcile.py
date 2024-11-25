@@ -5,6 +5,7 @@ import string
 import unittest
 
 import celpy
+from celpy import celtypes
 import jsonpath_ng
 
 from koreo.cel.encoder import encode_cel
@@ -91,6 +92,7 @@ class TestReconcileFunction(unittest.IsolatedAsyncioTestCase):
                     delete="abandon",
                 ),
                 managed_resource=None,
+                context=celtypes.MapType({}),
             ),
             input_validators=input_validators,
             outcome=function_structure.Outcome(tests=None, ok_value=source_ok_value),

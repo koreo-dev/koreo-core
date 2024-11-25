@@ -14,6 +14,7 @@ from . import structure
 from .registry import get_function_workflows
 
 import celpy
+from celpy import celtypes
 
 # Try to reduce the incredibly verbose logging from celpy
 logging.getLogger("Environment").setLevel(logging.WARNING)
@@ -42,11 +43,18 @@ async def prepare_function(
 
     static_resource_spec = spec.get("staticResource")
     if static_resource_spec:
+        context = celpy.json_to_cel(static_resource_spec.get("context", {}))
+        if not isinstance(context, celtypes.MapType):
+            return PermFail(
+                message=f"Function '{cache_key}' `spec.staticResource.context` ('{context}') must be an object.",
+                location=f"prepare:Function:{cache_key}",
+            )
         resource_config = structure.StaticResource(
             behavior=_load_behavior(static_resource_spec.get("behavior")),
             managed_resource=_build_managed_resource(
                 static_resource_spec.get("managedResource")
             ),
+            context=context,
         )
 
     dynamic_resource_spec = spec.get("dynamicResource")
@@ -75,7 +83,9 @@ async def prepare_function(
 
     if not resource_config:
         resource_config = structure.StaticResource(
-            managed_resource=None, behavior=_load_behavior(None)
+            managed_resource=None,
+            behavior=_load_behavior(None),
+            context=celtypes.MapType({}),
         )
 
     used_vars = set[str]()

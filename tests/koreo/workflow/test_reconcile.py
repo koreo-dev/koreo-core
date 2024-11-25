@@ -1,6 +1,7 @@
 import unittest
 
 import celpy
+from celpy import celtypes
 
 from koreo.result import Ok
 
@@ -41,6 +42,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                                 delete="abandon",
                             ),
                             managed_resource=None,
+                            context=celtypes.MapType({}),
                         ),
                         input_validators=None,
                         outcome=function_structure.Outcome(
@@ -96,6 +98,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                                 delete="abandon",
                             ),
                             managed_resource=None,
+                            context=celtypes.MapType({}),
                         ),
                         input_validators=None,
                         outcome=function_structure.Outcome(
@@ -126,6 +129,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                                 delete="abandon",
                             ),
                             managed_resource=None,
+                            context=celtypes.MapType({}),
                         ),
                         input_validators=None,
                         outcome=function_structure.Outcome(

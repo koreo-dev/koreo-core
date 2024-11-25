@@ -1,6 +1,7 @@
 from typing import NamedTuple, Literal
 
 import celpy
+from celpy import celtypes
 
 
 class Materializers(NamedTuple):
@@ -30,6 +31,7 @@ class Behavior(NamedTuple):
 class StaticResource(NamedTuple):
     managed_resource: ManagedResource | None
     behavior: Behavior
+    context: celtypes.MapType
 
 
 class DynamicResource(NamedTuple):
