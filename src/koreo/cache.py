@@ -98,7 +98,6 @@ async def reprepare_and_update_cache[
         Awaitable[UnwrappedOutcome[tuple[T, Generator[Coroutine, None, None]]]],
     ],
     cache_key: str,
-    _system_data: dict | None = None,
 ) -> (T | None):
     resource_class_name = resource_class.__name__
 
@@ -117,11 +116,8 @@ async def reprepare_and_update_cache[
         prepared_resource = preparer_outcome
         updaters = None
 
-    __CACHE[resource_class_name][cache_key] = __CachedResource[T](
-        spec=cached.spec,
-        resource=prepared_resource,
-        resource_version=cached.resource_version,
-        system_data=_system_data,
+    __CACHE[resource_class_name][cache_key] = cached._replace(
+        resource=prepared_resource
     )
 
     logging.debug(
