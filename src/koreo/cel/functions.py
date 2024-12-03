@@ -292,6 +292,14 @@ def _lower(string: celtypes.StringType) -> celtypes.StringType | celpy.CELEvalEr
     return celtypes.StringType(string.lower())
 
 
+def _strip(string: celtypes.StringType, on: celtypes.StringType) -> celtypes.StringType:
+    return celtypes.StringType(string.strip(on))
+
+
+def _rstrip(string: celtypes.StringType, on: celtypes.StringType) -> celtypes.StringType:
+    return celtypes.StringType(string.rstrip(on))
+
+
 def _split(
     string: celtypes.StringType, on: celtypes.StringType
 ) -> celtypes.ListType | celpy.CELEvalError:
@@ -325,6 +333,44 @@ def _split_last(
     return celtypes.StringType(string.rsplit(on, 1)[-1])
 
 
+def _split_index(
+        string: celtypes.StringType, on: celtypes.StringType, index: celtypes.IntType
+) -> celtypes.StringType | celpy.CELEvalError:
+    if not on:
+        return celpy.CELEvalError(f"split separator may not be empty")
+
+    if not string:
+        return celtypes.StringType("")
+
+    return celtypes.StringType(string.split(on)[index])
+
+
+def _map_list_merge(map1: celtypes.MapType, map2: celtypes.MapType) -> celtypes.MapType:
+    result = {}
+
+    # Process all keys from both maps
+    for key in set(map1.keys()) | set(map2.keys()):
+        # Combine lists and maintain uniqueness while preserving order
+        combined = []
+        if key in map1:
+            combined.extend(map1[key])
+        if key in map2:
+            combined.extend(value for value in map2[key] if value not in combined)
+        result[key] = combined
+
+    return celtypes.MapType(result)
+
+
+def _map_list_difference(map1: celtypes.MapType, map2: celtypes.MapType) -> celtypes.MapType:
+    result = {}
+    for key_str, value_list in map1.items():
+        unique_values = set(value_list).difference(
+            map2.get(key_str, [])
+        )
+        result[key_str] = list(unique_values)
+    return celtypes.MapType(result)
+
+
 koreo_function_annotations: dict[str, celpy.Annotation] = {
     "to_ref": celtypes.FunctionType,
     "self_ref": celtypes.FunctionType,
@@ -339,6 +385,11 @@ koreo_function_annotations: dict[str, celpy.Annotation] = {
     "split": celtypes.FunctionType,
     "split_first": celtypes.FunctionType,
     "split_last": celtypes.FunctionType,
+    "split_index": celtypes.FunctionType,
+    "map_list_merge": celtypes.FunctionType,
+    "map_list_difference": celtypes.FunctionType,
+    "strip": celtypes.FunctionType,
+    "rstrip": celtypes.FunctionType,
 }
 
 koreo_cel_functions: dict[str, celpy.CELFunction] = {
@@ -355,4 +406,9 @@ koreo_cel_functions: dict[str, celpy.CELFunction] = {
     "split": _split,
     "split_first": _split_first,
     "split_last": _split_last,
+    "split_index": _split_index,
+    "map_list_merge": _map_list_merge,
+    "map_list_difference": _map_list_difference,
+    "strip": _strip,
+    "rstrip": _rstrip,
 }
