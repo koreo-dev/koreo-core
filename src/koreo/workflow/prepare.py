@@ -195,7 +195,18 @@ def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str
     else:
         encoded_input_extractor = encode_cel(input_mapper_spec)
 
-        input_mapper_expression = cel_env.compile(encoded_input_extractor)
+        try:
+            input_mapper_expression = cel_env.compile(encoded_input_extractor)
+        except celpy.CELParseError as err:
+            return structure.ErrorStep(
+                label=step_label,
+                outcome=PermFail(
+                    message=f"CELParseError {err} parsing inputs ({encoded_input_extractor})",
+                    location=f"{step_label}:{logic_cache_key}",
+                ),
+                condition=None,
+            )
+
         used_vars = extract_argument_structure(input_mapper_expression)
 
         dynamic_input_keys.update(
