@@ -22,19 +22,21 @@ def get_resource_from_cache[T](resource_class: type[T], cache_key: str) -> T | N
     return None
 
 
+class __CachedResource[T](NamedTuple):
+    spec: dict
+    resource: T
+    resource_version: str
+    system_data: dict | None = None
+
+
 def get_resource_system_data_from_cache(
     resource_class: type, cache_key: str
-) -> tuple[str, dict | None] | None:
+) -> __CachedResource | None:
     resource_class_name = resource_class.__name__
     if not __CACHE.get(resource_class_name):
         __CACHE[resource_class_name] = {}
 
-    cached = __CACHE[resource_class.__name__].get(cache_key)
-
-    if cached:
-        return (cached.resource_version, cached.system_data)
-
-    return None
+    return __CACHE[resource_class.__name__].get(cache_key)
 
 
 async def prepare_and_cache[
@@ -130,13 +132,6 @@ async def reprepare_and_update_cache[
                 tasks.create_task(updater)
 
     return prepared_resource
-
-
-class __CachedResource[T](NamedTuple):
-    spec: dict
-    resource: T
-    resource_version: str
-    system_data: dict | None
 
 
 __CACHE: dict[str, dict[str, __CachedResource]] = {}
