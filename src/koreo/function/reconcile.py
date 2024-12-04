@@ -144,10 +144,8 @@ async def reconcile_function(
 
 def _check_for_celevalerror(value: celtypes.Value) -> Outcome[None]:
     if isinstance(value, celpy.CELEvalError):
-        return PermFail(
-            message=f"CELEvalError (at {tree_dump(value.tree)}) {value.args}",
-            location=tree_dump(value.tree),
-        )
+        tree = tree_dump(value.tree) if value and value.tree else ""
+        return PermFail(message=f"CELEvalError (at {tree}) {value.args}", location=tree)
 
     if isinstance(value, celtypes.MapType):
         for key, subvalue in value.items():
