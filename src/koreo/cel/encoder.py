@@ -1,4 +1,5 @@
 from typing import Any
+import re
 
 CEL_PREFIX = "="
 
@@ -34,20 +35,19 @@ def encode_cel_template(template_spec: dict):
      ])}}}"
 
 
+QUOTED_NAME = re.compile(".*[^a-zA-Z0-9-_]+.*")
+
+
 def _encode_template_dict(base: str, template_spec: dict):
     output: list[tuple[str, Any]] = []
 
     for field, expression in template_spec.items():
-        safe_field = field.replace('"', "'")
+        safe_field = field.replace('"', '\"')  # fmt: skip
 
         field_name = safe_field
         if base:
-            # TODO: QUESTION: I wonder if this should instead just check for
-            # '.'?  Maybe we should only allow json-path from the "root" level
-            # and not from nested fields?
-            if base.endswith("labels") or base.endswith("annotations"):
-                field_name = f"{base}['{safe_field}']"
-                print(field_name)
+            if QUOTED_NAME.match(safe_field):
+                field_name = f"{base}['{safe_field.replace("'", "\'")}']"  # fmt: skip
             else:
                 field_name = f"{base}.{safe_field}"
 
