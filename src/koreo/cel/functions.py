@@ -292,6 +292,14 @@ def _lower(string: celtypes.StringType) -> celtypes.StringType | celpy.CELEvalEr
     return celtypes.StringType(string.lower())
 
 
+def _strip(string: celtypes.StringType, on: celtypes.StringType) -> celtypes.StringType:
+    return celtypes.StringType(string.strip(on))
+
+
+def _rstrip(string: celtypes.StringType, on: celtypes.StringType) -> celtypes.StringType:
+    return celtypes.StringType(string.rstrip(on))
+
+
 def _split(
     string: celtypes.StringType, on: celtypes.StringType
 ) -> celtypes.ListType | celpy.CELEvalError:
@@ -325,6 +333,23 @@ def _split_last(
     return celtypes.StringType(string.rsplit(on, 1)[-1])
 
 
+def _split_index(
+        string: celtypes.StringType, on: celtypes.StringType, index: celtypes.IntType
+) -> celtypes.StringType | celpy.CELEvalError:
+    if not on:
+        return celpy.CELEvalError(f"split separator may not be empty")
+
+    if not string:
+        return celtypes.StringType("")
+
+    try:
+        split = string.split(on)[index]
+    except IndexError:
+        return celpy.CELEvalError(f"index out of bounds on split")
+
+    return celtypes.StringType(split)
+
+
 koreo_function_annotations: dict[str, celpy.Annotation] = {
     "to_ref": celtypes.FunctionType,
     "self_ref": celtypes.FunctionType,
@@ -339,6 +364,9 @@ koreo_function_annotations: dict[str, celpy.Annotation] = {
     "split": celtypes.FunctionType,
     "split_first": celtypes.FunctionType,
     "split_last": celtypes.FunctionType,
+    "split_index": celtypes.FunctionType,
+    "strip": celtypes.FunctionType,
+    "rstrip": celtypes.FunctionType,
 }
 
 koreo_cel_functions: dict[str, celpy.CELFunction] = {
@@ -355,4 +383,7 @@ koreo_cel_functions: dict[str, celpy.CELFunction] = {
     "split": _split,
     "split_first": _split_first,
     "split_last": _split_last,
+    "split_index": _split_index,
+    "strip": _strip,
+    "rstrip": _rstrip,
 }
