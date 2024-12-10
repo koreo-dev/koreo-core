@@ -36,18 +36,16 @@ def get_custom_crd_workflows(custom_crd: str) -> list[str]:
     return list(__custom_crd_wokflow_index[custom_crd])
 
 
-def index_workflow_workflows(workflow: str, workflows: list[str]):
+def index_workflow_workflows(workflow: str, workflows: set[str]):
     old_workflows = __workflow_workflow_index[workflow]
 
-    new_workflows = set(workflows)
-
-    for removed_workflow in old_workflows - new_workflows:
+    for removed_workflow in old_workflows - workflows:
         __workflow_wokflow_index[removed_workflow].remove(workflow)
 
-    for added_workflow in new_workflows - old_workflows:
+    for added_workflow in workflows - old_workflows:
         __workflow_wokflow_index[added_workflow].add(workflow)
 
-    __workflow_workflow_index[workflow] = new_workflows
+    __workflow_workflow_index[workflow] = workflows
 
 
 def get_workflow_workflows(workflow: str) -> list[str]:
