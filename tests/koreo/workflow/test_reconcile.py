@@ -27,6 +27,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
             ),
             steps_ready=Ok(None),
             status=workflow_structure.Status(conditions=[], state=None),
+            config_step=None,
             steps=[
                 workflow_structure.Step(
                     label="input_source",
@@ -54,7 +55,6 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                         dynamic_input_keys=used_vars,
                     ),
                     condition=None,
-                    provided_input_keys=set(),
                 )
             ],
         )
@@ -83,6 +83,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
             ),
             steps_ready=Ok(None),
             status=workflow_structure.Status(conditions=[], state=None),
+            config_step=None,
             steps=[
                 workflow_structure.Step(
                     label="sub_step",
@@ -113,7 +114,6 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                         dynamic_input_keys=set(),
                     ),
                     condition=None,
-                    provided_input_keys=set(),
                 ),
                 workflow_structure.Step(
                     label="sub_step_two",
@@ -142,7 +142,6 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                         dynamic_input_keys=set(),
                     ),
                     condition=None,
-                    provided_input_keys=set(),
                 ),
             ],
         )
@@ -153,6 +152,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
             ),
             steps_ready=Ok(None),
             status=workflow_structure.Status(conditions=[], state=None),
+            config_step=None,
             steps=[
                 workflow_structure.Step(
                     label="sub_workflow",
@@ -161,7 +161,6 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                     dynamic_input_keys=[],
                     logic=sub_workflow,
                     condition=None,
-                    provided_input_keys=set(),
                 )
             ],
         )
