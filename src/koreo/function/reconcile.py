@@ -85,10 +85,10 @@ async def reconcile_function(
         and "metadata" in trigger
         and "metadata" in managed_resource
         and managed_resource[celtypes.StringType("metadata")].get(
-            celtypes.StringType("namespace")
+            celtypes.StringType("namespace"), ""
         )
         == trigger[celtypes.StringType("metadata")].get(
-            celtypes.StringType("namespace")
+            celtypes.StringType("namespace"), ""
         )
     ):
         owners = managed_resource[celtypes.StringType("metadata")].get(
@@ -525,6 +525,9 @@ def _validate_match(target, actual):
 
 def _validate_dict_match(target: dict, actual: dict) -> bool:
     for target_key in target.keys():
+        if target_key == 'ownerReferences':
+            continue
+
         if target_key not in actual:
             return False
 

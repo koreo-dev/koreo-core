@@ -62,7 +62,7 @@ def _process_member_dot_arg(tree: Tree):
     if root.data == "member_dot_arg":
         return f"{_process_member_dot_arg(root)}.{terminal}"
 
-    if root.data == "primary":
+    if root.data == "primary" or root.data == "ident":
         return f"{_process_primary(root)}.{terminal}"
 
     # TODO: Is this possible?

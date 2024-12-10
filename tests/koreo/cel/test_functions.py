@@ -668,6 +668,76 @@ class TestSplitFirst(unittest.TestCase):
         self.assertEqual("test", result)
 
 
+class TestSplitIndex(unittest.TestCase):
+    def test_invalid_type(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "1.split_index('.', 1)"
+
+        with self.assertRaises(celpy.CELParseError):
+            cel_env.compile(test_cel_expression)
+
+    def test_empty_seperator(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "''.split_index('', 1)"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_empty_out_of_bounds(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "'test'.split_index('.', 2)"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_empty_target(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "''.split_index('.', 1)"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        flattened = program.evaluate(inputs)
+        self.assertEqual("", flattened)
+
+    def test_no_spilt(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "'test-ing-is-fun'.split_index('.', 0)"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual("test-ing-is-fun", result)
+
+    def test_spilt(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "'test.ing.is.fun'.split_index('.', 2)"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual("is", result)
+
+
 class TestSplitLast(unittest.TestCase):
     def test_invalid_type(self):
         cel_env = celpy.Environment(annotations=koreo_function_annotations)
@@ -724,3 +794,119 @@ class TestSplitLast(unittest.TestCase):
 
         result = program.evaluate(inputs)
         self.assertEqual("fun", result)
+
+
+class TestStrip(unittest.TestCase):
+    def test_invalid_type(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "1.strip('test')"
+
+        with self.assertRaises(celpy.CELParseError):
+            cel_env.compile(test_cel_expression)
+
+    def test_empty_on(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "test.strip('')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_empty_target(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "''.strip('test')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        flattened = program.evaluate(inputs)
+        self.assertEqual("", flattened)
+
+    def test_no_strip(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "'test-ing-is-fun'.strip('b')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual("test-ing-is-fun", result)
+
+    def test_strip(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "'testinga'.strip('testing')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual("a", result)
+
+
+class TestRStrip(unittest.TestCase):
+    def test_invalid_type(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "1.rstrip('test')"
+
+        with self.assertRaises(celpy.CELParseError):
+            cel_env.compile(test_cel_expression)
+
+    def test_empty_on(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "test.rstrip('')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_empty_target(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "''.rstrip('test')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        flattened = program.evaluate(inputs)
+        self.assertEqual("", flattened)
+
+    def test_no_rstrip(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "'test-ing-is-fun'.rstrip('b')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual("test-ing-is-fun", result)
+
+    def test_rstrip(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "'testingisfun'.rstrip('isfun')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual("testing", result)
