@@ -1,9 +1,10 @@
 from __future__ import annotations
-from typing import NamedTuple
+from typing import NamedTuple, Sequence
 
 import celpy
 
-from koreo.result import Outcome
+from koreo.result import Outcome, PermFail, Retry
+
 from koreo.function.structure import Function
 
 
@@ -23,15 +24,23 @@ class StepConditionSpec(NamedTuple):
     name: str
 
 
+class ConfigStep(NamedTuple):
+    label: str
+    logic: Function | Workflow | PermFail | Retry
+
+    inputs: celpy.Runner | None
+
+    condition: StepConditionSpec | None
+
+
 class Step(NamedTuple):
     label: str
-    logic: Function | Workflow
+    logic: Function | Workflow | PermFail | Retry
 
     mapped_input: MappedInput | None
     inputs: celpy.Runner | None
 
-    dynamic_input_keys: list[str]
-    provided_input_keys: set[str]
+    dynamic_input_keys: Sequence[str]
 
     condition: StepConditionSpec | None
 
@@ -50,7 +59,7 @@ class ConditionSpec(NamedTuple):
 
 
 class Status(NamedTuple):
-    conditions: list[ConditionSpec]
+    conditions: Sequence[ConditionSpec]
     state: celpy.Runner | None
 
 
@@ -58,6 +67,7 @@ class Workflow(NamedTuple):
     crd_ref: ConfigCRDRef | None
 
     steps_ready: Outcome
-    steps: list[Step | ErrorStep]
+    config_step: ConfigStep | ErrorStep | None
+    steps: Sequence[Step | ErrorStep]
 
     status: Status

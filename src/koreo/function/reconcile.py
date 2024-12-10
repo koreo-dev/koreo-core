@@ -49,7 +49,6 @@ async def reconcile_function(
 ) -> UnwrappedOutcome[celtypes.Value]:
     base_inputs = {
         "inputs": inputs,
-        "parent": trigger,
         "env": env,
     }
 
@@ -67,7 +66,6 @@ async def reconcile_function(
 
     base_inputs = base_inputs | {
         "inputs": inputs,
-        "parent": trigger,
         "context": resource_config.context,
     }
 
@@ -78,6 +76,9 @@ async def reconcile_function(
         inputs=base_inputs,
         location=location,
     )
+
+    if not is_unwrapped_ok(managed_resource):
+        return managed_resource
 
     # TODO: Add owners, if behaviors.add-owner
     if (
@@ -276,7 +277,7 @@ def _materialize_overlay(
     materializer: celpy.Runner | None,
     inputs: dict[str, celtypes.Value],
     location: str,
-):
+) -> UnwrappedOutcome[celtypes.MapType]:
     managed_resource = copy.deepcopy(template) if template else celtypes.MapType()
 
     if not materializer:
@@ -286,14 +287,18 @@ def _materialize_overlay(
         computed_inputs = inputs | {"template": managed_resource}
 
         overlay = materializer.evaluate(computed_inputs)
+
+        eval_errors = _check_for_celevalerror(overlay)
+        if is_not_ok(eval_errors):
+            return eval_errors
+
     except celpy.CELEvalError as err:
-        logging.exception(f"Encountered CELEvalError {err}. ({location})")
+        return PermFail(
+            f"Encountered CELEvalError {err}. ({location})", location=location
+        )
 
-        raise
     except TypeError as err:
-        logging.exception(f"Encountered TypeError {err}. ({location})")
-
-        raise
+        return PermFail(f"Encountered TypeError {err}. ({location})", location=location)
 
     # TODO: Insert check for CELEvalError here?
 
@@ -444,6 +449,9 @@ async def _resource_crud(
             location=location,
         )
 
+        if not is_unwrapped_ok(managed_resource):
+            return managed_resource
+
         new_object = resource_class(
             api=api,
             resource=_convert_bools(managed_resource),
@@ -476,6 +484,7 @@ async def _resource_crud(
         logging.debug(
             f"{resource_api}/{resource_name} resource matched spec, skipping update. ({location})"
         )
+
         return resource.raw
 
     logging.info(

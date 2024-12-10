@@ -384,8 +384,8 @@ class TestFunctionMaterializerBase(unittest.IsolatedAsyncioTestCase):
             "metadata.namespace": "my-test-namespace",
             "spec.name": "Person Name",
             "spec.age": 55,
-            "spec.children.*.name": "Person Name, Jr.",
-            "spec.children.*.age": 35,
+            "spec['children.*'].name": "Person Name, Jr.",
+            "spec['children.*'].age": 35,
         }
         self.assertDictEqual(output, result)
 
@@ -464,7 +464,7 @@ class TestFunctionMaterializerOnCreate(unittest.IsolatedAsyncioTestCase):
             "metadata.namespace": "my-test-namespace",
             "spec.name": "Person Name",
             "spec.age": 55,
-            "spec.children.*": {
+            "spec['children.*']": {
                 "name": "Person Name, Jr.",
                 "age": 35,
             },
