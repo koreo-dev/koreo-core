@@ -1,10 +1,10 @@
 from contextlib import asynccontextmanager
+from typing import NamedTuple
+import json
 
 import kr8s
 
-from typing import NamedTuple
-
-import json
+from celpy import celtypes
 
 from koreo.result import Outcome, UnwrappedOutcome, is_unwrapped_ok
 
@@ -85,7 +85,7 @@ async def run_function_test(location: str, function_test: FunctionTest) -> TestR
         api=api,
         location=location,
         function=function_test.function_under_test,
-        trigger=function_test.parent,
+        trigger=celtypes.MapType({}),
         inputs=function_test.inputs,
     )
 

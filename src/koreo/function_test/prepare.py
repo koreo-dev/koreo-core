@@ -47,13 +47,6 @@ async def prepare_function_test(
             location=f"prepare:FunctionTest:{cache_key}",
         )
 
-    parent = celpy.json_to_cel(spec.get("parent", {}))
-    if parent and not isinstance(parent, celtypes.MapType):
-        return PermFail(
-            message=f"FunctionTest '{cache_key}' `spec.parent` ('{parent}') must be an object.",
-            location=f"prepare:FunctionTest:{cache_key}",
-        )
-
     inputs = celpy.json_to_cel(spec.get("inputs", {}))
     if inputs and not isinstance(inputs, celtypes.MapType):
         return PermFail(
@@ -76,7 +69,6 @@ async def prepare_function_test(
     return (
         structure.FunctionTest(
             function_under_test=function_under_test,
-            parent=parent,
             inputs=inputs,
             current_resource=current_resource,
             expected_resource=expected_resource,
