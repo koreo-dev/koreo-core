@@ -1,5 +1,6 @@
 from typing import Any
 import copy
+import json
 
 from celpy import celtypes
 import celpy
@@ -296,7 +297,9 @@ def _strip(string: celtypes.StringType, on: celtypes.StringType) -> celtypes.Str
     return celtypes.StringType(string.strip(on))
 
 
-def _rstrip(string: celtypes.StringType, on: celtypes.StringType) -> celtypes.StringType:
+def _rstrip(
+    string: celtypes.StringType, on: celtypes.StringType
+) -> celtypes.StringType:
     return celtypes.StringType(string.rstrip(on))
 
 
@@ -334,7 +337,7 @@ def _split_last(
 
 
 def _split_index(
-        string: celtypes.StringType, on: celtypes.StringType, index: celtypes.IntType
+    string: celtypes.StringType, on: celtypes.StringType, index: celtypes.IntType
 ) -> celtypes.StringType | celpy.CELEvalError:
     if not on:
         return celpy.CELEvalError(f"split separator may not be empty")
@@ -348,6 +351,13 @@ def _split_index(
         return celpy.CELEvalError(f"index out of bounds on split")
 
     return celtypes.StringType(split)
+
+
+def _to_json(value: celtypes.Value) -> celtypes.StringType | celpy.CELEvalError:
+    try:
+        return celtypes.StringType(json.dumps(value))
+    except Exception as err:
+        return celpy.CELEvalError(f"JSON Encoding error {err}")
 
 
 koreo_function_annotations: dict[str, celpy.Annotation] = {
@@ -367,6 +377,7 @@ koreo_function_annotations: dict[str, celpy.Annotation] = {
     "split_index": celtypes.FunctionType,
     "strip": celtypes.FunctionType,
     "rstrip": celtypes.FunctionType,
+    "to_json": celtypes.FunctionType,
 }
 
 koreo_cel_functions: dict[str, celpy.CELFunction] = {
@@ -386,4 +397,5 @@ koreo_cel_functions: dict[str, celpy.CELFunction] = {
     "split_index": _split_index,
     "strip": _strip,
     "rstrip": _rstrip,
+    "to_json": _to_json,
 }
