@@ -30,7 +30,7 @@ spec:
     - label: empty
       functionRef:
         name: empty.v1
-    - label: ok-value
+    - label: ok_value
       functionRef:
         name: outcome-ok-value.v1
 ---
@@ -47,10 +47,11 @@ spec:
     version: v1alpha8
     kind: Domain
 
+  configStep:
+    functionRef:
+      name: domain-config.v1
+
   steps:
-    - label: config
-      functionRef:
-        name: domain-config.v1
     - label: metadata
       functionRef:
         name: domain-subresource-metadata.v1
@@ -87,7 +88,7 @@ spec:
     - label: empty
       functionRef:
         name: empty.v1
-    - label: ok-value
+    - label: ok_value
       functionRef:
         name: outcome-ok-value.v1
 ---
@@ -102,17 +103,24 @@ spec:
     version: v1alpha8
     kind: Domain
 
+  configStep:
+    label: dummy_test
+    functionRef:
+      name: dummy-test.v1
+
   steps:
-    - label: dummy_test
+    - label: noop
       functionRef:
-        name: dummy-test.v1
+        name: outcome-ok-value.v1
+      inputs:
+        output: "nothing"
   status:
     conditions:
       - type: Test
         name: this is fun
         step: dummy_test
     state:
-      dummyTestUID: =steps.dummy_test
+      dummyTestUID: =steps.config
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Workflow
@@ -125,10 +133,17 @@ spec:
     version: v1alpha8
     kind: Domain
 
+  configStep:
+    label: dummy_test
+    functionRef:
+      name: dummy-test.v1
+
   steps:
-    - label: dummy_test
+    - label: noop
       functionRef:
-        name: dummy-test.v1
+        name: outcome-ok-value.v1
+      inputs:
+        output: "nothing"
 
   status:
     conditions:
@@ -136,7 +151,7 @@ spec:
         name: this is fun
         step: dummy_test
     state:
-      uid: =steps.dummy_test
+      uid: =steps.config
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Workflow
@@ -185,10 +200,15 @@ spec:
     apiGroup: konfig.realkinetic.com
     version: v1alpha8
     kind: Domain
+  configStep:
+      functionRef:
+        name: dynamic-config.v1
   steps:
     - label: dynamic_template
       functionRef:
         name: dynamic-resource-test.v1
+      inputs:
+        config: =steps.config
     - label: dynamic_template_dynamic_key_a
       functionRef:
         name: dynamic-key-dynamic-resource-test.v1
