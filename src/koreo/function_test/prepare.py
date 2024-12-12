@@ -55,14 +55,15 @@ async def prepare_function_test(
         )
 
     expected_outcome_spec = spec.get("expectedOutcome")
-    if expected_outcome_spec:
+    if expected_outcome_spec and isinstance(expected_outcome_spec, dict):
+        expected_outcome_spec["assert"] = True
         expected_outcome = _predicate_to_koreo_result(
             [expected_outcome_spec], location=cache_key
         )
     else:
         expected_outcome = None
 
-    expected_ok_value = spec.get("expectedOkValue")
+    expected_return = spec.get("expectedReturn")
 
     index_test_function(test=cache_key, function=function_ref_name)
 
@@ -73,7 +74,7 @@ async def prepare_function_test(
             current_resource=current_resource,
             expected_resource=expected_resource,
             expected_outcome=expected_outcome,
-            expected_ok_value=expected_ok_value,
+            expected_return=expected_return,
         ),
         None,
     )

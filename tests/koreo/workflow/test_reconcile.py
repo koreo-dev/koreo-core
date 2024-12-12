@@ -16,10 +16,10 @@ from koreo.workflow import structure as workflow_structure
 class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
     async def test_reconcile(self):
         cel_env = celpy.Environment()
-        source_ok_value = cel_env.program(
+        source_return_value = cel_env.program(
             cel_env.compile("{'resources': [{'bool': true}, {'bool': false}]}")
         )
-        used_vars = set(extract_argument_structure(source_ok_value.ast))
+        used_vars = set(extract_argument_structure(source_return_value.ast))
 
         workflow = workflow_structure.Workflow(
             crd_ref=workflow_structure.ConfigCRDRef(
@@ -47,7 +47,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                         ),
                         input_validators=None,
                         outcome=function_structure.Outcome(
-                            tests=None, ok_value=source_ok_value
+                            validators=None, return_value=source_return_value
                         ),
                         materializers=function_structure.Materializers(
                             base=None, on_create=None
@@ -72,10 +72,10 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
 
     async def test_reconcile_nested(self):
         cel_env = celpy.Environment()
-        source_ok_value = cel_env.program(
+        source_return_value = cel_env.program(
             cel_env.compile("{'resources': [{'bool': true}, {'bool': false}]}")
         )
-        used_vars = set(extract_argument_structure(source_ok_value.ast))
+        used_vars = set(extract_argument_structure(source_return_value.ast))
 
         sub_workflow = workflow_structure.Workflow(
             crd_ref=workflow_structure.ConfigCRDRef(
@@ -103,8 +103,8 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                         ),
                         input_validators=None,
                         outcome=function_structure.Outcome(
-                            tests=None,
-                            ok_value=cel_env.program(
+                            validators=None,
+                            return_value=cel_env.program(
                                 cel_env.compile("{'sub_one': true}")
                             ),
                         ),
@@ -133,8 +133,8 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                         ),
                         input_validators=None,
                         outcome=function_structure.Outcome(
-                            tests=None,
-                            ok_value=cel_env.program(cel_env.compile("17171")),
+                            validators=None,
+                            return_value=cel_env.program(cel_env.compile("17171")),
                         ),
                         materializers=function_structure.Materializers(
                             base=None, on_create=None

@@ -21,7 +21,6 @@ from koreo.result import (
     Retry,
     Skip,
     UnwrappedOutcome,
-    combine,
     is_error,
     is_ok,
     is_not_ok,
@@ -116,23 +115,23 @@ async def reconcile_function(
         "resource": celpy.json_to_cel(resource) if resource else None
     }
 
-    outcome_tests_outcome = _run_checks(
-        checks=function.outcome.tests, inputs=full_inputs, location=location
+    outcome_validators_outcome = _run_checks(
+        checks=function.outcome.validators, inputs=full_inputs, location=location
     )
-    if not is_ok(outcome_tests_outcome):
-        return outcome_tests_outcome
+    if not is_ok(outcome_validators_outcome):
+        return outcome_validators_outcome
 
-    if not function.outcome.ok_value:
+    if not function.outcome.return_value:
         return celpy.json_to_cel(None)
 
     try:
-        ok_value = function.outcome.ok_value.evaluate(full_inputs)
+        return_value = function.outcome.return_value.evaluate(full_inputs)
 
-        eval_errors = _check_for_celevalerror(ok_value)
+        eval_errors = _check_for_celevalerror(return_value)
         if is_not_ok(eval_errors):
             return eval_errors
 
-        return ok_value
+        return return_value
     except celpy.CELEvalError as err:
         msg = f"CEL Eval Error computing OK value. {err.tree}"
         logging.exception(msg)
@@ -237,39 +236,34 @@ def _run_checks(
 
 
 def _predicate_to_koreo_result(results: list, location: str) -> Outcome:
-    outcomes = []
-
-    for result in results:
-        match result.get("type"):
-            case "DepSkip":
-                outcomes.append(
-                    DepSkip(message=result.get("message"), location=location)
-                )
-            case "Ok":
-                outcomes.append(Ok(None, location=location))
-            case "PermFail":
-                outcomes.append(
-                    PermFail(message=result.get("message"), location=location)
-                )
-            case "Retry":
-                outcomes.append(
-                    Retry(
-                        message=result.get("message"),
-                        delay=result.get("delay"),
-                        location=location,
-                    )
-                )
-            case "Skip":
-                outcomes.append(Skip(message=result.get("message"), location=location))
-            case _ as t:
-                outcomes.append(
-                    PermFail(f"Unknown predicate result type: {t}", location=location)
-                )
-
-    if not outcomes:
+    if not results:
         return Ok(None)
 
-    return combine(outcomes=outcomes)
+    for result in results:
+        match result:
+            case {"assert": _, "ok": {}}:
+                return Ok(None, location=location)
+
+            case {"assert": _, "depSkip": {"message": message}}:
+                return DepSkip(message=message, location=location)
+
+            case {"assert": _, "skip": {"message": message}}:
+                return Skip(message=message, location=location)
+
+            case {"assert": _, "retry": {"message": message, "delay": delay}}:
+                return Retry(
+                    message=message,
+                    delay=delay,
+                    location=location,
+                )
+
+            case {"assert": _, "permFail": {"message": message}}:
+                return PermFail(message=message, location=location)
+
+            case _:
+                return PermFail(f"Unknown predicate type: {result}", location=location)
+
+    return Ok(None)
 
 
 def _materialize_overlay(
@@ -534,7 +528,7 @@ def _validate_match(target, actual):
 
 def _validate_dict_match(target: dict, actual: dict) -> bool:
     for target_key in target.keys():
-        if target_key == 'ownerReferences':
+        if target_key == "ownerReferences":
             continue
 
         if target_key not in actual:

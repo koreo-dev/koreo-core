@@ -10,6 +10,7 @@ metadata:
   namespace: koreo-testing
   labels:
     koreo.realkinetic.com/bump: "13"
+spec:
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -18,31 +19,33 @@ metadata:
   namespace: koreo-testing
 spec:
   inputValidators:
-    - type: Skip
-      message: number too small, must be over 5.
-      test: =inputs.number < 5
+    - assert: =inputs.number < 5
+      skip:
+        message: number too small, must be over 5.
 
-    - type: PermFail
-      message: optional number not equal to 3333.
-      test: =has(inputs.optional_number) && inputs.optional_number != 3333
+    - assert: =has(inputs.optional_number) && inputs.optional_number != 3333
+      permFail:
+        message: optional number not equal to 3333.
 
-    - type: Retry
-      message: number too large, must be under 13.
-      test: =inputs.number > 13
-      delay: 90
+    - assert: =inputs.number > 13
+      retry:
+        message: number too large, must be under 13.
+        delay: 90
 
-    - type: PermFail
-      message: number too small, must be over 1.
-      test: =inputs.number < 1
+    - assert: =inputs.number < 1
+      permFail:
+        message: number too small, must be over 1.
+      
 
-    - type: Retry
-      message: optional retry_number not equal to 1212.
-      test: =has(inputs.optional_retry_number) && inputs.optional_retry_number != 1212
-      delay: 75
+    - assert: =has(inputs.optional_retry_number) && inputs.optional_retry_number != 1212
+      retry:
+        message: optional retry_number not equal to 1212.
+        delay: 75
 
-    - type: Skip
-      message: ="value for message (\"" + inputs.value_for_message + "\") was set."
-      test: =has(inputs.value_for_message)
+    - assert: =has(inputs.value_for_message)
+      skip:
+        message: ="value for message (\"" + inputs.value_for_message + "\") was set."
+      
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -51,18 +54,18 @@ metadata:
   namespace: koreo-testing
 spec:
   outcome:
-    tests:
-      - type: Retry
-        message: number too large, must be under 13.
-        test: =inputs.number > 13
-        delay: 90
+    validators:
+      - assert: =inputs.number > 13
+        retry:
+          message: number too large, must be under 13.
+          delay: 90
 
-      - type: PermFail
-        message: optional number not equal to 3333.
-        test: =has(inputs.optional_number) && inputs.optional_number != 3333
+      - assert: =has(inputs.optional_number) && inputs.optional_number != 3333
+        permFail:
+          message: optional number not equal to 3333.
 
-      - type: Ok
-        test: =has(inputs.output) && inputs.output == 11221122
+      - assert: =has(inputs.output) && inputs.output == 11221122
+        ok: {}
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -73,7 +76,8 @@ metadata:
     koreo.realkinetic.com/bump: "4"
 spec:
   outcome:
-    okValue: "=has(inputs.output) ? inputs.output: null"
+    return:
+      value: "=has(inputs.output) ? inputs.output: null"
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -176,12 +180,13 @@ metadata:
   namespace: koreo-testing
 spec:
   outcome:
-    tests:
-      - type: Ok
-        test: =resource.config_connect_ready()
+    validators:
+      - assert: =resource.config_connect_ready()
+        ok: {}
 
-    okValue: |
-      ={"folderId": resource.status.folderId, "ref": resource.self_ref() }
+    return:
+      folderId: =resource.status.folderId
+      ref: =resource.self_ref()
 
   materializers:
     base:
@@ -211,10 +216,10 @@ spec:
       apiVersion: koreo.realkinetic.com/v1alpha8
       kind: TestDummy
       metadata:
-        name: =parent.metadata.name
+        name: =inputs.parent.metadata.name
         namespace: =string("koreo-testing")
         labels:
-          testing.realkinetic.com/key: =parent.metadata.name
+          testing.realkinetic.com/key: =inputs.parent.metadata.name
       spec:
         intKey: 99
         strKey: =string("A string!")
@@ -231,7 +236,22 @@ spec:
           aFalse: false
 
   outcome:
-    okValue: =resource.metadata.uid
+    return:
+      uid: =resource.metadata.uid
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Function
+metadata:
+  name: dummy-config.v1
+  namespace: koreo-testing
+spec:
+  staticResource:
+    behavior:
+      load: virtual
+      update: never
+  outcome:
+    return:
+      parent_name: =inputs.parent.metadata.name
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -244,9 +264,10 @@ spec:
   materializers:
     base:
       metadata:
-        name: =parent.metadata.name + "-simple"
+        name: =inputs.config.parent_name + "-simple"
   outcome:
-    okValue: =resource.metadata.uid
+    return:
+      uid: =resource.metadata.uid
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -259,12 +280,13 @@ spec:
   materializers:
     base:
       metadata:
-        name: =parent.metadata.name + "-" + inputs.template_name
+        name: =inputs.config.parent_name + "-" + inputs.template_name
       spec:
         boolTrue: true
         boolFalse: false
   outcome:
-    okValue: =resource.metadata.uid
+    return:
+      uid: =resource.metadata.uid
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -279,20 +301,18 @@ spec:
       update: never
       delete: abandon
   inputValidators:
-    - type: PermFail
-      message: Domain resource-name must start with a letter.
-      test: =parent.metadata.name.matches("^[0-9][a-zA-Z]+")
-    - type: PermFail
-      message: Domain resource must have platform label.
-      test: '=!has(parent.metadata.labels["konfig.realkinetic.com/platform"])'
+    - assert: =inputs.parent.metadata.name.matches("^[0-9][a-zA-Z]+")
+      permFail:
+        message: Domain resource-name must start with a letter.
+    - assert: '=!has(inputs.parent.metadata.labels["konfig.realkinetic.com/platform"])'
+      permFail:
+        message: Domain resource must have platform label.
   outcome:
-    okValue: |
-      ={
-        "domain_resource_name": parent.metadata.name,
-        "namespace": parent.metadata.namespace,
-        "platform_resource_name": parent.metadata.labels["konfig.realkinetic.com/platform"],
-        "domain_human_name": has(parent.spec.domainName) ? parent.spec.domainName: parent.metadata.name
-      }
+    return:
+      domain_resource_name: =inputs.parent.metadata.name
+      namespace: =inputs.parent.metadata.namespace
+      platform_resource_name: =inputs.parent.metadata.labels["konfig.realkinetic.com/platform"]
+      domain_human_name: "=has(inputs.parent.spec.domainName) ? inputs.parent.spec.domainName: inputs.parent.metadata.name"
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -307,19 +327,16 @@ spec:
       update: never
       delete: abandon
   outcome:
-    okValue: |
-      ={
-        "name": inputs.config.domain_resource_name,
-        "namespace": inputs.config.namespace,
-        "labels": {
-          "app.kubernetes.io/managed-by": "konfig",
-          "konfig.realkinetic.com/platform": inputs.config.platform_resource_name,
-          "konfig.realkinetic.com/domain": inputs.config.domain_resource_name,
-          "konfig-platform": inputs.config.platform_resource_name,
-          "konfig-domain": inputs.config.domain_resource_name,
-          "testing": string("is fun!")
-        }
-      }
+    return:
+      name: =inputs.config.domain_resource_name
+      namespace: =inputs.config.namespace
+      labels:
+        app.kubernetes.io/managed-by: konfig
+        konfig.realkinetic.com/platform: =inputs.config.platform_resource_name
+        konfig.realkinetic.com/domain: =inputs.config.domain_resource_name
+        konfig-platform: =inputs.config.platform_resource_name
+        konfig-domain: =inputs.config.domain_resource_name
+        testing: =string("is fun!")
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -334,15 +351,14 @@ spec:
       update: never
       delete: abandon
   inputValidators:
-    - type: PermFail
-      message: testing skip encoding
-      test: "=!has(inputs.metadata.name)"
+    - assert: "=!has(inputs.metadata.name)"
+      permFail:
+        message: testing skip encoding
+      
   outcome:
-    okValue: |
-      ={
-        "metadata-name": inputs.metadata.name,
-        "config-human-name": inputs.config.domain_human_name
-      }
+    return:
+      metadata-name: =inputs.metadata.name
+      config-human-name: =inputs.config.domain_human_name
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -357,7 +373,8 @@ spec:
       update: never
       delete: abandon
   outcome:
-    okValue: =["a", "b", "c", "d", "e"]
+    return:
+      list: =["a", "b", "c", "d", "e"]
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -388,4 +405,5 @@ spec:
           number: 42
 
   outcome:
-    okValue: =resource.metadata.uid
+    return:
+      uid: =resource.metadata.uid

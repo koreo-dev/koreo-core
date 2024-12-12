@@ -12,7 +12,7 @@ class FunctionTest(NamedTuple):
     inputs: celtypes.MapType | None
 
     expected_outcome: Outcome | None
-    expected_ok_value: dict | None
+    expected_return: dict | None
 
     current_resource: dict | None
     expected_resource: dict | None

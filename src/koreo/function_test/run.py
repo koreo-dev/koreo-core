@@ -72,7 +72,7 @@ class MockApi:
 class TestResults(NamedTuple):
     expected_resource: dict | None
     expected_outcome: Outcome | None
-    expected_ok_value: dict | None
+    expected_return: dict | None
 
     actual_resource: dict | None
     outcome: UnwrappedOutcome[dict]
@@ -94,7 +94,7 @@ async def run_function_test(location: str, function_test: FunctionTest) -> TestR
 
     return TestResults(
         expected_resource=function_test.expected_resource,
-        expected_ok_value=function_test.expected_ok_value,
+        expected_return=function_test.expected_return,
         expected_outcome=function_test.expected_outcome,
         actual_resource=api.materialized,
         outcome=result,
