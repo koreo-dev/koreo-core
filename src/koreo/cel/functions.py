@@ -179,16 +179,18 @@ def _overlay(
     resource: celtypes.MapType,
     overlay: celtypes.MapType,
 ) -> celtypes.MapType | celpy.CELEvalError:
+    updated_resource = copy.deepcopy(resource)
+
     computed_overlay = __build_overlay_structure(overlay)
 
     for field_path, value in computed_overlay:
         try:
             path = jsonpath_ng.parse(field_path)
-            path.update_or_create(resource, value)
+            path.update_or_create(updated_resource, value)
         except Exception as err:
             return celpy.CELEvalError(f"Error applying template overlay ({err}).")
 
-    return resource
+    return updated_resource
 
 
 def __build_overlay_structure(overlay: celtypes.MapType, base: str | None = None):
