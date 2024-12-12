@@ -56,6 +56,7 @@ async def prepare_function_test(
 
     expected_outcome_spec = spec.get("expectedOutcome")
     if expected_outcome_spec:
+        expected_outcome_spec["assert"] = True
         expected_outcome = _predicate_to_koreo_result(
             [expected_outcome_spec], location=cache_key
         )

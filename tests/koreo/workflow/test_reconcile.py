@@ -47,7 +47,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                         ),
                         input_validators=None,
                         outcome=function_structure.Outcome(
-                            tests=None, ok_value=source_ok_value
+                            validators=None, ok_value=source_ok_value
                         ),
                         materializers=function_structure.Materializers(
                             base=None, on_create=None
@@ -103,7 +103,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                         ),
                         input_validators=None,
                         outcome=function_structure.Outcome(
-                            tests=None,
+                            validators=None,
                             ok_value=cel_env.program(
                                 cel_env.compile("{'sub_one': true}")
                             ),
@@ -133,7 +133,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                         ),
                         input_validators=None,
                         outcome=function_structure.Outcome(
-                            tests=None,
+                            validators=None,
                             ok_value=cel_env.program(cel_env.compile("17171")),
                         ),
                         materializers=function_structure.Materializers(

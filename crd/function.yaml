@@ -80,65 +80,131 @@ spec:
                   maxItems: 20
                   items:
                     type: object
-                    x-kubernetes-validations:
-                      - rule: (self.type == 'Retry' && has(self.delay) && self.delay > 0) || self.type != 'Retry'
-                        message: "Retry validators must provide delay-seconds."
-                      - rule: (self.type != 'Retry' && !has(self.delay)) || self.type == 'Retry'
-                        message: "Non-retry validators must not provide delay-seconds."
                     properties:
-                      type:
-                        type: string
-                        nullable: false
-                        enum: [DepSkip, Ok, PermFail, Retry, Skip]
-                      test:
+                      assert:
                         type: string
                         nullable: false
                         x-kubernetes-validations:
                           - rule: self.startsWith('=')
-                            message: "test must be a cel expression (start with '=')."
-                      message:
-                        type: string
-                        nullable: false
-                      delay:
-                        type: integer
+                            message: "assertion must be a cel expression (start with '=')."
+                      ok:
+                        type: object
                         nullable: true
-                    required: [type, test, message]
+                      skip:
+                        type: object
+                        nullable: true
+                        properties:
+                          message:
+                            type: string
+                            nullable: false
+                        required: [message]
+                      depSkip:
+                        type: object
+                        nullable: true
+                        properties:
+                          message:
+                            type: string
+                            nullable: false
+                        required: [message]
+                      retry:
+                        type: object
+                        nullable: true
+                        properties:
+                          message:
+                            type: string
+                            nullable: false
+                          delay:
+                            type: integer
+                            nullable: false
+                        required: [message, delay]
+                      permFail:
+                        type: object
+                        nullable: true
+                        properties:
+                          message:
+                            type: string
+                            nullable: false
+                        required: [message]
+                    required: [assert]
+                    oneOf:
+                      - properties:
+                        required: [ok]
+                      - properties:
+                        required: [skip]
+                      - properties:
+                        required: [depSkip]
+                      - properties:
+                        required: [retry]
+                      - properties:
+                        required: [permFail]
                 outcome:
                   nullable: true
                   type: object
                   properties:
-                    tests:
+                    validators:
                       nullable: true
                       type: array
                       maxItems: 20
                       items:
                         type: object
-                        x-kubernetes-validations:
-                          - rule: (self.type == 'Retry' && has(self.delay) && self.delay > 0) || self.type != 'Retry'
-                            message: "Retry validators must provide delay-seconds."
-                          - rule: (self.type != 'Retry' && !has(self.delay)) || self.type == 'Retry'
-                            message: "Non-retry validators must not provide delay-seconds."
-                          - rule: (self.type == 'Ok' && !has(self.message)) || self.type != 'Ok'
-                            message: "Ok validators should not provide a message."
-
                         properties:
-                          type:
-                            type: string
-                            nullable: false
-                            enum: [Ok, PermFail, Retry]
-                          test:
+                          assert:
                             type: string
                             nullable: false
                             x-kubernetes-validations:
                               - rule: self.startsWith('=')
-                                message: "test must be a CEL expression."
-                          message:
-                            type: string
+                                message: "assertion must be a cel expression (start with '=')."
+                          ok:
+                            type: object
                             nullable: true
-                          delay:
-                            type: integer
+                          skip:
+                            type: object
                             nullable: true
-                        required: [type, test]
+                            properties:
+                              message:
+                                type: string
+                                nullable: false
+                            required: [message]
+                          depSkip:
+                            type: object
+                            nullable: true
+                            properties:
+                              message:
+                                type: string
+                                nullable: false
+                            required: [message]
+                          retry:
+                            type: object
+                            nullable: true
+                            properties:
+                              message:
+                                type: string
+                                nullable: false
+                              delay:
+                                type: integer
+                                nullable: false
+                            required: [message, delay]
+                          permFail:
+                            type: object
+                            nullable: true
+                            properties:
+                              message:
+                                type: string
+                                nullable: false
+                            required: [message]
+                        required: [assert]
+                        oneOf:
+                          - properties:
+                            required: [ok]
+                          - properties:
+                            required: [skip]
+                          - properties:
+                            required: [depSkip]
+                          - properties:
+                            required: [retry]
+                          - properties:
+                            required: [permFail]
+
                     okValue:
                       nullable: true
                       type: string
@@ -154,11 +220,6 @@ spec:
                       nullable: true
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
-              oneOf:
-                - properties:
-                  required: [dynamicResource]
-                - properties:
-                  required: [staticResource]
             status:
               x-kubernetes-preserve-unknown-fields: true
               type: object

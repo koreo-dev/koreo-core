@@ -9,7 +9,7 @@ from koreo.result import PermFail, is_unwrapped_ok
 
 _functions = {}
 
-with open("crd/sample-function.yaml", "r") as raw_yamls:
+with open("crd/sample-function.koreo", "r") as raw_yamls:
     yamls = yaml.load_all(raw_yamls, Loader=yaml.Loader)
     for function_yaml in yamls:
         if function_yaml.get("kind") != "Function":
@@ -71,8 +71,8 @@ class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
 
         result = results.pop()
 
-        self.assertEqual("Skip", result.get("type"))
-        self.assertIn("too small", result.get("message"))
+        self.assertIsInstance(result.get("skip"), dict)
+        self.assertIn("too small", result["skip"].get("message"))
 
     async def test_optional_perm_fail(self):
         prepared = await prepare.prepare_function(
@@ -93,8 +93,8 @@ class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
 
         result = results.pop()
 
-        self.assertEqual("PermFail", result.get("type"))
-        self.assertIn("not equal", result.get("message"))
+        self.assertIsInstance(result.get("permFail"), dict)
+        self.assertIn("not equal", result["permFail"].get("message"))
 
     async def test_retry_delay(self):
         prepared = await prepare.prepare_function(
@@ -115,11 +115,11 @@ class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
 
         result = results.pop()
 
-        self.assertEqual("Retry", result.get("type"))
-        self.assertEqual(90, result.get("delay"))
-        self.assertIn("too large", result.get("message"))
+        self.assertIsInstance(result.get("retry"), dict)
+        self.assertEqual(90, result["retry"].get("delay"))
+        self.assertIn("too large", result["retry"].get("message"))
 
-    async def test_multiple_issues(self):
+    async def test_first_issue(self):
         prepared = await prepare.prepare_function(
             cache_key="input-validation-tests.v1",
             spec=_functions["input-validation-tests.v1"].get("spec", {}),
@@ -157,9 +157,10 @@ class TestFunctionInputValidation(unittest.IsolatedAsyncioTestCase):
 
         result = results.pop()
 
-        self.assertEqual("Skip", result.get("type"))
+        self.assertIsInstance(result.get("skip"), dict)
         self.assertEqual(
-            'value for message ("set within message") was set.', result.get("message")
+            'value for message ("set within message") was set.',
+            result["skip"].get("message"),
         )
 
 
@@ -173,7 +174,7 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(is_unwrapped_ok(prepared))
         prepared_function, _ = prepared
 
-        self.assertIsNone(prepared_function.outcome.tests)
+        self.assertIsNone(prepared_function.outcome.validators)
 
     async def test_optional_perm_fail(self):
         prepared = await prepare.prepare_function(
@@ -182,7 +183,7 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(is_unwrapped_ok(prepared))
         prepared_function, _ = prepared
-        cel_result = prepared_function.outcome.tests.evaluate(
+        cel_result = prepared_function.outcome.validators.evaluate(
             {"inputs": celpy.json_to_cel({"number": 5, "optional_number": 250})}
         )
 
@@ -192,8 +193,8 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
 
         result = results.pop()
 
-        self.assertEqual("PermFail", result.get("type"))
-        self.assertIn("not equal", result.get("message"))
+        self.assertIsInstance(result.get("permFail"), dict)
+        self.assertIn("not equal", result["permFail"].get("message"))
 
     async def test_retry_delay(self):
         prepared = await prepare.prepare_function(
@@ -204,7 +205,7 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(is_unwrapped_ok(prepared))
         prepared_function, _ = prepared
 
-        cel_result = prepared_function.outcome.tests.evaluate(
+        cel_result = prepared_function.outcome.validators.evaluate(
             {"inputs": celpy.json_to_cel({"number": 15})}
         )
 
@@ -214,9 +215,9 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
 
         result = results.pop()
 
-        self.assertEqual("Retry", result.get("type"))
-        self.assertEqual(90, result.get("delay"))
-        self.assertIn("too large", result.get("message"))
+        self.assertIsInstance(result.get("retry"), dict)
+        self.assertEqual(90, result["retry"].get("delay"))
+        self.assertIn("too large", result["retry"].get("message"))
 
     async def test_multiple_issues(self):
         prepared = await prepare.prepare_function(
@@ -227,7 +228,7 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(is_unwrapped_ok(prepared))
         prepared_function, _ = prepared
 
-        result = prepared_function.outcome.tests.evaluate(
+        result = prepared_function.outcome.validators.evaluate(
             {
                 "inputs": celpy.json_to_cel(
                     {"number": 20, "optional_number": 7, "output": 12}
@@ -243,10 +244,12 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
             spec=_functions["outcome-tests.v1"].get("spec", {}),
         )
 
+        print(_functions["outcome-tests.v1"].get("spec", {}))
+        print(prepared)
         self.assertTrue(is_unwrapped_ok(prepared))
         prepared_function, _ = prepared
 
-        results = prepared_function.outcome.tests.evaluate(
+        results = prepared_function.outcome.validators.evaluate(
             {
                 "inputs": celpy.json_to_cel(
                     {"number": 10, "optional_number": 3333, "output": 11221122}
@@ -258,7 +261,7 @@ class TestFunctionOutcomeTests(unittest.IsolatedAsyncioTestCase):
 
         result = results.pop()
 
-        self.assertEqual("Ok", result.get("type"))
+        self.assertIsInstance(result.get("ok"), dict)
 
 
 class TestFunctionOutcomeOkValue(unittest.IsolatedAsyncioTestCase):

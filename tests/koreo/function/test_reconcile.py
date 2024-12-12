@@ -57,7 +57,7 @@ class TestReconcileFunction(unittest.IsolatedAsyncioTestCase):
 
         input_validators = cel_env.program(
             cel_env.compile(
-                f"{encode_cel([{'type': 'Skip', 'message': 'Bad input', 'test': '=!has(inputs.value)'}])}.filter(predicate, predicate.test)"
+                f"{encode_cel([{'skip': {'message': 'Bad input'}, 'assert': '=!has(inputs.value)'}])}.filter(predicate, predicate.assert)"
             )
         )
         used_vars.update(extract_argument_structure(input_validators.ast))
@@ -95,7 +95,9 @@ class TestReconcileFunction(unittest.IsolatedAsyncioTestCase):
                 context=celtypes.MapType({}),
             ),
             input_validators=input_validators,
-            outcome=function_structure.Outcome(tests=None, ok_value=source_ok_value),
+            outcome=function_structure.Outcome(
+                validators=None, ok_value=source_ok_value
+            ),
             materializers=function_structure.Materializers(base=None, on_create=None),
             dynamic_input_keys=used_vars,
         )

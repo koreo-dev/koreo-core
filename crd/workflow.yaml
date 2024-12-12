@@ -34,6 +34,61 @@ spec:
                       type: string
                       nullable: false
                   required: [apiGroup, version, kind]
+                configStep:
+                  nullable: true
+                  type: object
+                  properties:
+                    label:
+                      type: string
+                      nullable: false
+                      default: config
+                      maxLength: 40
+                      x-kubernetes-validations:
+                        - rule: self.matches("^[[:word:]]+$")
+                          message: "step labels must be alphanumeric (underscore is ok)."
+                    functionRef:
+                      type: object
+                      nullable: false
+                      properties:
+                        name:
+                          type: string
+                          nullable: false
+                      required: [name]
+                    workflowRef:
+                      type: object
+                      nullable: false
+                      properties:
+                        name:
+                          type: string
+                          nullable: false
+                      required: [name]
+                    inputs:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                      nullable: true
+                    condition:
+                      nullable: true
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          nullable: false
+                          maxLength: 40
+                          x-kubernetes-validations:
+                            - rule: self.matches("^[A-Z][a-zA-Z0-9]+$")
+                              message: "type must be CamelCase, and contain only alphanumeric chars"
+                        name:
+                          type: string
+                          nullable: false
+                          maxLength: 60
+                          x-kubernetes-validations:
+                            - rule: "!self.startsWith('=')"
+                              message: "name may not be a CEL expression."
+                  oneOf:
+                    - properties:
+                      required: [functionRef]
+                    - properties:
+                      required: [workflowRef]
                 steps:
                   nullable: true
                   type: array

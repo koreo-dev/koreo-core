@@ -10,7 +10,7 @@ class Materializers(NamedTuple):
 
 
 class Outcome(NamedTuple):
-    tests: celpy.Runner | None
+    validators: celpy.Runner | None
     ok_value: celpy.Runner | None
 
 

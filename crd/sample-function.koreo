@@ -11,8 +11,6 @@ metadata:
   labels:
     koreo.realkinetic.com/bump: "13"
 spec:
-  outcome:
-    okValue: "ok"
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
