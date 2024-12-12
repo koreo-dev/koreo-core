@@ -76,7 +76,8 @@ metadata:
     koreo.realkinetic.com/bump: "4"
 spec:
   outcome:
-    okValue: "=has(inputs.output) ? inputs.output: null"
+    return:
+      value: "=has(inputs.output) ? inputs.output: null"
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -183,8 +184,9 @@ spec:
       - assert: =resource.config_connect_ready()
         ok: {}
 
-    okValue: |
-      ={"folderId": resource.status.folderId, "ref": resource.self_ref() }
+    return:
+      folderId: =resource.status.folderId
+      ref: =resource.self_ref()
 
   materializers:
     base:
@@ -234,7 +236,8 @@ spec:
           aFalse: false
 
   outcome:
-    okValue: =resource.metadata.uid
+    return:
+      uid: =resource.metadata.uid
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -247,10 +250,8 @@ spec:
       load: virtual
       update: never
   outcome:
-    okValue: |
-      ={
-        "parent_name": inputs.parent.metadata.name
-      }
+    return:
+      parent_name: =inputs.parent.metadata.name
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -265,7 +266,8 @@ spec:
       metadata:
         name: =inputs.config.parent_name + "-simple"
   outcome:
-    okValue: =resource.metadata.uid
+    return:
+      uid: =resource.metadata.uid
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -283,7 +285,8 @@ spec:
         boolTrue: true
         boolFalse: false
   outcome:
-    okValue: =resource.metadata.uid
+    return:
+      uid: =resource.metadata.uid
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -305,13 +308,11 @@ spec:
       permFail:
         message: Domain resource must have platform label.
   outcome:
-    okValue: |
-      ={
-        "domain_resource_name": inputs.parent.metadata.name,
-        "namespace": inputs.parent.metadata.namespace,
-        "platform_resource_name": inputs.parent.metadata.labels["konfig.realkinetic.com/platform"],
-        "domain_human_name": has(inputs.parent.spec.domainName) ? inputs.parent.spec.domainName: inputs.parent.metadata.name
-      }
+    return:
+      domain_resource_name: =inputs.parent.metadata.name
+      namespace: =inputs.parent.metadata.namespace
+      platform_resource_name: =inputs.parent.metadata.labels["konfig.realkinetic.com/platform"]
+      domain_human_name: "=has(inputs.parent.spec.domainName) ? inputs.parent.spec.domainName: inputs.parent.metadata.name"
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -326,19 +327,16 @@ spec:
       update: never
       delete: abandon
   outcome:
-    okValue: |
-      ={
-        "name": inputs.config.domain_resource_name,
-        "namespace": inputs.config.namespace,
-        "labels": {
-          "app.kubernetes.io/managed-by": "konfig",
-          "konfig.realkinetic.com/platform": inputs.config.platform_resource_name,
-          "konfig.realkinetic.com/domain": inputs.config.domain_resource_name,
-          "konfig-platform": inputs.config.platform_resource_name,
-          "konfig-domain": inputs.config.domain_resource_name,
-          "testing": string("is fun!")
-        }
-      }
+    return:
+      name: =inputs.config.domain_resource_name
+      namespace: =inputs.config.namespace
+      labels:
+        app.kubernetes.io/managed-by: konfig
+        konfig.realkinetic.com/platform: =inputs.config.platform_resource_name
+        konfig.realkinetic.com/domain: =inputs.config.domain_resource_name
+        konfig-platform: =inputs.config.platform_resource_name
+        konfig-domain: =inputs.config.domain_resource_name
+        testing: =string("is fun!")
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -358,11 +356,9 @@ spec:
         message: testing skip encoding
       
   outcome:
-    okValue: |
-      ={
-        "metadata-name": inputs.metadata.name,
-        "config-human-name": inputs.config.domain_human_name
-      }
+    return:
+      metadata-name: =inputs.metadata.name
+      config-human-name: =inputs.config.domain_human_name
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -377,7 +373,8 @@ spec:
       update: never
       delete: abandon
   outcome:
-    okValue: =["a", "b", "c", "d", "e"]
+    return:
+      list: =["a", "b", "c", "d", "e"]
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Function
@@ -408,4 +405,5 @@ spec:
           number: 42
 
   outcome:
-    okValue: =resource.metadata.uid
+    return:
+      uid: =resource.metadata.uid

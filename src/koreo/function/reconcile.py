@@ -21,7 +21,6 @@ from koreo.result import (
     Retry,
     Skip,
     UnwrappedOutcome,
-    combine,
     is_error,
     is_ok,
     is_not_ok,
@@ -122,17 +121,17 @@ async def reconcile_function(
     if not is_ok(outcome_validators_outcome):
         return outcome_validators_outcome
 
-    if not function.outcome.ok_value:
+    if not function.outcome.return_value:
         return celpy.json_to_cel(None)
 
     try:
-        ok_value = function.outcome.ok_value.evaluate(full_inputs)
+        return_value = function.outcome.return_value.evaluate(full_inputs)
 
-        eval_errors = _check_for_celevalerror(ok_value)
+        eval_errors = _check_for_celevalerror(return_value)
         if is_not_ok(eval_errors):
             return eval_errors
 
-        return ok_value
+        return return_value
     except celpy.CELEvalError as err:
         msg = f"CEL Eval Error computing OK value. {err.tree}"
         logging.exception(msg)

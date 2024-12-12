@@ -274,7 +274,7 @@ class TestFunctionOutcomeOkValue(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(is_unwrapped_ok(prepared))
         prepared_function, _ = prepared
 
-        self.assertIsNone(prepared_function.outcome.ok_value)
+        self.assertIsNone(prepared_function.outcome.return_value)
 
     async def test_value(self):
         prepared = await prepare.prepare_function(
@@ -285,13 +285,13 @@ class TestFunctionOutcomeOkValue(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(is_unwrapped_ok(prepared))
         prepared_function, _ = prepared
 
-        cel_result = prepared_function.outcome.ok_value.evaluate(
+        cel_result = prepared_function.outcome.return_value.evaluate(
             {"inputs": celpy.json_to_cel({"output": 19283746})}
         )
 
-        result: list = json.loads(json.dumps(cel_result))
+        result: dict = json.loads(json.dumps(cel_result))
 
-        self.assertEqual(result, 19283746)
+        self.assertEqual(result["value"], 19283746)
 
     async def test_no_output(self):
         prepared = await prepare.prepare_function(
@@ -302,11 +302,11 @@ class TestFunctionOutcomeOkValue(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(is_unwrapped_ok(prepared))
         prepared_function, _ = prepared
 
-        cel_result = prepared_function.outcome.ok_value.evaluate({})
+        cel_result = prepared_function.outcome.return_value.evaluate({})
 
-        result: list = json.loads(json.dumps(cel_result))
+        result: dict = json.loads(json.dumps(cel_result))
 
-        self.assertIsNone(result)
+        self.assertIsNone(result["value"])
 
 
 class TestFunctionMaterializerBase(unittest.IsolatedAsyncioTestCase):

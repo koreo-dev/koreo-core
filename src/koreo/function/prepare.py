@@ -201,7 +201,7 @@ def _prepare_outcome(
 ) -> tuple[structure.Outcome, set[str]]:
     outcome_vars = set[str]()
     if not outcome:
-        return structure.Outcome(validators=None, ok_value=None), outcome_vars
+        return structure.Outcome(validators=None, return_value=None), outcome_vars
 
     validators = _predicate_extractor(
         cel_env=cel_env,
@@ -210,20 +210,24 @@ def _prepare_outcome(
     if validators:
         outcome_vars.update(extract_argument_structure(validators.ast))
 
-    ok_value = None
-    ok_value_spec = outcome.get("okValue")
-    if ok_value_spec:
-        ok_value = cel_env.program(
-            cel_env.compile(encode_cel(ok_value_spec)), functions=koreo_cel_functions
+    return_value = None
+    return_value_spec = outcome.get("return")
+    if return_value_spec:
+        return_value = cel_env.program(
+            cel_env.compile(encode_cel(return_value_spec)),
+            functions=koreo_cel_functions,
         )
 
         # TODO: We should inspect this more to map the output structure vs
         # needed values.
-        outcome_vars.update(extract_argument_structure(ok_value.ast))
+        outcome_vars.update(extract_argument_structure(return_value.ast))
 
-        ok_value.logger.setLevel(logging.WARNING)
+        return_value.logger.setLevel(logging.WARNING)
 
-    return structure.Outcome(validators=validators, ok_value=ok_value), outcome_vars
+    return (
+        structure.Outcome(validators=validators, return_value=return_value),
+        outcome_vars,
+    )
 
 
 def _template_extractor(
