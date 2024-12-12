@@ -440,6 +440,20 @@ class TestOverlay(unittest.TestCase):
             program.evaluate(inputs),
         )
 
+    def test_resource_is_not_mutated(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "{'a': inputs.base.overlay({'value': inputs.base.value + 1}), 'b': inputs.base.overlay({'value': inputs.base.value + 1})}"
+        inputs = {"inputs": celpy.json_to_cel({"base": {"value": 1}})}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+        self.maxDiff = None
+        self.assertDictEqual(
+            {"a": {"value": 2}, "b": {"value": 2}},
+            program.evaluate(inputs),
+        )
+
     def test_resource_with_deep_overlay(self):
         cel_env = celpy.Environment(annotations=koreo_function_annotations)
 
