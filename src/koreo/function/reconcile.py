@@ -80,24 +80,11 @@ async def reconcile_function(
         return managed_resource
 
     # TODO: Add owners, if behaviors.add-owner
-    if (
-        isinstance(managed_resource, celtypes.MapType)
-        and "metadata" in trigger
-        and "metadata" in managed_resource
-        and managed_resource[celtypes.StringType("metadata")].get(
-            celtypes.StringType("namespace"), ""
-        )
-        == trigger[celtypes.StringType("metadata")].get(
-            celtypes.StringType("namespace"), ""
-        )
-    ):
-        owners = managed_resource[celtypes.StringType("metadata")].get(
-            celtypes.StringType("ownerReferences"), celtypes.ListType()
-        )
-        owners.append(trigger.get(celtypes.StringType("ownerRef")))
+    owner_refs = _managed_owners(managed_resource, trigger)
+    if owner_refs:
         managed_resource[celtypes.StringType("metadata")][
             celtypes.StringType("ownerReferences")
-        ] = owners
+        ] = owner_refs
 
     resource = await _resource_crud(
         api=api,
@@ -140,6 +127,50 @@ async def reconcile_function(
         msg = "Failure computing OK value."
         logging.exception(msg)
         return PermFail(msg, location=location)
+
+
+def _managed_owners(managed_resource: celtypes.MapType, trigger: celtypes.MapType):
+    if not isinstance(managed_resource, celtypes.MapType):
+        # This would be non-ideal, and probably shouldn't happen.
+        return None
+
+    if "metadata" not in trigger or "metadata" not in managed_resource:
+        # No metadata block, which is not great...
+        return None
+
+    managed_resource_namespace = managed_resource[celtypes.StringType("metadata")].get(
+        celtypes.StringType("namespace"), ""
+    )
+    trigger_namespace = trigger[celtypes.StringType("metadata")].get(
+        celtypes.StringType("namespace"), ""
+    )
+
+    if managed_resource_namespace != trigger_namespace:
+        # You can only own a resource in the same namespace.
+        return None
+
+    trigger_uid = trigger[celtypes.StringType("metadata")].get(
+        celtypes.StringType("uid")
+    )
+    if not trigger_uid:
+        # I'm not sure how this would happen. Perhaps in testing?
+        return None
+
+    managed_resource_owners: celtypes.ListType = copy.deepcopy(
+        managed_resource[celtypes.StringType("metadata")].get(
+            celtypes.StringType("ownerReferences"), celtypes.ListType()
+        )
+    )
+    if not managed_resource_owners:
+        return celtypes.ListType([trigger.get(celtypes.StringType("ownerRef"))])
+
+    for owner in managed_resource_owners:
+        if owner.get("uid") == trigger_uid:
+            return None
+
+    managed_resource_owners.append(trigger.get(celtypes.StringType("ownerRef")))
+
+    return managed_resource_owners
 
 
 def _check_for_celevalerror(value: celtypes.Value) -> Outcome[None]:
