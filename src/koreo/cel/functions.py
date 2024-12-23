@@ -362,6 +362,13 @@ def _to_json(value: celtypes.Value) -> celtypes.StringType | celpy.CELEvalError:
         return celpy.CELEvalError(f"JSON Encoding error {err}")
 
 
+def _from_json(value: celtypes.StringType) -> celtypes.Value | celpy.CELEvalError:
+    try:
+        return celpy.json_to_cel(json.loads(value))
+    except Exception as err:
+        return celpy.CELEvalError(f"JSON Decoding error {err}")
+
+
 koreo_function_annotations: dict[str, celpy.Annotation] = {
     "to_ref": celtypes.FunctionType,
     "self_ref": celtypes.FunctionType,
@@ -380,6 +387,7 @@ koreo_function_annotations: dict[str, celpy.Annotation] = {
     "strip": celtypes.FunctionType,
     "rstrip": celtypes.FunctionType,
     "to_json": celtypes.FunctionType,
+    "from_json": celtypes.FunctionType,
 }
 
 koreo_cel_functions: dict[str, celpy.CELFunction] = {
@@ -400,4 +408,5 @@ koreo_cel_functions: dict[str, celpy.CELFunction] = {
     "strip": _strip,
     "rstrip": _rstrip,
     "to_json": _to_json,
+    "from_json": _from_json,
 }

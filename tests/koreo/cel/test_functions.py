@@ -1,5 +1,6 @@
 import unittest
 
+from celpy import celtypes
 import celpy
 
 from koreo.cel.functions import koreo_cel_functions, koreo_function_annotations
@@ -924,3 +925,151 @@ class TestRStrip(unittest.TestCase):
 
         result = program.evaluate(inputs)
         self.assertEqual("testing", result)
+
+
+class TestToJson(unittest.TestCase):
+    def test_to_json_null(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = 'to_json()'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_to_json_str(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "to_json('isfun')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual('"isfun"', result)
+
+    def test_to_json_map(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = 'to_json({"testKey": "testValue"})'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual('{"testKey": "testValue"}', result)
+
+    def test_to_json_list(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = 'to_json(["testKey", "testValue"])'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual('["testKey", "testValue"]', result)
+
+    def test_to_json_bool(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = 'to_json(false)'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual('0', result)
+
+    def test_to_json_int(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = 'to_json(3)'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual('3', result)
+
+
+class TestFromJson(unittest.TestCase):
+    def test_from_json_null(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = 'from_json()'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_from_json_str(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "from_json('isfun')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_from_json_map(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = 'from_json(\'{"testKey": "testValue"}\')'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual({"testKey": "testValue"}, result)
+
+    def test_from_json_list(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = 'from_json(\'["testKey", "testValue"]\')'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual(["testKey", "testValue"], result)
+
+    def test_from_json_bool(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = 'from_json(false)'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_from_json_int(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = 'from_json(3)'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
