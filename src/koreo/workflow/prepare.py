@@ -1,14 +1,17 @@
-from typing import Generator, Coroutine
+from typing import Sequence
+import asyncio
 import logging
 import re
+import time
 
 import celpy
 
-from koreo.cache import get_resource_from_cache, reprepare_and_update_cache
+from koreo import ref_helpers
+from koreo import registry
+from koreo.cache import get_resource_from_cache
 from koreo.cel.encoder import encode_cel
-from koreo.cel.structure_extractor import extract_argument_structure
 from koreo.cel.functions import koreo_cel_functions, koreo_function_annotations
-from koreo.function.registry import index_workflow_functions
+from koreo.cel.structure_extractor import extract_argument_structure
 from koreo.function.structure import Function
 from koreo.result import (
     Ok,
@@ -19,22 +22,24 @@ from koreo.result import (
     is_error,
     unwrapped_combine,
 )
+from koreo.value_function.structure import ValueFunction
 
 from controller.custom_workflow import start_controller
 
 from . import structure
 from .registry import (
     index_workflow_custom_crd,
-    index_workflow_workflows,
-    get_workflow_workflows,
     unindex_workflow_custom_crd,
 )
 
 
+logger = logging.getLogger("koreo.workflow")
+
+
 async def prepare_workflow(
     cache_key: str, spec: dict | None
-) -> UnwrappedOutcome[tuple[structure.Workflow, Generator[Coroutine, None, None]]]:
-    logging.info(f"Prepare workflow {cache_key}")
+) -> UnwrappedOutcome[tuple[structure.Workflow, Sequence[registry.Resource]]]:
+    logger.info(f"Prepare workflow {cache_key}")
 
     if not spec:
         spec = {}
@@ -42,8 +47,7 @@ async def prepare_workflow(
     cel_env = celpy.Environment(annotations=koreo_function_annotations)
 
     # Used to  update our cross-reference registries
-    function_keys = set[str]()
-    workflow_keys = set[str]()
+    watched_resources = set[registry.Resource]()
 
     # Handle configStep, which is just slightly special.
     config_step_spec = spec.get("configStep", {})
@@ -55,13 +59,20 @@ async def prepare_workflow(
         config_step_label = None
 
     if config_step_spec:
-        function_ref = config_step_spec.get("functionRef")
-        if function_ref:
-            function_keys.add(function_ref.get("name"))
+        location_base = f"Workflow:{cache_key}:configStep"
+        match ref_helpers.function_or_workflow_to_resource(
+            config_step_spec, location_base=location_base
+        ):
+            case None:
+                return PermFail(
+                    message="`configStep` must contain `functionRef` or `workflowRef`",
+                    location=location_base,
+                )
+            case PermFail() as perm_fail:
+                return perm_fail
 
-        workflow_ref = config_step_spec.get("workflowRef")
-        if workflow_ref:
-            workflow_keys.add(workflow_ref.get("name"))
+            case registry.Resource() as resource:
+                watched_resources.add(resource)
 
     # Handle normal Steps
     steps_spec = spec.get("steps", [])
@@ -91,22 +102,37 @@ async def prepare_workflow(
     # Perform registry updates.
     if steps_spec:
         for step in steps_spec:
-            function_ref = step.get("functionRef")
-            if function_ref:
-                function_keys.add(function_ref.get("name"))
+            step_label = step.get("label")
+            location_base = f"Workflow:{cache_key}:{step_label}"
+            match ref_helpers.function_or_workflow_to_resource(
+                step, location_base=location_base
+            ):
+                case None:
+                    return PermFail(
+                        message=f"Step `{step_label}` must contain `functionRef` or `workflowRef`",
+                        location=location_base,
+                    )
+                case PermFail() as perm_fail:
+                    return perm_fail
 
-            workflow_ref = step.get("workflowRef")
-            if workflow_ref:
-                workflow_keys.add(workflow_ref.get("name"))
-
-    index_workflow_functions(workflow=cache_key, functions=function_keys)
-    index_workflow_workflows(workflow=cache_key, workflows=workflow_keys)
+                case registry.Resource() as resource:
+                    watched_resources.add(resource)
 
     # Update CRD registry and ensure controller is running for the CRD.
     crd_ref = _build_crd_ref(spec.get("crdRef", {}))
     if not crd_ref:
         unindex_workflow_custom_crd(workflow=cache_key)
     else:
+        deletor_name = f"DeleteWorkflow:{cache_key}"
+        if deletor_name not in _DEREGISTERERS:
+            delete_task = asyncio.create_task(
+                _deindex_crd_on_delete(cache_key=cache_key), name=deletor_name
+            )
+            _DEREGISTERERS[deletor_name] = delete_task
+            delete_task.add_done_callback(
+                lambda task: _DEREGISTERERS.__delitem__(task.get_name())
+            )
+
         index_workflow_custom_crd(
             workflow=cache_key,
             custom_crd=f"{crd_ref.api_group}:{crd_ref.kind}:{crd_ref.version}",
@@ -116,16 +142,6 @@ async def prepare_workflow(
             group=crd_ref.api_group, kind=crd_ref.kind, version=crd_ref.version
         )
 
-    # Re-prepare any Workflows using this Workflow
-    updaters = (
-        reprepare_and_update_cache(
-            resource_class=structure.Workflow,
-            preparer=prepare_workflow,
-            cache_key=workflow_key,
-        )
-        for workflow_key in get_workflow_workflows(workflow=cache_key)
-    )
-
     return (
         structure.Workflow(
             crd_ref=crd_ref,
@@ -134,8 +150,60 @@ async def prepare_workflow(
             steps=steps,
             status=_build_status(cel_env=cel_env, status_spec=spec.get("status")),
         ),
-        updaters,
+        tuple(watched_resources),
     )
+
+
+class WorkflowDeleteor: ...
+
+
+_DEREGISTERERS: dict[str, asyncio.Task] = {}
+
+
+async def _deindex_crd_on_delete(cache_key: str):
+    deletor_resource = registry.Resource(
+        resource_type=WorkflowDeleteor, name=cache_key, namespace=None
+    )
+    queue = registry.register(deletor_resource)
+
+    registry.subscribe(
+        subscriber=deletor_resource,
+        resource=registry.Resource(
+            resource_type=structure.Workflow, name=cache_key, namespace=None
+        ),
+    )
+
+    last_event = 0
+    while True:
+        try:
+            event = await queue.get()
+        except (asyncio.CancelledError, asyncio.QueueShutDown):
+            break
+
+        try:
+            match event:
+                case registry.Kill():
+                    break
+                case registry.ResourceEvent(
+                    event_time=event_time
+                ) if event_time >= last_event:
+                    cached = get_resource_from_cache(
+                        resource_class=structure.Workflow, cache_key=cache_key
+                    )
+
+                    if cached:
+                        continue
+
+                    logger.debug(f"Deregistering CRD watches for Workflow {cache_key}")
+
+                    unindex_workflow_custom_crd(workflow=cache_key)
+
+                    break
+
+        finally:
+            queue.task_done()
+
+    registry.deregister(deletor_resource, deregistered_at=time.monotonic())
 
 
 def _build_crd_ref(crd_ref_spec: dict) -> structure.ConfigCRDRef | None:
@@ -394,17 +462,37 @@ def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str
 
 
 def _load_function(step_label: str, function_ref: dict):
+    function_kind = function_ref.get("kind")
     function_cache_key = function_ref.get("name")
+
+    if not function_kind:
+        return function_cache_key, PermFail(
+            message=f"Missing functionRef Kind, can not prepare Workflow.",
+            location=f"{step_label}:{function_cache_key if function_cache_key else 'missing'}",
+        )
+
     if not function_cache_key:
         return function_cache_key, PermFail(
             message=f"Missing Function name, can not prepare Workflow.",
-            location=f"{step_label}",
+            location=f"{step_label}:missing",
         )
 
-    function = get_resource_from_cache(
-        resource_class=Function,
-        cache_key=function_cache_key,
-    )
+    if function_kind == "ValueFunction":
+        function = get_resource_from_cache(
+            resource_class=ValueFunction,
+            cache_key=function_cache_key,
+        )
+    elif function_kind == "Function":
+        function = get_resource_from_cache(
+            resource_class=Function,
+            cache_key=function_cache_key,
+        )
+    else:
+        return function_cache_key, PermFail(
+            message=f"Invalid Function kind ({function_kind}), can not prepare Workflow.",
+            location=f"{step_label}:{function_cache_key}",
+        )
+
     if not function:
         return function_cache_key, Retry(
             message=f"Missing Function ({function_cache_key}), can not prepare Workflow.",
@@ -435,7 +523,7 @@ def _load_workflow(step_label: str, workflow_ref: dict):
     )
     if not workflow:
         return workflow_cache_key, Retry(
-            message=f"Missing Function ({workflow_cache_key}), can not prepare Workflow.",
+            message=f"Missing Workflow ({workflow_cache_key}), can not prepare Workflow.",
             delay=15,
             location=f"{step_label}:{workflow_cache_key}",
         )

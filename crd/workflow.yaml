@@ -50,10 +50,14 @@ spec:
                       type: object
                       nullable: false
                       properties:
+                        kind:
+                          type: string
+                          nullable: false
+                          enum: [ValueFunction, Function]
                         name:
                           type: string
                           nullable: false
-                      required: [name]
+                      required: [kind, name]
                     workflowRef:
                       type: object
                       nullable: false
@@ -107,10 +111,14 @@ spec:
                         type: object
                         nullable: false
                         properties:
+                          kind:
+                            type: string
+                            nullable: false
+                            enum: [ValueFunction, Function]
                           name:
                             type: string
                             nullable: false
-                        required: [name]
+                        required: [kind, name]
                       workflowRef:
                         type: object
                         nullable: false

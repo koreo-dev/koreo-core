@@ -7,9 +7,10 @@ import kr8s
 
 from resources.k8s.conditions import Condition, update_condition
 
-from koreo.result import combine, is_error, raise_for_error
+from koreo.result import is_error, raise_for_error
 
 from koreo.cache import get_resource_from_cache
+from koreo.cel.encoder import convert_bools
 from koreo.workflow.reconcile import reconcile_workflow
 from koreo.workflow.registry import get_custom_crd_workflows
 from koreo.workflow.structure import Workflow
@@ -85,12 +86,37 @@ def start_controller(group: str, kind: str, version: str):
             "uid": meta.uid,
         }
 
+        conditions: list[Condition] = status.get("conditions", [])
+
+        if len(workflow_keys) > 1:
+            message = f"Multiple Workflows attempted to run ({','.join(workflow_keys)})"
+            condition = Condition(
+                type="Ready",
+                reason="MultipleWorkflows",
+                message=message,
+                status="false",
+                location=f"{';'.join(workflow_keys)}",
+            )
+            conditions = update_condition(conditions=conditions, condition=condition)
+
+            patch.update(
+                {
+                    "status": {
+                        "conditions": conditions,
+                        "koreo": {
+                            "errors": message,
+                            "locations": f"{';'.join(workflow_keys)}",
+                        },
+                    }
+                }
+            )
+            raise kopf.TemporaryError(message, delay=120)
+
         trigger = celpy.json_to_cel(
             {"ownerRef": owner_ref, "metadata": dict(meta), "spec": dict(spec)}
         )
 
-        conditions: list[Condition] = status.get("conditions", [])
-        outcomes = {}
+        outcome = None
         for workflow_key in workflow_keys:
             workflow = get_resource_from_cache(
                 resource_class=Workflow, cache_key=workflow_key
@@ -106,37 +132,40 @@ def start_controller(group: str, kind: str, version: str):
                 trigger=trigger,
                 workflow=workflow,
             )
-            outcomes[workflow_key] = workflow_outcomes
+            outcome = workflow_outcomes
             for condition in workflow_conditions:
                 conditions = update_condition(
                     conditions=conditions, condition=condition
                 )
 
-        if outcomes:
-            error_outcomes = [
-                outcome for outcome in outcomes.values() if is_error(outcome)
-            ]
-            error_outcome = combine(error_outcomes)
-            if is_error(error_outcome):
-                patch.update(
-                    {
-                        "status": {
-                            "conditions": conditions,
-                            "koreo": {
-                                "errors": error_outcome.message,
-                                "locations": error_outcome.location,
-                            },
-                        }
+        if not outcome:
+            return True
+
+        if is_error(outcome):
+            patch.update(
+                {
+                    "status": {
+                        "conditions": conditions,
+                        "koreo": {
+                            "errors": outcome.message,
+                            "locations": outcome.location,
+                        },
                     }
-                )
-                raise_for_error(error_outcome)
+                }
+            )
+            raise_for_error(outcome)
 
-            koreo_value = {
-                "errors": None,
-                "locations": None,
+        koreo_value = {
+            "errors": None,
+            "locations": None,
+        }
+
+        patch.update(
+            {
+                "status": {
+                    "conditions": conditions,
+                    "koreo": koreo_value,
+                    "state": convert_bools(outcome),
+                }
             }
-            koreo_value.update(celpy.CELJSONEncoder.to_python(outcomes))
-
-            patch.update({"status": {"conditions": conditions, "koreo": koreo_value}})
-
-        return True
+        )

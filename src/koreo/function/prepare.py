@@ -1,17 +1,12 @@
-from typing import Coroutine, Generator
 import logging
 
 
-from koreo.cache import reprepare_and_update_cache
 from koreo.cel.encoder import encode_cel, encode_cel_template
 from koreo.cel.functions import koreo_cel_functions, koreo_function_annotations
 from koreo.cel.structure_extractor import extract_argument_structure
 from koreo.result import PermFail, UnwrappedOutcome
-from koreo.workflow.prepare import prepare_workflow
-from koreo.workflow.structure import Workflow
 
 from . import structure
-from .registry import get_function_workflows
 
 import celpy
 from celpy import celtypes
@@ -26,7 +21,7 @@ logging.getLogger("celtypes").setLevel(logging.WARNING)
 
 async def prepare_function(
     cache_key: str, spec: dict
-) -> UnwrappedOutcome[tuple[structure.Function, Generator[Coroutine, None, None]]]:
+) -> UnwrappedOutcome[tuple[structure.Function, None]]:
     # NOTE: We can try `celpy.Environment(runner_class=celpy.CompiledRunner)`
     # We need to do a safety check to ensure there are no escapes / injections.
     logging.info(f"Prepare function {cache_key}")
@@ -120,16 +115,6 @@ async def prepare_function(
         )
     used_vars.update(outcome_vars)
 
-    # Update Workflows using this Function.
-    updaters = (
-        reprepare_and_update_cache(
-            resource_class=Workflow,
-            preparer=prepare_workflow,
-            cache_key=workflow_key,
-        )
-        for workflow_key in get_function_workflows(function=cache_key)
-    )
-
     return (
         structure.Function(
             resource_config=resource_config,
@@ -138,7 +123,7 @@ async def prepare_function(
             outcome=outcome,
             dynamic_input_keys=used_vars,
         ),
-        updaters,
+        None,
     )
 
 

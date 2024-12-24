@@ -3,8 +3,9 @@ from typing import NamedTuple, Sequence
 
 import celpy
 
-from koreo.result import Outcome, PermFail, Retry
+from koreo.result import Outcome, ErrorOutcome
 
+from koreo.value_function.structure import ValueFunction
 from koreo.function.structure import Function
 
 
@@ -26,7 +27,7 @@ class StepConditionSpec(NamedTuple):
 
 class ConfigStep(NamedTuple):
     label: str
-    logic: Function | Workflow | PermFail | Retry
+    logic: ValueFunction | Function | Workflow | ErrorOutcome
 
     inputs: celpy.Runner | None
 
@@ -35,7 +36,7 @@ class ConfigStep(NamedTuple):
 
 class Step(NamedTuple):
     label: str
-    logic: Function | Workflow | PermFail | Retry
+    logic: ValueFunction | Function | Workflow | ErrorOutcome
 
     mapped_input: MappedInput | None
     inputs: celpy.Runner | None

@@ -11,12 +11,15 @@ import kopf
 
 from controller import koreo_cache
 
+from koreo import registry
 from koreo.function.prepare import prepare_function
 from koreo.function.structure import Function
-from koreo.workflow.prepare import prepare_workflow
-from koreo.workflow.structure import Workflow
 from koreo.resource_template.prepare import prepare_resource_template
 from koreo.resource_template.structure import ResourceTemplate
+from koreo.value_function.prepare import prepare_value_function
+from koreo.value_function.structure import ValueFunction
+from koreo.workflow.prepare import prepare_workflow
+from koreo.workflow.structure import Workflow
 
 
 GROUP = "koreo.realkinetic.com"
@@ -32,13 +35,13 @@ RESOURCE_NAMESPACE = os.environ.get("RESOURCE_NAMESPACE", "koreo-testing")
 KOREO_RESOURCES = [
     (
         TEMPLATE_NAMESPACE,
-        "resourcetemplates",
         "ResourceTemplate",
         ResourceTemplate,
         prepare_resource_template,
     ),
-    (KOREO_NAMESPACE, "functions", "Function", Function, prepare_function),
-    (KOREO_NAMESPACE, "workflows", "Workflow", Workflow, prepare_workflow),
+    (KOREO_NAMESPACE, "Function", Function, prepare_function),
+    (KOREO_NAMESPACE, "ValueFunction", ValueFunction, prepare_value_function),
+    (KOREO_NAMESPACE, "Workflow", Workflow, prepare_workflow),
 ]
 
 
@@ -56,13 +59,13 @@ def main():
     # First load the Functions, then Workflows to ensure they're cached.
     # Then maintain the Function and Workflow caches in the background.
 
-    for namespace, plural_kind, kind_title, resource_class, preparer in KOREO_RESOURCES:
+    for namespace, kind_title, resource_class, preparer in KOREO_RESOURCES:
         # Block until completion.
         load_task = loop.create_task(
             koreo_cache.load_cache(
                 namespace=namespace,
                 api_version=API_VERSION,
-                plural_kind=plural_kind,
+                plural_kind=f"{kind_title.lower()}s",
                 kind_title=kind_title,
                 resource_class=resource_class,
                 preparer=preparer,
@@ -78,7 +81,7 @@ def main():
             koreo_cache.maintain_cache(
                 namespace=namespace,
                 api_version=API_VERSION,
-                plural_kind=plural_kind,
+                plural_kind=f"{kind_title.lower()}s",
                 kind_title=kind_title,
                 resource_class=resource_class,
                 preparer=preparer,
@@ -93,6 +96,9 @@ def main():
     try:
         loop.run_until_complete(kopf.operator(namespace=RESOURCE_NAMESPACE))
     except:
+        for resource_key in registry._SUBSCRIPTION_QUEUES:
+            registry._kill_resource(resource_key=resource_key)
+
         tasks = [
             task
             for task in asyncio.tasks.all_tasks(loop=loop)

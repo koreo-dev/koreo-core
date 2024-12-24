@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import reduce
-from typing import Any, NoReturn, TypeGuard, TypeVar, Iterable
+from typing import Any, NoReturn, TypeIs, TypeVar, Iterable
 
 import kopf
 
@@ -21,7 +21,7 @@ class DepSkip:
 
     def __str__(self) -> str:
         if self.message:
-            return f"Dependency Skip ({self.message})"
+            return f"Dependency Skip (message={self.message})"
 
         return "Dependency Violation Skip"
 
@@ -44,7 +44,7 @@ class Skip:
 
     def __str__(self) -> str:
         if self.message:
-            return f"Skip ({self.message})"
+            return f"Skip (message={self.message})"
 
         return "User Skip"
 
@@ -60,7 +60,7 @@ class Ok[T]:
         self.location = location
 
     def __str__(self) -> str:
-        return f"Ok({self.data})"
+        return f"Ok(data={self.data})"
 
     def combine(self, other: Outcome):
         if isinstance(other, (DepSkip, Skip)):
@@ -205,14 +205,14 @@ def unwrapped_combine(outcomes: Iterable[UnwrappedOutcome]) -> UnwrappedOutcome:
     return outcome
 
 
-def is_ok[T](candidate: Outcome[T]) -> TypeGuard[Ok[T]]:
+def is_ok[T](candidate: Outcome[T]) -> TypeIs[Ok[T]]:
     if isinstance(candidate, Ok):
         return True
 
     return False
 
 
-def is_unwrapped_ok[T](candidate: UnwrappedOutcome[T]) -> TypeGuard[T]:
+def is_unwrapped_ok[T](candidate: UnwrappedOutcome[T]) -> TypeIs[T]:
     if is_error(candidate):
         return False
 
@@ -222,25 +222,25 @@ def is_unwrapped_ok[T](candidate: UnwrappedOutcome[T]) -> TypeGuard[T]:
     return True
 
 
-def is_not_ok(candidate: Outcome) -> TypeGuard[NonOkOutcome]:
+def is_not_ok(candidate: Outcome) -> TypeIs[NonOkOutcome]:
     return not is_ok(candidate=candidate)
 
 
-def is_error(candidate: Any) -> TypeGuard[ErrorOutcome]:
+def is_error(candidate: Any) -> TypeIs[ErrorOutcome]:
     if isinstance(candidate, (Retry, PermFail)):
         return True
 
     return False
 
 
-def is_skip(candidate: Any) -> TypeGuard[SkipOutcome]:
+def is_skip(candidate: Any) -> TypeIs[SkipOutcome]:
     if isinstance(candidate, (DepSkip, Skip)):
         return True
 
     return False
 
 
-def is_not_error(candidate: Outcome) -> TypeGuard[Ok | Skip | DepSkip]:
+def is_not_error(candidate: Outcome) -> TypeIs[Ok | Skip | DepSkip]:
     return not is_error(candidate=candidate)
 
 

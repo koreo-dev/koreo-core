@@ -1,6 +1,75 @@
+import json
 import unittest
 
-from koreo.cel.encoder import encode_cel, encode_cel_template
+from celpy import celtypes
+
+from koreo.cel.encoder import convert_bools, encode_cel
+
+
+class TestEncodeBools(unittest.TestCase):
+    def test_structure(self):
+        value = {
+            "zero": 0,
+            "one": 1,
+            celtypes.BoolType(True): celtypes.BoolType(True),
+            celtypes.StringType("true"): celtypes.BoolType(True),
+            celtypes.BoolType(False): celtypes.BoolType(False),
+            celtypes.StringType("false"): celtypes.BoolType(False),
+            "nested_map": {
+                "zero": 0,
+                "one": 1,
+                celtypes.BoolType(True): celtypes.BoolType(True),
+                celtypes.StringType("true"): celtypes.BoolType(True),
+                celtypes.BoolType(False): celtypes.BoolType(False),
+                celtypes.StringType("false"): celtypes.BoolType(False),
+            },
+            "list": [
+                "zero",
+                0,
+                "one",
+                1,
+                celtypes.BoolType(True),
+                celtypes.StringType("true"),
+                celtypes.BoolType(False),
+                celtypes.StringType("false"),
+            ],
+            "cel_values": celtypes.MapType(
+                {
+                    celtypes.StringType("zero"): celtypes.IntType(0),
+                    celtypes.StringType("one"): celtypes.IntType(1),
+                    celtypes.BoolType(True): celtypes.BoolType(True),
+                    celtypes.StringType("true"): celtypes.BoolType(True),
+                    celtypes.StringType("false"): celtypes.BoolType(False),
+                    celtypes.StringType("nested_map"): celtypes.MapType(
+                        {
+                            celtypes.StringType("zero"): celtypes.IntType(0),
+                            celtypes.StringType("one"): celtypes.IntType(1),
+                            celtypes.BoolType(True): celtypes.BoolType(True),
+                            celtypes.StringType("true"): celtypes.BoolType(True),
+                            celtypes.BoolType(False): celtypes.BoolType(False),
+                            celtypes.StringType("false"): celtypes.BoolType(False),
+                        }
+                    ),
+                    celtypes.StringType("list"): celtypes.ListType(
+                        [
+                            celtypes.StringType("zero"),
+                            celtypes.IntType(0),
+                            celtypes.StringType("one"),
+                            celtypes.IntType(1),
+                            celtypes.BoolType(True),
+                            celtypes.StringType("true"),
+                            celtypes.BoolType(False),
+                            celtypes.StringType("false"),
+                        ]
+                    ),
+                }
+            ),
+        }
+        self.maxDiff = None
+        self.assertEqual(
+            '{"zero": 0, "one": 1, "true": true, "true": true, "false": false, "false": false, "nested_map": {"zero": 0, "one": 1, "true": true, "true": true, "false": false, "false": false}, "list": ["zero", 0, "one", 1, true, "true", false, "false"], "cel_values": {"zero": 0, "one": 1, "true": true, "true": true, "false": false, "nested_map": {"zero": 0, "one": 1, "true": true, "true": true, "false": false, "false": false}, "list": ["zero", 0, "one", 1, true, "true", false, "false"]}}',
+            json.dumps(convert_bools(value)),
+        )
 
 
 class TestEncodeCel(unittest.TestCase):
@@ -68,10 +137,18 @@ class TestEncodeCel(unittest.TestCase):
             "cel_expr": "=8 + 3",
             "cel_expr_list": ["=8 + 3", "='a' + 'b'"],
             "cel_expr_list_list": [["=8 + 3", "='a' + 'b'"], ["=has(value)"]],
+            "false": False,
+            "true": True,
+            "yes": True,
+            "no": False,
+            "none": None,
+            "null": "=null",
         }
+
         # fmt: off
+        self.maxDiff = None
         self.assertEqual(
-            '{"a_string":"testing","a_quoted_string":"you should \"test\"","an_int":7,"an_int_str":29,"a_float":82.34,"a_float_str":94.55,"bool_true":true,"bool_false":false,"empty_list":[],"complex_list":["a",2,4,3.2,53.4,true,false],"nested_list":[[1,2,3],[true,false,false],["a","b","c"]],"cel_expr":8 + 3,"cel_expr_list":[8 + 3,\'a\' + \'b\'],"cel_expr_list_list":[[8 + 3,\'a\' + \'b\'],[has(value)]]}',
+            '{"a_string":"testing","a_quoted_string":"you should \"test\"","an_int":7,"an_int_str":29,"a_float":82.34,"a_float_str":94.55,"bool_true":true,"bool_false":false,"empty_list":[],"complex_list":["a",2,4,3.2,53.4,true,false],"nested_list":[[1,2,3],[true,false,false],["a","b","c"]],"cel_expr":8 + 3,"cel_expr_list":[8 + 3,\'a\' + \'b\'],"cel_expr_list_list":[[8 + 3,\'a\' + \'b\'],[has(value)]],"false":false,"true":true,"yes":true,"no":false,"none":null,"null":null}',
             encode_cel(value),
         )
         # fmt: on

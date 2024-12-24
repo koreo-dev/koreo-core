@@ -11,12 +11,12 @@ from resources.k8s.conditions import Condition
 from koreo import result
 
 from koreo.function.reconcile import reconcile_function
+from koreo.value_function.reconcile import reconcile_value_function
 
 from . import structure
 
 # TODO: What is reasonable here? Perhaps 10 seconds?
 STEP_TIMEOUT = 10
-
 TIMEOUT_RETRY_DELAY = 30
 UNKNOWN_ERROR_RETRY_DELAY = 60
 
@@ -32,7 +32,7 @@ async def reconcile_workflow(
         updated_outcome = copy.deepcopy(workflow.steps_ready)
         updated_outcome.location = f"{workflow_key}:{updated_outcome.location}"
         condition = _condition_helper(
-            condition_type=f"Ready:{workflow_key}",
+            condition_type="Ready",
             thing_name=f"Workflow {workflow_key}",
             outcome=updated_outcome,
             workflow_key=workflow_key,
@@ -62,7 +62,7 @@ async def reconcile_workflow(
     overall_outcome = result.unwrapped_combine(outcomes=outcomes.values())
     conditions.append(
         _condition_helper(
-            condition_type=f"Ready:{workflow_key}",
+            condition_type="Ready",
             thing_name=f"Workflow {workflow_key}",
             outcome=overall_outcome,
             workflow_key=workflow_key,
@@ -201,7 +201,7 @@ async def _reconcile_steps(
             outcomes[task_name] = timeout_outcome
             conditions.append(
                 _condition_helper(
-                    condition_type=f"Ready:{workflow_key}",
+                    condition_type="Ready",
                     thing_name=f"Workflow {workflow_key}",
                     outcome=timeout_outcome,
                     workflow_key=workflow_key,
@@ -217,7 +217,7 @@ async def _reconcile_steps(
             outcomes[task_name] = error_outcome
             conditions.append(
                 _condition_helper(
-                    condition_type=f"Ready:{workflow_key}",
+                    condition_type="Ready",
                     thing_name=f"Workflow {workflow_key}",
                     outcome=error_outcome,
                     workflow_key=workflow_key,
@@ -359,21 +359,35 @@ async def _reconcile_step_logic(
     trigger: celtypes.Value,
     inputs: celtypes.Value,
     location: str,
-    logic: structure.Function | structure.Workflow,
+    logic: (
+        structure.ValueFunction
+        | structure.Function
+        | structure.Workflow
+        | result.ErrorOutcome
+    ),
 ):
-    if isinstance(logic, structure.Workflow):
-        workflow, _ = await reconcile_workflow(
-            api=api, workflow_key=workflow_key, trigger=inputs, workflow=logic
-        )
-        return workflow
+    match logic:
+        case structure.Workflow():
+            workflow, _ = await reconcile_workflow(
+                api=api, workflow_key=workflow_key, trigger=inputs, workflow=logic
+            )
+            return workflow
+        case structure.ValueFunction():
+            return await reconcile_value_function(
+                location=location,
+                function=logic,
+                inputs=inputs,
+            )
+        case structure.Function():
+            return await reconcile_function(
+                api=api,
+                location=location,
+                function=logic,
+                trigger=trigger,
+                inputs=inputs,
+            )
 
-    return await reconcile_function(
-        api=api,
-        location=location,
-        function=logic,
-        trigger=trigger,
-        inputs=inputs,
-    )
+    return logic
 
 
 async def _reconcile_mapped_function(
