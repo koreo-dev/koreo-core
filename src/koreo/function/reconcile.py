@@ -2,6 +2,9 @@ from typing import Any, Dict, List, NamedTuple, Union
 
 import copy
 import logging
+import json
+
+logger = logging.getLogger("koreo.function")
 
 import jsonpath_ng
 import kr8s
@@ -9,8 +12,6 @@ import kr8s
 import celpy
 from celpy import celtypes
 from celpy.celparser import tree_dump
-
-import env
 
 
 from koreo.result import (
@@ -27,6 +28,7 @@ from koreo.result import (
     is_unwrapped_ok,
 )
 
+from koreo.cel.encoder import convert_bools
 from koreo.cache import get_resource_from_cache
 from koreo.resource_template.structure import ResourceTemplate
 
@@ -46,10 +48,7 @@ async def reconcile_function(
     trigger: celtypes.Value,
     inputs: celtypes.Value,
 ) -> UnwrappedOutcome[celtypes.Value]:
-    base_inputs = {
-        "inputs": inputs,
-        "env": env,
-    }
+    base_inputs = {"inputs": inputs}
 
     validation_outcome = _run_checks(
         checks=function.input_validators, inputs=base_inputs, location=location
@@ -121,11 +120,11 @@ async def reconcile_function(
         return return_value
     except celpy.CELEvalError as err:
         msg = f"CEL Eval Error computing OK value. {err.tree}"
-        logging.exception(msg)
+        logger.exception(msg)
         return PermFail(msg, location=location)
     except:
         msg = "Failure computing OK value."
-        logging.exception(msg)
+        logger.exception(msg)
         return PermFail(msg, location=location)
 
 
@@ -325,8 +324,6 @@ def _materialize_overlay(
     except TypeError as err:
         return PermFail(f"Encountered TypeError {err}. ({location})", location=location)
 
-    # TODO: Insert check for CELEvalError here?
-
     if overlay:
         for field_path, value in overlay.items():
             field_expr = jsonpath_ng.parse(field_path)
@@ -374,30 +371,6 @@ def _build_resource_config(
     )
 
 
-def _convert_bools(
-    cel_object: celtypes.Value,
-) -> Union[celtypes.Value, List[Any], Dict[Any, Any], bool]:
-    """Recursive walk through the CEL object, replacing BoolType with native bool instances.
-    This lets the :py:mod:`json` module correctly represent the obects
-    with JSON ``true`` and ``false``.
-
-    This will also replace ListType and MapType with native ``list`` and ``dict``.
-    All other CEL objects will be left intact. This creates an intermediate hybrid
-    beast that's not quite a :py:class:`celtypes.Value` because a few things have been replaced.
-    """
-    if isinstance(cel_object, celtypes.BoolType):
-        return True if cel_object else False
-    elif isinstance(cel_object, (celtypes.ListType, list)):
-        return [_convert_bools(item) for item in cel_object]
-    elif isinstance(cel_object, (celtypes.MapType, dict)):
-        return {
-            _convert_bools(key): _convert_bools(value)
-            for key, value in cel_object.items()
-        }
-    else:
-        return cel_object
-
-
 async def _resource_crud(
     api: kr8s.Api,
     location: str,
@@ -417,11 +390,24 @@ async def _resource_crud(
 
     if not (
         resource_api_params.api_version
+        or resource_api_params.kind
+        or resource_api_params.name
+    ):
+        return PermFail(
+            "To compute a retun value, use `spec.outcome.return`. For resources, "
+            f"`kind` ({resource_api_params.kind}), `apiVersion` ({resource_api_params.api_version}), "
+            f"and `metadata.name` ({resource_api_params.name}) are all required.",
+            location=location,
+        )
+    elif not (
+        resource_api_params.api_version
         and resource_api_params.kind
         and resource_api_params.name
     ):
         return PermFail(
-            f"kind ({resource_api_params.kind}), apiVersion ({resource_api_params.api_version}), and metadata.name ({resource_api_params.name}) are all required. ({managed_resource}, {managed_resource_config}, {resource_api_params._asdict()})",
+            f"`kind` ({resource_api_params.kind}), `apiVersion` ({resource_api_params.api_version}), "
+            f"and `metadata.name` ({resource_api_params.name}) are all required. "
+            f"({json.dumps(managed_resource)}, {managed_resource_config}, {resource_api_params._asdict()})",
             location=location,
         )
 
@@ -449,11 +435,11 @@ async def _resource_crud(
             resource_matches = None
         else:
             msg = f"ServerError loading {resource_api} resource {resource_name}. ({type(err)}: {err})"
-            logging.exception(msg)
+            logger.exception(msg)
             return Retry(message=msg, delay=30, location=location)
     except Exception as err:
         msg = f"Failure loading {resource_api} resource {resource_name}. ({type(err)}: {err})"
-        logging.exception(msg)
+        logger.exception(msg)
         return Retry(message=msg, delay=30, location=location)
 
     if not resource_matches:
@@ -479,14 +465,14 @@ async def _resource_crud(
 
         new_object = resource_class(
             api=api,
-            resource=_convert_bools(managed_resource),
+            resource=convert_bools(managed_resource),
             namespace=resource_api_params.namespace,
         )
 
         try:
             await new_object.create()
         except TypeError as err:
-            logging.error(f"Error creating: {managed_resource}")
+            logger.error(f"Error creating: {managed_resource}")
             # TODO: Should this be Retry or PermFail? What about timeouts /
             # transient errors?
             return PermFail(
@@ -504,20 +490,20 @@ async def _resource_crud(
     if not resource:
         return None
 
-    py_managed_resource = _convert_bools(managed_resource)
+    py_managed_resource = convert_bools(managed_resource)
     if _validate_match(py_managed_resource, resource.raw):
-        logging.debug(
+        logger.debug(
             f"{resource_api}/{resource_name} resource matched spec, skipping update. ({location})"
         )
 
         return resource.raw
 
-    logging.info(
+    logger.info(
         f"{resource_api}/{resource_name} resource did not match spec. ({location})"
     )
     if behavior.update == "patch":
         # TODO: Should this only send fields with differences?
-        logging.info(
+        logger.info(
             f"Patching {resource_api}/{resource_name} to match spec. ({location})"
         )
         await resource.patch(py_managed_resource)
@@ -527,7 +513,7 @@ async def _resource_crud(
             location=location,
         )
     elif behavior.update == "recreate":
-        logging.info(
+        logger.info(
             f"Will re-create {resource_api}/{resource_name} to match spec. ({location})"
         )
         await resource.delete()
@@ -537,7 +523,7 @@ async def _resource_crud(
             location=location,
         )
     else:
-        logging.info(
+        logger.info(
             f"Skipping update (behavior.update is 'never') for {resource_api}/{resource_name}. ({location})"
         )
 

@@ -1,57 +1,83 @@
+from typing import Sequence
+
 import celpy
 from celpy import celtypes
 
+from koreo import ref_helpers
+from koreo import registry
 from koreo.cache import get_resource_from_cache
-from koreo.result import PermFail, UnwrappedOutcome
+from koreo.result import DepSkip, PermFail, UnwrappedOutcome
 
 from koreo.function.reconcile import _predicate_to_koreo_result
+from koreo.value_function.structure import ValueFunction
 
 from . import structure
-from .registry import index_test_function
 
 
 async def prepare_function_test(
     cache_key: str, spec: dict | None
-) -> UnwrappedOutcome[tuple[structure.FunctionTest, None]]:
+) -> UnwrappedOutcome[tuple[structure.FunctionTest, Sequence[registry.Resource]]]:
+    location = f"prepare:FunctionTest:{cache_key}"
+
     if not spec:
         return PermFail(
-            message=f"Missing `spec` for FunctionTest '{cache_key}'.",
-            location=f"prepare:FunctionTest:{cache_key}",
+            message=f"Missing `spec` for FunctionTest '{cache_key}'.", location=location
         )
 
-    function_ref_name = spec.get("functionRef", {}).get("name")
-    if not function_ref_name:
-        return PermFail(
-            message=f"Missing `functionRef.name` for FunctionTest '{cache_key}'.",
-            location=f"prepare:FunctionTest:{cache_key}",
-        )
+    match ref_helpers.function_ref_spec_to_resource(spec.get("functionRef")):
+        case None:
+            return PermFail(
+                message=f"Missing `functionRef.name` for FunctionTest '{cache_key}'.",
+                location=location,
+            )
+        case PermFail() as perm_fail:
+            return perm_fail
+        case registry.Resource() as watched_function:
+            # Just needed to set `watched_function`
+            pass
 
-    function_under_test = get_resource_from_cache(structure.Function, function_ref_name)
+    function_under_test = get_resource_from_cache(
+        resource_class=watched_function.resource_type, cache_key=watched_function.name
+    )
     if not function_under_test:
-        return PermFail(
-            message=f"Function ({function_ref_name}) not found or not ready, FunctionTest '{cache_key}' must wait.",
-            location=f"prepare:FunctionTest:{cache_key}",
+        function_under_test = DepSkip(
+            message=(
+                f"{watched_function.resource_type.__name__} ({watched_function.name}) "
+                f"not found or not ready, FunctionTest '{cache_key}' must wait."
+            ),
+            location=location,
         )
 
     current_resource = spec.get("currentResource")
     if current_resource is not None and not isinstance(current_resource, dict):
         return PermFail(
             message=f"FunctionTest '{cache_key}' `spec.currentResource` must be an object.",
-            location=f"prepare:FunctionTest:{cache_key}",
+            location=location,
         )
 
     expected_resource = spec.get("expectedResource")
     if expected_resource is not None and not isinstance(expected_resource, dict):
         return PermFail(
             message=f"FunctionTest '{cache_key}' `spec.expectedResource` must be an object.",
-            location=f"prepare:FunctionTest:{cache_key}",
+            location=location,
+        )
+
+    if watched_function.resource_type == ValueFunction and (
+        current_resource is not None or expected_resource is not None
+    ):
+        return PermFail(
+            message=(
+                f"`FunctionTest` for `{watched_function.resource_type.__name__}` "
+                f"('{cache_key}') may not set `spec.currentResource` or `spec.expectedResource`."
+            ),
+            location=location,
         )
 
     inputs = celpy.json_to_cel(spec.get("inputs", {}))
     if inputs and not isinstance(inputs, celtypes.MapType):
         return PermFail(
             message=f"FunctionTest '{cache_key}' `spec.inputs` ('{inputs}') must be an object.",
-            location=f"prepare:FunctionTest:{cache_key}",
+            location=location,
         )
 
     expected_outcome_spec = spec.get("expectedOutcome")
@@ -65,8 +91,6 @@ async def prepare_function_test(
 
     expected_return = spec.get("expectedReturn")
 
-    index_test_function(test=cache_key, function=function_ref_name)
-
     return (
         structure.FunctionTest(
             function_under_test=function_under_test,
@@ -76,5 +100,5 @@ async def prepare_function_test(
             expected_outcome=expected_outcome,
             expected_return=expected_return,
         ),
-        None,
+        [watched_function],
     )

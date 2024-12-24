@@ -3,7 +3,7 @@ import logging
 
 import kr8s
 
-from koreo.cache import prepare_and_cache
+from koreo.cache import delete_resource_from_cache, prepare_and_cache
 
 
 async def load_cache(
@@ -65,6 +65,16 @@ async def maintain_cache(
             watcher = kr8s_api.async_watch(kind=resource_class, namespace=namespace)
 
             async for event, resource in watcher:
+                if event == "DELETED":
+                    logging.debug(
+                        f"Deleting {plural_kind}.{api_version} from cache due to {event} for {resource.name}."
+                    )
+                    await delete_resource_from_cache(
+                        resource_class=resource_class,
+                        metadata=resource.metadata,
+                    )
+                    continue
+
                 logging.debug(
                     f"Updating {plural_kind}.{api_version} cache due to {event} for {resource.name}."
                 )

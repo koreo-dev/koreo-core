@@ -6,9 +6,13 @@ import kr8s
 
 from celpy import celtypes
 
+from koreo.cel.encoder import convert_bools
 from koreo.result import Outcome, UnwrappedOutcome, is_unwrapped_ok
 
-from koreo.function.reconcile import reconcile_function, _convert_bools
+from koreo.function.reconcile import reconcile_function
+from koreo.function.structure import Function
+from koreo.value_function.reconcile import reconcile_value_function
+from koreo.value_function.structure import ValueFunction
 
 from .structure import FunctionTest
 
@@ -81,16 +85,27 @@ class TestResults(NamedTuple):
 async def run_function_test(location: str, function_test: FunctionTest) -> TestResults:
     api = MockApi(current_resource=function_test.current_resource)
 
-    result = await reconcile_function(
-        api=api,
-        location=location,
-        function=function_test.function_under_test,
-        trigger=celtypes.MapType({}),
-        inputs=function_test.inputs,
-    )
+    if not is_unwrapped_ok(function_test.function_under_test):
+        result = function_test.function_under_test
+    else:
+        match function_test.function_under_test:
+            case Function():
+                result = await reconcile_function(
+                    api=api,
+                    location=location,
+                    function=function_test.function_under_test,
+                    trigger=celtypes.MapType({}),
+                    inputs=function_test.inputs,
+                )
+            case ValueFunction():
+                result = await reconcile_value_function(
+                    location=location,
+                    function=function_test.function_under_test,
+                    inputs=function_test.inputs,
+                )
 
-    if is_unwrapped_ok(result):
-        result = json.loads(json.dumps(_convert_bools(result)))
+        if is_unwrapped_ok(result):
+            result = json.loads(json.dumps(convert_bools(result)))
 
     return TestResults(
         expected_resource=function_test.expected_resource,

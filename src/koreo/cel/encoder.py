@@ -1,13 +1,39 @@
 from typing import Any
 import re
 
+from celpy import celtypes
+
 CEL_PREFIX = "="
+
+
+def convert_bools(
+    cel_object: celtypes.Value,
+) -> celtypes.Value | list[Any] | dict[Any, Any] | bool:
+    """Recursive walk through the CEL object, replacing BoolType with native bool instances.
+    This lets the :py:mod:`json` module correctly represent the obects
+    with JSON ``true`` and ``false``.
+
+    This will also replace ListType and MapType with native ``list`` and ``dict``.
+    All other CEL objects will be left intact. This creates an intermediate hybrid
+    beast that's not quite a :py:class:`celtypes.Value` because a few things have been replaced.
+    """
+    if isinstance(cel_object, celtypes.BoolType):
+        return True if cel_object else False
+    elif isinstance(cel_object, (celtypes.ListType, list)):
+        return [convert_bools(item) for item in cel_object]
+    elif isinstance(cel_object, (celtypes.MapType, dict)):
+        return {
+            convert_bools(key): convert_bools(value)
+            for key, value in cel_object.items()
+        }
+    else:
+        return cel_object
 
 
 def encode_cel(value):
     if isinstance(value, dict):
         return f"{{{ ",".join(
-            f'"{key.replace('"', '\"')}":{encode_cel(value)}'
+            f'"{f"{key}".replace('"', '\"')}":{encode_cel(value)}'
             for key, value in value.items()
         ) }}}"
 
@@ -16,6 +42,9 @@ def encode_cel(value):
 
     if isinstance(value, bool):
         return "true" if value else "false"
+
+    if value is None:
+        return "null"
 
     if _encode_plain(value):
         return f"{value}"
@@ -42,6 +71,8 @@ def _encode_template_dict(base: str, template_spec: dict):
     output: list[tuple[str, Any]] = []
 
     for field, expression in template_spec.items():
+        if not isinstance(field, str):
+            field = f"{field}"
         safe_field = field.replace('"', '\"')  # fmt: skip
 
         field_name = safe_field

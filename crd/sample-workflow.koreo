@@ -3,234 +3,71 @@ kind: Namespace
 metadata:
   name: koreo-testing
 ---
-apiVersion: konfig.realkinetic.com/v1alpha8
-kind: Domain
-metadata:
-  name: fully-built-trigger
-  namespace: koreo-testing
-  labels:
-    koreo.realkinetic.com/bumper: "4"
-spec:
-  domainName: Testing
----
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Workflow
 metadata:
   name: fully-built.v1
   namespace: koreo-testing
-  labels:
-    koreo.realkinetic.com/bump: "2"
 spec:
   crdRef:
-    apiGroup: konfig.realkinetic.com
+    apiGroup: koreo.realkinetic.com
     version: v1alpha8
-    kind: Domain
-
-  steps:
-    - label: empty
-      functionRef:
-        name: empty.v1
-    - label: ok_value
-      functionRef:
-        name: outcome-ok-value.v1
----
-apiVersion: koreo.realkinetic.com/v1alpha8
-kind: Workflow
-metadata:
-  name: flojo-mojo.v1
-  namespace: koreo-testing
-  labels:
-    koreo.realkinetic.com/bump: "1"
-spec:
-  crdRef:
-    apiGroup: konfig.realkinetic.com
-    version: v1alpha8
-    kind: Domain
+    kind: TriggerDummy
 
   configStep:
     functionRef:
-      name: domain-config.v1
+      kind: ValueFunction
+      name: config-test.v1
 
   steps:
-    - label: metadata
+    - label: return_value
       functionRef:
-        name: domain-subresource-metadata.v1
+        kind: ValueFunction
+        name: return-test.v1
       inputs:
-        config: =steps.config
-        test_label: test label value
-    - label: value
-      functionRef:
-        name: domain-subresource-value.v1
-      inputs:
-        config: =steps.config
-        metadata: =steps.metadata
-    - label: concurrent
-      functionRef:
-        name: empty.v1
-      inputs:
-        config: =steps.config
-        metadata: =steps.metadata
+        string: =steps.config.string
+        int: =steps.config.int
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Workflow
 metadata:
-  name: fully-built-2.v1
+  name: duplicate-workflow
+  namespace: koreo-testing
+spec:
+  crdRef:
+    apiGroup: koreo.realkinetic.com
+    version: v1alpha8
+    kind: TriggerDummy
+
+  configStep:
+    functionRef:
+      kind: ValueFunction
+      name: config-test.v1
+
+  steps:
+    - label: return_value
+      functionRef:
+        kind: ValueFunction
+        name: return-test.v1
+      inputs:
+        string: =steps.config.string
+        int: =steps.config.int
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: TriggerDummy
+metadata:
+  name: fully-built-trigger
   namespace: koreo-testing
   labels:
-    koreo.realkinetic.com/bump: "2"
+    konfig.realkinetic.com/bump: "2"
 spec:
-  crdRef:
-    apiGroup: konfig.realkinetic.com
-    version: v1alpha8
-    kind: Domain
+  validators:
+    skip: false
+    depSkip: false
+    permFail: false
+    retry: false
+    ok: false
 
-  steps:
-    - label: empty
-      functionRef:
-        name: empty.v1
-    - label: ok_value
-      functionRef:
-        name: outcome-ok-value.v1
----
-apiVersion: koreo.realkinetic.com/v1alpha8
-kind: Workflow
-metadata:
-  name: dummy-test-1.v1
-  namespace: koreo-testing
-spec:
-  crdRef:
-    apiGroup: konfig.realkinetic.com
-    version: v1alpha8
-    kind: Domain
-
-  configStep:
-    label: dummy_test
-    functionRef:
-      name: dummy-test.v1
-
-  steps:
-    - label: noop
-      functionRef:
-        name: outcome-ok-value.v1
-      inputs:
-        output: "nothing"
-  status:
-    conditions:
-      - type: Test
-        name: this is fun
-        step: dummy_test
-    state:
-      dummyTestUID: =steps.config
----
-apiVersion: koreo.realkinetic.com/v1alpha8
-kind: Workflow
-metadata:
-  name: status-test.v1
-  namespace: koreo-testing
-spec:
-  crdRef:
-    apiGroup: konfig.realkinetic.com
-    version: v1alpha8
-    kind: Domain
-
-  configStep:
-    label: dummy_test
-    functionRef:
-      name: dummy-test.v1
-
-  steps:
-    - label: noop
-      functionRef:
-        name: outcome-ok-value.v1
-      inputs:
-        output: "nothing"
-
-  status:
-    conditions:
-      - type: Test
-        name: this is fun
-        step: dummy_test
-    state:
-      uid: =steps.config
----
-apiVersion: koreo.realkinetic.com/v1alpha8
-kind: Workflow
-metadata:
-  name: mapped-input-test.v1
-  namespace: koreo-testing
-spec:
-  crdRef:
-    apiGroup: konfig.realkinetic.com
-    version: v1alpha8
-    kind: Domain
-
-  steps:
-    - label: source
-      functionRef:
-        name: mapped-input-source.v1
-
-    - label: multi_out
-      functionRef:
-        name: mapped-input-resource.v1
-      mappedInput:
-        source: =steps.source
-        inputKey: key
-      inputs:
-        static_value: "This will not change"
-
-  status:
-    conditions:
-      - type: SourceValues
-        name: Source Step
-        step: source
-      - type: Resources
-        name: Resrouces
-        step: multi_out
-    state:
-      source: =steps.source
-      resources: =steps.multi_out
----
-apiVersion: koreo.realkinetic.com/v1alpha8
-kind: Workflow
-metadata:
-  name: dynamic-test.v1
-  namespace: koreo-testing
-spec:
-  crdRef:
-    apiGroup: konfig.realkinetic.com
-    version: v1alpha8
-    kind: Domain
-  configStep:
-      functionRef:
-        name: dynamic-config.v1
-  steps:
-    - label: dynamic_template
-      functionRef:
-        name: dynamic-resource-test.v1
-      inputs:
-        config: =steps.config
-    - label: dynamic_template_dynamic_key_a
-      functionRef:
-        name: dynamic-key-dynamic-resource-test.v1
-      inputs:
-        template_name: template-a.v1
-    - label: dynamic_template_dynamic_key_b
-      functionRef:
-        name: dynamic-key-dynamic-resource-test.v1
-      inputs:
-        template_name: template-b.v1
-  status:
-    conditions:
-      - type: DyanmicTemplate
-        name: Simple Dynamic Template
-        step: dynamic_template
-      - type: DyanmicKeyResourceTemplateA
-        name: Dynamic Key Dynamic Template
-        step: dynamic_template_dynamic_key_a
-      - type: DyanmicKeyResourceTemplateB
-        name: Dynamic Key Dynamic Template
-        step: dynamic_template_dynamic_key_b
-    state:
-      dynamic_template: =steps.dynamic_template
-      dynamic_key_a: =steps.dynamic_template_dynamic_key_a
-      dynamic_key_b: =steps.dynamic_template_dynamic_key_b
+  values:
+    string: A test string
+    int: 89

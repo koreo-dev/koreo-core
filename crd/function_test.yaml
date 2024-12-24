@@ -7,7 +7,7 @@ spec:
   group: koreo.realkinetic.com
   names:
     kind: FunctionTest
-    plural: functiontestss
+    plural: functiontests
     singular: functiontest
   versions:
     - name: v1alpha8
@@ -29,11 +29,6 @@ spec:
                       nullable: false
                   required: [name]
 
-                parent:
-                  type: object
-                  x-kubernetes-preserve-unknown-fields: true
-                  nullable: true
-
                 inputs:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
@@ -51,33 +46,64 @@ spec:
                   x-kubernetes-embedded-resource: true
                   x-kubernetes-preserve-unknown-fields: true
 
-                expectedOkValue:
+                expectedReturn:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
                   nullable: true
 
                 expectedOutcome:
                   type: object
-                  x-kubernetes-validations:
-                    - rule: (self.type == 'Retry' && has(self.delay) && self.delay > 0) || self.type != 'Retry'
-                      message: "Retry validators must provide delay-seconds."
-                    - rule: (self.type != 'Retry' && !has(self.delay)) || self.type == 'Retry'
-                      message: "Non-retry validators must not provide delay-seconds."
-                    - rule: (self.type == 'Ok' && !has(self.message)) || self.type != 'Ok'
-                      message: "Ok validators should not provide a message."
-
                   properties:
-                    type:
-                      type: string
-                      nullable: false
-                      enum: [Ok, PermFail, Retry]
-                    message:
-                      type: string
+                    ok:
+                      type: object
                       nullable: true
-                    delay:
-                      type: integer
+                    skip:
+                      type: object
                       nullable: true
-                  required: [type]
+                      properties:
+                        message:
+                          type: string
+                          nullable: false
+                      required: [message]
+                    depSkip:
+                      type: object
+                      nullable: true
+                      properties:
+                        message:
+                          type: string
+                          nullable: false
+                      required: [message]
+                    retry:
+                      type: object
+                      nullable: true
+                      properties:
+                        message:
+                          type: string
+                          nullable: false
+                        delay:
+                          type: integer
+                          nullable: false
+                      required: [message, delay]
+                    permFail:
+                      type: object
+                      nullable: true
+                      properties:
+                        message:
+                          type: string
+                          nullable: false
+                      required: [message]
+                  required: [assert]
+                  oneOf:
+                    - properties:
+                      required: [ok]
+                    - properties:
+                      required: [skip]
+                    - properties:
+                      required: [depSkip]
+                    - properties:
+                      required: [retry]
+                    - properties:
+                      required: [permFail]
 
             status:
               x-kubernetes-preserve-unknown-fields: true
