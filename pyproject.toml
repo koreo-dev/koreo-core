@@ -12,7 +12,8 @@ dependencies = [
     "jsonpath-ng==1.7.0",
     "PyYAML==6.0.2",
     "kr8s==0.18.1",
-    "uvloop>=0.20.0",
+    "uvloop==0.21.0",
+    "fastjsonschema==2.21.1",
 ]
 
 requires-python = ">=3.13"
@@ -24,9 +25,9 @@ Homepage = "https://realkinetic.com/konfig"
 
 [project.optional-dependencies]
 dev = [
-    "black>=24.8.0",
-    "pytest>=8.3.2",
-    "pytest-cov>=5.0.0",
+    "black==24.10.0",
+    "pytest==8.3.4",
+    "pytest-cov==6.0.0",
 ]
 
 [build-system]

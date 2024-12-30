@@ -11,6 +11,7 @@ from resources.k8s.conditions import Condition
 from koreo import result
 
 from koreo.function.reconcile import reconcile_function
+from koreo.resource_function.reconcile import reconcile_resource_function
 from koreo.value_function.reconcile import reconcile_value_function
 
 from . import structure
@@ -24,6 +25,7 @@ UNKNOWN_ERROR_RETRY_DELAY = 60
 async def reconcile_workflow(
     api: kr8s.Api,
     workflow_key: str,
+    owner: tuple[str, dict],
     trigger: celtypes.Value,
     workflow: structure.Workflow,
 ) -> tuple[result.UnwrappedOutcome[celtypes.Value], list[Condition]]:
@@ -44,6 +46,7 @@ async def reconcile_workflow(
         workflow_key=workflow_key,
         config_step=workflow.config_step,
         steps=workflow.steps,
+        owner=owner,
         trigger=trigger,
     )
 
@@ -104,6 +107,7 @@ async def _reconcile_config_step(
     api: kr8s.Api,
     workflow_key: str,
     step: structure.ConfigStep | structure.ErrorStep,
+    owner: tuple[str, celtypes.Value],
     trigger: celtypes.Value,
 ):
     location = f"{workflow_key}.{step.label}"
@@ -127,6 +131,7 @@ async def _reconcile_config_step(
         workflow_key=workflow_key,
         location=location,
         logic=step.logic,
+        owner=owner,
         trigger=trigger,
         inputs=inputs,
     )
@@ -135,6 +140,7 @@ async def _reconcile_config_step(
 async def _reconcile_steps(
     api: kr8s.Api,
     workflow_key: str,
+    owner: tuple[str, celtypes.Value],
     trigger: celtypes.Value,
     config_step: structure.ConfigStep | structure.ErrorStep | None,
     steps: Sequence[structure.Step | structure.ErrorStep],
@@ -153,6 +159,7 @@ async def _reconcile_steps(
                         api=api,
                         workflow_key=workflow_key,
                         step=config_step,
+                        owner=owner,
                         trigger=trigger,
                     ),
                     name=config_step.label,
@@ -176,6 +183,7 @@ async def _reconcile_steps(
                             api=api,
                             workflow_key=workflow_key,
                             step=step,
+                            owner=owner,
                             trigger=trigger,
                             dependencies=step_dependencies,
                         ),
@@ -259,6 +267,7 @@ async def _reconcile_step(
     workflow_key: str,
     step: structure.Step | structure.ErrorStep,
     dependencies: list[asyncio.Task[result.UnwrappedOutcome]],
+    owner: tuple[str, celtypes.Value],
     trigger: celtypes.Value,
 ):
     location = f"{workflow_key}.{step.label}"
@@ -277,6 +286,7 @@ async def _reconcile_step(
             workflow_key=workflow_key,
             location=location,
             logic=step.logic,
+            owner=owner,
             trigger=trigger,
             inputs=inputs,
         )
@@ -339,6 +349,7 @@ async def _reconcile_step(
             location=location,
             step=step,
             steps=ok_outcomes,
+            owner=owner,
             trigger=trigger,
             inputs=inputs,
         )
@@ -348,6 +359,7 @@ async def _reconcile_step(
             workflow_key=workflow_key,
             location=location,
             logic=step.logic,
+            owner=owner,
             trigger=trigger,
             inputs=inputs,
         )
@@ -357,11 +369,13 @@ async def _reconcile_step_logic(
     api: kr8s.Api,
     workflow_key: str,
     trigger: celtypes.Value,
+    owner: tuple[str, celtypes.Value],
     inputs: celtypes.Value,
     location: str,
     logic: (
-        structure.ValueFunction
-        | structure.Function
+        structure.Function
+        | structure.ResourceFunction
+        | structure.ValueFunction
         | structure.Workflow
         | result.ErrorOutcome
     ),
@@ -369,9 +383,21 @@ async def _reconcile_step_logic(
     match logic:
         case structure.Workflow():
             workflow, _ = await reconcile_workflow(
-                api=api, workflow_key=workflow_key, trigger=inputs, workflow=logic
+                api=api,
+                workflow_key=workflow_key,
+                owner=owner,
+                trigger=inputs,
+                workflow=logic,
             )
             return workflow
+        case structure.ResourceFunction():
+            return await reconcile_resource_function(
+                api=api,
+                location=location,
+                function=logic,
+                owner=owner,
+                inputs=inputs,
+            )
         case structure.ValueFunction():
             return await reconcile_value_function(
                 location=location,
@@ -396,6 +422,7 @@ async def _reconcile_mapped_function(
     workflow_key: str,
     location: str,
     steps: celtypes.MapType,
+    owner: tuple[str, celtypes.Value],
     inputs: celtypes.Value,
     trigger: celtypes.Value,
 ) -> result.UnwrappedOutcome[celtypes.ListType]:
@@ -422,6 +449,7 @@ async def _reconcile_mapped_function(
                         workflow_key=workflow_key,
                         location=f"{location}[{idx}]",
                         logic=step.logic,
+                        owner=owner,
                         trigger=trigger,
                         inputs=iterated_inputs,
                     ),

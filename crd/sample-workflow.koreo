@@ -27,6 +27,21 @@ spec:
       inputs:
         string: =steps.config.string
         int: =steps.config.int
+    - label: resource
+      functionRef:
+        kind: ResourceFunction
+        name: resource-test.v1
+      inputs:
+        name: resource-function-test
+        validators:
+          skip: false
+          depSkip: false
+          permFail: false
+          retry: false
+          ok: false
+        values:
+          string: =steps.config.string
+          int: =steps.config.int
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Workflow

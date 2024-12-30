@@ -17,7 +17,7 @@ class TestReconcileValueFunction(unittest.IsolatedAsyncioTestCase):
             location="test-fn",
             function=ValueFunction(
                 validators=None,
-                constants=celpy.json_to_cel({}),
+                local_values=None,
                 return_value=None,
                 dynamic_input_keys=set(),
             ),
@@ -33,18 +33,18 @@ class TestReconcileValueFunction(unittest.IsolatedAsyncioTestCase):
                 "validators": [
                     {
                         "assert": "=inputs.validators.skip",
-                        "skip": {"message": "=constants.messages.skip"},
+                        "skip": {"message": "=locals.messages.skip"},
                     },
                     {
                         "assert": "=inputs.validators.permFail",
-                        "permFail": {"message": "=constants.messages.permFail"},
+                        "permFail": {"message": "=locals.messages.permFail"},
                     },
                     {
                         "assert": "=inputs.validators.depSkip",
-                        "depSkip": {"message": "=constants.messages.depSkip"},
+                        "depSkip": {"message": "=locals.messages.depSkip"},
                     },
                 ],
-                "constants": {
+                "locals": {
                     "messages": {
                         "skip": "skip message",
                         "permFail": "permFail message",
@@ -61,7 +61,6 @@ class TestReconcileValueFunction(unittest.IsolatedAsyncioTestCase):
         )
 
         function, _ = prepared
-
         base_inputs = {
             "validators": {
                 "skip": False,
@@ -94,7 +93,7 @@ class TestReconcileValueFunction(unittest.IsolatedAsyncioTestCase):
                 result.Skip,
                 {
                     "assert": "=inputs.skip",
-                    "skip": {"message": "=constants.messages.skip"},
+                    "skip": {"message": "skip message"},
                 },
             ),
             (
@@ -102,7 +101,7 @@ class TestReconcileValueFunction(unittest.IsolatedAsyncioTestCase):
                 result.PermFail,
                 {
                     "assert": "=inputs.permFail",
-                    "permFail": {"message": "=constants.messages.permFail"},
+                    "permFail": {"message": "permFail message"},
                 },
             ),
             (
@@ -110,7 +109,7 @@ class TestReconcileValueFunction(unittest.IsolatedAsyncioTestCase):
                 result.DepSkip,
                 {
                     "assert": "=inputs.depSkip",
-                    "depSkip": {"message": "=constants.messages.depSkip"},
+                    "depSkip": {"message": "depSkip message"},
                 },
             ),
             (
@@ -118,7 +117,7 @@ class TestReconcileValueFunction(unittest.IsolatedAsyncioTestCase):
                 result.Retry,
                 {
                     "assert": "=inputs.retry",
-                    "retry": {"message": "=constants.messages.retry", "delay": 17},
+                    "retry": {"message": "retry message", "delay": 17},
                 },
             ),
             (
@@ -126,31 +125,11 @@ class TestReconcileValueFunction(unittest.IsolatedAsyncioTestCase):
                 None,
                 {"assert": "=inputs.ok", "ok": {}},
             ),
-            (
-                "bogus",
-                result.PermFail,
-                {
-                    "assert": "=inputs.bogus",
-                    "bogus": {"message": "=constants.messages.bogus", "whatever": True},
-                },
-            ),
         )
 
         predicates = [predicate for _, __, predicate in predicate_pairs]
         prepared_function = await prepare.prepare_value_function(
-            cache_key="test",
-            spec={
-                "validators": predicates,
-                "constants": {
-                    "messages": {
-                        "skip": "skip message",
-                        "depSkip": "depSkip message",
-                        "permFail": "permFail message",
-                        "retry": "retry message",
-                        "bogus": "bogus message",
-                    },
-                },
-            },
+            cache_key="test", spec={"validators": predicates}
         )
         assert isinstance(prepared_function, tuple)
         function, _ = prepared_function
@@ -173,9 +152,6 @@ class TestReconcileValueFunction(unittest.IsolatedAsyncioTestCase):
                 inputs=celpy.json_to_cel(test_inputs),
             )
 
-            print(f"test case: {input_key}")
-            print(reconcile_result)
-            print(expected_type)
             if expected_type is None:
                 self.assertIsNone(reconcile_result)
             else:
@@ -217,6 +193,42 @@ class TestReconcileValueFunction(unittest.IsolatedAsyncioTestCase):
 
         self.assertDictEqual(reconcile_result, expected_value)
 
+    async def test_return_with_locals(self):
+        prepared = await prepare.prepare_value_function(
+            cache_key="test",
+            spec={
+                "locals": {
+                    "value": "=inputs.a + inputs.b",
+                    "list": ["=inputs.a + inputs.b", 17, "constant"],
+                    "map": {"mapKey": "=inputs.a + inputs.b"},
+                },
+                "return": {
+                    "value": "=locals.value * locals.value",
+                    "list": "=locals.list.map(value, string(value) + ' value')",
+                    "map": "=locals.map.map(key, locals.map[key] * 3)",
+                },
+            },
+        )
+
+        function, _ = prepared
+
+        base_inputs = {"a": 1, "b": 8}
+
+        reconcile_result = await reconcile.reconcile_value_function(
+            location="test-fn",
+            function=function,
+            inputs=celpy.json_to_cel(base_inputs),
+        )
+
+        expected_value = {
+            "value": 81,
+            "list": ["9 value", "17 value", "constant value"],
+            "map": [27],
+        }
+
+        self.maxDiff = None
+        self.assertDictEqual(reconcile_result, expected_value)
+
     async def test_corrupt_validator(self):
         prepared = await prepare.prepare_value_function(
             cache_key="test",
@@ -224,7 +236,7 @@ class TestReconcileValueFunction(unittest.IsolatedAsyncioTestCase):
                 "validators": [
                     {
                         "assert": "='a' + 9",
-                        "skip": {"message": "=constants.messages.skip"},
+                        "skip": {"message": "=locals.messages.skip"},
                     },
                 ],
             },
@@ -241,7 +253,33 @@ class TestReconcileValueFunction(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertIsInstance(reconcile_result, result.PermFail)
-        self.assertIn("evaluating `validators`", reconcile_result.message)
+        self.assertIn("evaluating `spec.validators`", reconcile_result.message)
+
+    async def test_corrupt_locals(self):
+        prepared = await prepare.prepare_value_function(
+            cache_key="test",
+            spec={
+                "locals": {
+                    "busted": "='a' + 9",
+                },
+                "return": {
+                    "value": "unused",  # Needed to prevent early-exit  eval of locals
+                },
+            },
+        )
+
+        function, _ = prepared
+
+        base_inputs = {}
+
+        reconcile_result = await reconcile.reconcile_value_function(
+            location="test-fn",
+            function=function,
+            inputs=celpy.json_to_cel(base_inputs),
+        )
+
+        self.assertIsInstance(reconcile_result, result.PermFail)
+        self.assertIn("evaluating `spec.locals`", reconcile_result.message)
 
     async def test_corrupt_return(self):
         prepared = await prepare.prepare_value_function(
@@ -264,4 +302,4 @@ class TestReconcileValueFunction(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertIsInstance(reconcile_result, result.PermFail)
-        self.assertIn("evaluating `return value`", reconcile_result.message)
+        self.assertIn("evaluating `spec.return`", reconcile_result.message)

@@ -5,8 +5,9 @@ import celpy
 
 from koreo.result import Outcome, ErrorOutcome
 
-from koreo.value_function.structure import ValueFunction
 from koreo.function.structure import Function
+from koreo.resource_function.structure import ResourceFunction
+from koreo.value_function.structure import ValueFunction
 
 
 class ConfigCRDRef(NamedTuple):
@@ -27,7 +28,7 @@ class StepConditionSpec(NamedTuple):
 
 class ConfigStep(NamedTuple):
     label: str
-    logic: ValueFunction | Function | Workflow | ErrorOutcome
+    logic: ResourceFunction | ValueFunction | Function | Workflow | ErrorOutcome
 
     inputs: celpy.Runner | None
 
@@ -36,7 +37,7 @@ class ConfigStep(NamedTuple):
 
 class Step(NamedTuple):
     label: str
-    logic: ValueFunction | Function | Workflow | ErrorOutcome
+    logic: ResourceFunction | ValueFunction | Function | Workflow | ErrorOutcome
 
     mapped_input: MappedInput | None
     inputs: celpy.Runner | None

@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Sequence
 import re
 
 from celpy import celtypes
@@ -17,20 +17,24 @@ def convert_bools(
     All other CEL objects will be left intact. This creates an intermediate hybrid
     beast that's not quite a :py:class:`celtypes.Value` because a few things have been replaced.
     """
-    if isinstance(cel_object, celtypes.BoolType):
-        return True if cel_object else False
-    elif isinstance(cel_object, (celtypes.ListType, list)):
-        return [convert_bools(item) for item in cel_object]
-    elif isinstance(cel_object, (celtypes.MapType, dict)):
-        return {
-            convert_bools(key): convert_bools(value)
-            for key, value in cel_object.items()
-        }
-    else:
-        return cel_object
+    match cel_object:
+        case celtypes.BoolType():
+            return True if cel_object else False
+
+        case celtypes.ListType() | list() | tuple():
+            return [convert_bools(item) for item in cel_object]
+
+        case celtypes.MapType() | dict():
+            return {
+                convert_bools(key): convert_bools(value)
+                for key, value in cel_object.items()
+            }
+
+        case _:
+            return cel_object
 
 
-def encode_cel(value):
+def encode_cel(value) -> str:
     if isinstance(value, dict):
         return f"{{{ ",".join(
             f'"{f"{key}".replace('"', '\"')}":{encode_cel(value)}'
@@ -58,7 +62,7 @@ def encode_cel(value):
     return value.lstrip(CEL_PREFIX)
 
 
-def encode_cel_template(template_spec: dict):
+def encode_cel_template(template_spec: dict) -> str:
     return f"{{{','.join([f'"{field}": {expression}'
      for field, expression in _encode_template_dict("", template_spec)
      ])}}}"
@@ -67,8 +71,8 @@ def encode_cel_template(template_spec: dict):
 QUOTED_NAME = re.compile(".*[^a-zA-Z0-9-_]+.*")
 
 
-def _encode_template_dict(base: str, template_spec: dict):
-    output: list[tuple[str, Any]] = []
+def _encode_template_dict(base: str, template_spec: dict) -> Sequence[tuple[str, str]]:
+    output: list[tuple[str, str]] = []
 
     for field, expression in template_spec.items():
         if not isinstance(field, str):

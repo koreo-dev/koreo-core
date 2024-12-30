@@ -7,7 +7,7 @@ import kr8s
 
 from resources.k8s.conditions import Condition, update_condition
 
-from koreo.result import is_error, raise_for_error
+from koreo.result import Retry, is_error, is_unwrapped_ok, raise_for_error
 
 from koreo.cache import get_resource_from_cache
 from koreo.cel.encoder import convert_bools
@@ -77,14 +77,17 @@ def start_controller(group: str, kind: str, version: str):
 
         workflow_keys = get_custom_crd_workflows(custom_crd=key)
 
-        owner_ref = {
-            "apiVersion": f"{group}/{version}",
-            "kind": kind,
-            "blockOwnerDeletion": True,
-            "controller": True,
-            "name": meta.name,
-            "uid": meta.uid,
-        }
+        owner = (
+            f"{meta.namespace}",
+            {
+                "apiVersion": f"{group}/{version}",
+                "kind": kind,
+                "blockOwnerDeletion": True,
+                "controller": False,
+                "name": meta.name,
+                "uid": meta.uid,
+            },
+        )
 
         conditions: list[Condition] = status.get("conditions", [])
 
@@ -112,9 +115,7 @@ def start_controller(group: str, kind: str, version: str):
             )
             raise kopf.TemporaryError(message, delay=120)
 
-        trigger = celpy.json_to_cel(
-            {"ownerRef": owner_ref, "metadata": dict(meta), "spec": dict(spec)}
-        )
+        trigger = celpy.json_to_cel({"metadata": dict(meta), "spec": dict(spec)})
 
         outcome = None
         for workflow_key in workflow_keys:
@@ -124,11 +125,15 @@ def start_controller(group: str, kind: str, version: str):
             if not workflow:
                 logging.error("Missing Workflow!")
                 return
+            if not is_unwrapped_ok(workflow):
+                outcome = Retry(message=workflow.message, delay=30)
+                break
             logging.info(f"Running Workflow {workflow_key}")
 
             workflow_outcomes, workflow_conditions = await reconcile_workflow(
                 api=kr8s_api,
                 workflow_key=workflow_key,
+                owner=owner,
                 trigger=trigger,
                 workflow=workflow,
             )

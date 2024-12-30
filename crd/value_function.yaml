@@ -22,7 +22,7 @@ spec:
               nullable: false
               properties:
                 validators:
-                  nullable: true
+                  nullable: false
                   type: array
                   maxItems: 20
                   items:
@@ -36,10 +36,10 @@ spec:
                             message: "assertion must be a cel expression (start with '=')."
                       ok:
                         type: object
-                        nullable: true
+                        nullable: false
                       skip:
                         type: object
-                        nullable: true
+                        nullable: false
                         properties:
                           message:
                             type: string
@@ -47,7 +47,7 @@ spec:
                         required: [message]
                       depSkip:
                         type: object
-                        nullable: true
+                        nullable: false
                         properties:
                           message:
                             type: string
@@ -55,7 +55,7 @@ spec:
                         required: [message]
                       retry:
                         type: object
-                        nullable: true
+                        nullable: false
                         properties:
                           message:
                             type: string
@@ -66,7 +66,7 @@ spec:
                         required: [message, delay]
                       permFail:
                         type: object
-                        nullable: true
+                        nullable: false
                         properties:
                           message:
                             type: string
@@ -74,24 +74,22 @@ spec:
                         required: [message]
                     required: [assert]
                     oneOf:
-                      - properties:
-                        required: [ok]
-                      - properties:
-                        required: [skip]
-                      - properties:
-                        required: [depSkip]
-                      - properties:
-                        required: [retry]
-                      - properties:
-                        required: [permFail]
-                constants:
+                      - required: [ok]
+                      - required: [skip]
+                      - required: [depSkip]
+                      - required: [retry]
+                      - required: [permFail]
+                locals:
                   type: object
-                  nullable: true
+                  nullable: false
                   x-kubernetes-preserve-unknown-fields: true
                 return:
-                  nullable: true
+                  nullable: false
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
+              anyOf:
+                - required: [validators]
+                - required: [return]
             status:
               type: object
               x-kubernetes-preserve-unknown-fields: true

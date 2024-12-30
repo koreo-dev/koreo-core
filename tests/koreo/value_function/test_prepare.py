@@ -20,11 +20,12 @@ class TestValueFunctionPrepare(unittest.IsolatedAsyncioTestCase):
                     },
                     {"assert": "=inputs.depSkip", "depSkip": {"message": "Dep Skip"}},
                 ],
-                "constants": {
+                "locals": {
                     "some_list": [1, 2, 3, 4],
                     "a_value_map": {"a": "b"},
                     "integer": 7,
                     "a_none": None,
+                    "cel_expr": "=1 + 17 / 2",
                 },
                 "return": {
                     "string": "1 + 1",
@@ -65,25 +66,24 @@ class TestValueFunctionPrepare(unittest.IsolatedAsyncioTestCase):
                 msg=f'Expected `PermFail` for malformed `spec` "{bad_spec}"',
             )
 
-    async def test_malformed_constants(self):
-        bad_constants = ["asda", [], 2, True]
-        for bad_constants in bad_constants:
+    async def test_malformed_locals(self):
+        bad_locals = ["asda", [], 2, True]
+        for bad_locals in bad_locals:
             outcome = await prepare.prepare_value_function(
-                cache_key="test", spec={"constants": bad_constants}
+                cache_key="test", spec={"locals": bad_locals}
             )
             self.assertIsInstance(
                 outcome,
                 result.PermFail,
-                msg=f'Expected `PermFail` for malformed `spec.constants` "{bad_constants}"',
+                msg=f'Expected `PermFail` for malformed `spec.locals` "{bad_locals}"',
             )
 
     async def test_validators_none_and_empty_list(self):
-        function, _ = await prepare.prepare_value_function("test", {"validators": None})
+        outcome = await prepare.prepare_value_function("test", {"validators": None})
 
         self.assertIsInstance(
-            function,
-            ValueFunction,
-            msg="Unexpected error with `None` `spec.validators`",
+            outcome,
+            result.PermFail,
         )
 
         function, _ = await prepare.prepare_value_function("test", {"validators": []})
@@ -113,12 +113,8 @@ class TestValueFunctionPrepare(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_none_and_empty_list_return(self):
-        function, _ = await prepare.prepare_value_function("test", {"return": None})
-        self.assertIsInstance(
-            function,
-            ValueFunction,
-            msg="Unexpected error with missing `return`",
-        )
+        outcome = await prepare.prepare_value_function("test", {"return": None})
+        self.assertIsInstance(outcome, result.PermFail)
 
         function, _ = await prepare.prepare_value_function("test", {"return": {}})
         self.assertIsInstance(

@@ -24,10 +24,14 @@ spec:
                   type: object
                   nullable: false
                   properties:
+                    kind:
+                      type: string
+                      nullable: false
+                      enum: [ResourceFunction, ValueFunction, Function]
                     name:
                       type: string
                       nullable: false
-                  required: [name]
+                  required: [kind, name]
 
                 inputs:
                   type: object
