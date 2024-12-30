@@ -14,6 +14,8 @@ from controller import koreo_cache
 from koreo import registry
 from koreo.function.prepare import prepare_function
 from koreo.function.structure import Function
+from koreo.resource_function.prepare import prepare_resource_function
+from koreo.resource_function.structure import ResourceFunction
 from koreo.resource_template.prepare import prepare_resource_template
 from koreo.resource_template.structure import ResourceTemplate
 from koreo.value_function.prepare import prepare_value_function
@@ -41,6 +43,7 @@ KOREO_RESOURCES = [
     ),
     (KOREO_NAMESPACE, "Function", Function, prepare_function),
     (KOREO_NAMESPACE, "ValueFunction", ValueFunction, prepare_value_function),
+    (KOREO_NAMESPACE, "ResourceFunction", ResourceFunction, prepare_resource_function),
     (KOREO_NAMESPACE, "Workflow", Workflow, prepare_workflow),
 ]
 

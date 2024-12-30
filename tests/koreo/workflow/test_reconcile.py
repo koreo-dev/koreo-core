@@ -60,7 +60,11 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
         )
 
         value, conditions = await reconcile.reconcile_workflow(
-            api=None, workflow_key="test-case", trigger={}, workflow=workflow
+            api=None,
+            workflow_key="test-case",
+            owner=("unit-tests", celtypes.MapType({"uid": "sam-123"})),
+            trigger=celtypes.MapType({}),
+            workflow=workflow,
         )
 
         self.maxDiff = None
@@ -166,7 +170,11 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
         )
 
         value, conditions = await reconcile.reconcile_workflow(
-            api=None, workflow_key="test-case", trigger={}, workflow=workflow
+            api=None,
+            workflow_key="test-case",
+            owner=("unit-tests", celtypes.MapType({"uid": "sam-123"})),
+            trigger=celtypes.MapType({}),
+            workflow=workflow,
         )
 
         self.maxDiff = None

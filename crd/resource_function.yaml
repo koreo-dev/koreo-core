@@ -1,0 +1,267 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: resourcefunctions.koreo.realkinetic.com
+spec:
+  scope: Namespaced
+  group: koreo.realkinetic.com
+  names:
+    kind: ResourceFunction
+    plural: resourcefunctions
+    singular: resourcefunction
+  versions:
+    - name: v1alpha8
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                inputValidators:
+                  type: array
+                  nullable: false
+                  maxItems: 20
+                  items:
+                    type: object
+                    properties:
+                      assert:
+                        type: string
+                        nullable: false
+                        x-kubernetes-validations:
+                          - rule: self.startsWith('=')
+                            message: "assertion must be a cel expression (start with '=')."
+                      ok:
+                        type: object
+                        nullable: false
+                      skip:
+                        type: object
+                        nullable: false
+                        properties:
+                          message:
+                            type: string
+                            nullable: false
+                        required: [message]
+                      depSkip:
+                        type: object
+                        nullable: false
+                        properties:
+                          message:
+                            type: string
+                            nullable: false
+                        required: [message]
+                      retry:
+                        type: object
+                        nullable: false
+                        properties:
+                          message:
+                            type: string
+                            nullable: false
+                          delay:
+                            type: integer
+                            nullable: false
+                        required: [message, delay]
+                      permFail:
+                        type: object
+                        nullable: false
+                        properties:
+                          message:
+                            type: string
+                            nullable: false
+                        required: [message]
+                    required: [assert]
+                    oneOf:
+                      - required: [ok]
+                      - required: [skip]
+                      - required: [depSkip]
+                      - required: [retry]
+                      - required: [permFail]
+                locals:
+                  type: object
+                  nullable: false
+                  x-kubernetes-preserve-unknown-fields: true
+                apiConfig:
+                  type: object
+                  nullable: false
+                  properties:
+                    apiVersion:
+                      type: string
+                      nullable: false
+                    kind:
+                      type: string
+                      nullable: false
+                    plural:
+                      type: string
+                      nullable: true
+                    namespaced:
+                      type: boolean
+                      nullable: true
+                      default: true
+                    owned:
+                      type: boolean
+                      nullable: true
+                      default: true
+                    name:
+                      type: string
+                      nullable: false
+                    namespace:
+                      type: string
+                      nullable: true
+                  required: [apiVersion, kind, name]
+                base:
+                  type: object
+                  nullable: false
+                  properties:
+                    fromTemplate:
+                      type: string
+                      nullable: false
+                    overlay:
+                      type: object
+                      nullable: false
+                      x-kubernetes-preserve-unknown-fields: true
+                  anyOf:
+                    - required: [fromTemplate]
+                    - required: [overlay]
+                create:
+                  type: object
+                  nullable: false
+                  default:
+                    enabled: true
+                    delay: 30
+                  properties:
+                    enabled:
+                      type: boolean
+                      nullable: false
+                      default: true
+                    delay:
+                      type: integer
+                      nullable: false
+                      default: 30
+                    overlay:
+                      type: object
+                      nullable: true
+                      x-kubernetes-preserve-unknown-fields: true
+                update:
+                  type: object
+                  nullable: false
+                  default:
+                    patch:
+                      delay: 30
+                  properties:
+                    patch:
+                      type: object
+                      nullable: false
+                      properties:
+                        delay:
+                          type: integer
+                          nullable: false
+                          default: 30
+                    recreate:
+                      type: object
+                      nullable: false
+                      properties:
+                        delay:
+                          type: integer
+                          nullable: false
+                          default: 30
+                    never:
+                      type: object
+                      nullable: false
+                      additionalProperties: false
+                      minProperties: 0
+                      maxProperties: 0
+                  oneOf:
+                    - required: [patch]
+                    - required: [recreate]
+                    - required: [never]
+                delete:
+                  type: object
+                  nullable: false
+                  properties:
+                    abandon:
+                      type: object
+                      nullable: false
+                      additionalProperties: false
+                      minProperties: 0
+                      maxProperties: 0
+                    destroy:
+                      type: object
+                      nullable: false
+                      additionalProperties: false
+                      minProperties: 0
+                      maxProperties: 0
+                  oneOf:
+                    - required: [abandon]
+                    - required: [destroy]
+                outcome:
+                  nullable: false
+                  type: object
+                  properties:
+                    validators:
+                      nullable: false
+                      type: array
+                      maxItems: 20
+                      items:
+                        type: object
+                        properties:
+                          assert:
+                            type: string
+                            nullable: false
+                            x-kubernetes-validations:
+                              - rule: self.startsWith('=')
+                                message: "assertion must be a cel expression (start with '=')."
+                          ok:
+                            type: object
+                            nullable: false
+                          skip:
+                            type: object
+                            nullable: false
+                            properties:
+                              message:
+                                type: string
+                                nullable: false
+                            required: [message]
+                          depSkip:
+                            type: object
+                            nullable: false
+                            properties:
+                              message:
+                                type: string
+                                nullable: false
+                            required: [message]
+                          retry:
+                            type: object
+                            nullable: false
+                            properties:
+                              message:
+                                type: string
+                                nullable: false
+                              delay:
+                                type: integer
+                                nullable: false
+                            required: [message, delay]
+                          permFail:
+                            type: object
+                            nullable: false
+                            properties:
+                              message:
+                                type: string
+                                nullable: false
+                            required: [message]
+                        required: [assert]
+                        oneOf:
+                          - required: [ok]
+                          - required: [skip]
+                          - required: [depSkip]
+                          - required: [retry]
+                          - required: [permFail]
+                    return:
+                      nullable: false
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+              required: [apiConfig, base]
+            status:
+              x-kubernetes-preserve-unknown-fields: true
+              type: object

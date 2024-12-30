@@ -19,34 +19,31 @@ spec:
   validators:
     - assert: =inputs.parent.spec.validators.skip
       skip:
-        message: =constants.messages.skip
+        message: skip message
 
     - assert: =inputs.parent.spec.validators.depSkip
       depSkip:
-        message: =constants.messages.depSkip
+        message: depSkip message
 
     - assert: =inputs.parent.spec.validators.permFail
       permFail:
-        message: =constants.messages.permFail
+        message: permFail message
 
     - assert: =inputs.parent.spec.validators.retry
       retry:
-        message: =constants.messages.retry
+        message: retry message
         delay: 13
 
     - assert: =inputs.parent.spec.validators.ok
       ok: {}
 
-  constants:
-    messages:
-      skip: skip message
-      depSkip: depSkip message
-      permFail: permFail message
-      retry: retry message
+  locals:
+    computed: =inputs.parent.spec.values.string + " local computed"
 
   return:
     string: =inputs.parent.spec.values.string
     int: =inputs.parent.spec.values.int
+    local_computed: =locals.computed
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: ValueFunction

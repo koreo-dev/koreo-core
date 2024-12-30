@@ -53,7 +53,7 @@ spec:
                         kind:
                           type: string
                           nullable: false
-                          enum: [ValueFunction, Function]
+                          enum: [ResourceFunction, ValueFunction, Function]
                         name:
                           type: string
                           nullable: false
@@ -89,10 +89,8 @@ spec:
                             - rule: "!self.startsWith('=')"
                               message: "name may not be a CEL expression."
                   oneOf:
-                    - properties:
-                      required: [functionRef]
-                    - properties:
-                      required: [workflowRef]
+                    - required: [functionRef]
+                    - required: [workflowRef]
                 steps:
                   nullable: true
                   type: array
@@ -114,7 +112,7 @@ spec:
                           kind:
                             type: string
                             nullable: false
-                            enum: [ValueFunction, Function]
+                            enum: [ResourceFunction, ValueFunction, Function]
                           name:
                             type: string
                             nullable: false
@@ -162,10 +160,8 @@ spec:
                                 message: "name may not be a CEL expression."
                     required: [label]
                     oneOf:
-                      - properties:
-                        required: [functionRef]
-                      - properties:
-                        required: [workflowRef]
+                      - required: [functionRef]
+                      - required: [workflowRef]
                 status:
                   type: object
                   nullable: true

@@ -13,6 +13,7 @@ from koreo.cel.encoder import encode_cel
 from koreo.cel.functions import koreo_cel_functions, koreo_function_annotations
 from koreo.cel.structure_extractor import extract_argument_structure
 from koreo.function.structure import Function
+from koreo.resource_function.structure import ResourceFunction
 from koreo.result import (
     Ok,
     Outcome,
@@ -480,6 +481,11 @@ def _load_function(step_label: str, function_ref: dict):
     if function_kind == "ValueFunction":
         function = get_resource_from_cache(
             resource_class=ValueFunction,
+            cache_key=function_cache_key,
+        )
+    elif function_kind == "ResourceFunction":
+        function = get_resource_from_cache(
+            resource_class=ResourceFunction,
             cache_key=function_cache_key,
         )
     elif function_kind == "Function":
