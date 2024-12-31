@@ -100,7 +100,7 @@ async def run_function_test(location: str, function_test: FunctionTest) -> TestR
                     inputs=function_test.inputs,
                 )
             case ResourceFunction():
-                result = await reconcile_resource_function(
+                result, _ = await reconcile_resource_function(
                     api=api,
                     location=location,
                     function=function_test.function_under_test,

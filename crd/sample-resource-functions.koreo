@@ -13,7 +13,7 @@ spec:
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: ResourceFunction
 metadata:
-  name: resource-test.v1
+  name: resource-reader.v1
   namespace: koreo-testing
 spec:
   inputValidators:
@@ -46,23 +46,64 @@ spec:
     kind: TestDummy
     plural: testdummies
     namespaced: true
-    owned: true
+    readonly: true
+
+    name: =locals.resource_name
+    namespace: koreo-testing
+
+  resource: {}
+
+  outcome:
+    return:
+      ref: =resource.self_ref()
+      computedInt: =resource.spec.int
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: ResourceFunction
+metadata:
+  name: resource-factory.v1
+  namespace: koreo-testing
+spec:
+  inputValidators:
+    - assert: =inputs.validators.skip
+      skip:
+        message: skip message
+
+    - assert: =inputs.validators.depSkip
+      depSkip:
+        message: depSkip message
+
+    - assert: =inputs.validators.permFail
+      permFail:
+        message: permFail message
+
+    - assert: =inputs.validators.retry
+      retry:
+        message: retry message
+        delay: 13
+
+    - assert: =inputs.validators.ok
+      ok: {}
+
+  locals:
+    computed: =inputs.values.string + " local computed"
+    resource_name: =inputs.name + "-"  + inputs.suffix
+
+  apiConfig:
+    apiVersion: koreo.realkinetic.com/v1alpha8
+    kind: TestDummy
+    plural: testdummies
+    namespaced: true
 
     name: =locals.resource_name
     namespace: koreo-testing
 
   resource:
     spec:
-      string: =inputs.values.string
-      int: =inputs.values.int + 5
-      local_computed: =locals.computed
-
-  update:
-    patch:
-      delay: 20
+      string: =locals.computed
+      int: =inputs.values.int
 
   outcome:
     return:
       ref: =resource.self_ref()
       computedInt: =resource.spec.int
-

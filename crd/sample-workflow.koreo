@@ -27,10 +27,28 @@ spec:
       inputs:
         string: =steps.config.string
         int: =steps.config.int
-    - label: resource
+    - label: resource_reader
       functionRef:
         kind: ResourceFunction
-        name: resource-test.v1
+        name: resource-reader.v1
+      inputs:
+        name: resource-function-test
+        validators:
+          skip: false
+          depSkip: false
+          permFail: false
+          retry: false
+          ok: false
+        values:
+          string: =steps.config.string
+          int: =steps.config.int
+    - label: resource_factory
+      functionRef:
+        kind: ResourceFunction
+        name: resource-factory.v1
+      mappedInput:
+        source: =["a", "b", "c"]
+        inputKey: suffix
       inputs:
         name: resource-function-test
         validators:
@@ -47,8 +65,8 @@ spec:
         kind: ValueFunction
         name: resource-user-test.v1
       inputs:
-        computedInt: =steps.resource.computedInt
-        resourceRef: =steps.resource.ref
+        computedInt: =steps.resource_reader.computedInt
+        resourceRef: =steps.resource_reader.ref
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Workflow
