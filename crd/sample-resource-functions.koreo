@@ -51,12 +51,11 @@ spec:
     name: =locals.resource_name
     namespace: koreo-testing
 
-  base:
-    overlay:
-      spec:
-        string: =inputs.values.string
-        int: =inputs.values.int + 5
-        local_computed: =locals.computed
+  resource:
+    spec:
+      string: =inputs.values.string
+      int: =inputs.values.int + 5
+      local_computed: =locals.computed
 
   update:
     patch:
@@ -65,4 +64,5 @@ spec:
   outcome:
     return:
       ref: =resource.self_ref()
+      computedInt: =resource.spec.int
 

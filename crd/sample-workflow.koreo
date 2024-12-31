@@ -42,6 +42,13 @@ spec:
         values:
           string: =steps.config.string
           int: =steps.config.int
+    - label: resource_value_user
+      functionRef:
+        kind: ValueFunction
+        name: resource-user-test.v1
+      inputs:
+        computedInt: =steps.resource.computedInt
+        resourceRef: =steps.resource.ref
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Workflow

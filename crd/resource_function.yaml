@@ -94,36 +94,42 @@ spec:
                       nullable: false
                     plural:
                       type: string
-                      nullable: true
+                      nullable: false
                     namespaced:
                       type: boolean
-                      nullable: true
+                      nullable: false
                       default: true
                     owned:
                       type: boolean
-                      nullable: true
+                      nullable: false
                       default: true
+                    readonly:
+                      type: boolean
+                      nullable: false
+                      default: false
                     name:
                       type: string
                       nullable: false
                     namespace:
                       type: string
-                      nullable: true
+                      nullable: false
                   required: [apiVersion, kind, name]
-                base:
+                resourceTemplateRef:
                   type: object
                   nullable: false
                   properties:
-                    fromTemplate:
+                    name:
                       type: string
                       nullable: false
                     overlay:
                       type: object
                       nullable: false
                       x-kubernetes-preserve-unknown-fields: true
-                  anyOf:
-                    - required: [fromTemplate]
-                    - required: [overlay]
+                  required: [name]
+                resource:
+                  type: object
+                  nullable: false
+                  x-kubernetes-preserve-unknown-fields: true
                 create:
                   type: object
                   nullable: false
@@ -261,7 +267,10 @@ spec:
                       nullable: false
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
-              required: [apiConfig, base]
+              required: [apiConfig]
+              oneOf:
+                - required: [resource]
+                - required: [resourceTemplateRef]
             status:
               x-kubernetes-preserve-unknown-fields: true
               type: object

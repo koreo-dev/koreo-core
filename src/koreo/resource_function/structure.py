@@ -7,11 +7,11 @@ import celpy
 
 class ResourceTemplateRef(NamedTuple):
     name: celpy.Runner | None
-
-
-class Base(NamedTuple):
-    from_template: celpy.Runner | None = None
     overlay: celpy.Runner | None = None
+
+
+class InlineResourceTemplate(NamedTuple):
+    template: celpy.Runner | None = None
 
 
 class Create(NamedTuple):
@@ -52,8 +52,9 @@ class CRUDConfig(NamedTuple):
     resource_api: type[APIObject]
     resource_id: celpy.Runner
     own_resource: bool
+    readonly: bool
 
-    base: Base
+    resource_template: InlineResourceTemplate | ResourceTemplateRef
     create: Create
     update: Update
 
