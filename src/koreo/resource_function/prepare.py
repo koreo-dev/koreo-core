@@ -9,7 +9,7 @@ import celpy
 
 from koreo import schema
 from koreo.cel.encoder import encode_cel, encode_cel_template
-from koreo.cel.functions import koreo_function_annotations
+from koreo.cel.functions import koreo_cel_functions, koreo_function_annotations
 from koreo.cel.prepare import prepare_map_expression
 from koreo.cel.structure_extractor import extract_argument_structure
 from koreo.predicate_helpers import predicate_extractor
@@ -75,17 +75,23 @@ async def prepare_resource_function(
                 message=message,
                 location=_location(cache_key, "spec.apiConfig"),
             )
-        case (resource_api, resource_id, own_resource):
+        case (resource_api, resource_id, own_resource, readonly):
             used_vars.update(extract_argument_structure(resource_id.ast))
 
-    match _prepare_base(cel_env=env, spec=spec.get("base")):
-        case PermFail(message=message):
-            return PermFail(message=message, location=_location(cache_key, "spec.base"))
-        case structure.Base(from_template=from_template, overlay=overlay) as base:
-            if from_template:
-                used_vars.update(extract_argument_structure(from_template.ast))
-            if overlay:
-                used_vars.update(extract_argument_structure(overlay.ast))
+    match _prepare_resource_template(cel_env=env, spec=spec, readonly=readonly):
+        case PermFail() as err:
+            return err
+
+        case structure.ResourceTemplateRef(
+            name=template_name, overlay=template_overlay
+        ) as resource_template:
+            used_vars.update(extract_argument_structure(template_name.ast))
+            if template_overlay:
+                used_vars.update(extract_argument_structure(template_overlay.ast))
+
+        case structure.InlineResourceTemplate(template=template) as resource_template:
+            if template:
+                used_vars.update(extract_argument_structure(template.ast))
 
     match _prepare_create(cel_env=env, spec=spec.get("create")):
         case PermFail(message=message):
@@ -128,7 +134,8 @@ async def prepare_resource_function(
                 resource_api=resource_api,
                 resource_id=resource_id,
                 own_resource=own_resource,
-                base=base,
+                readonly=readonly,
+                resource_template=resource_template,
                 create=create,
                 update=update,
             ),
@@ -149,7 +156,7 @@ def _location(cache_key: str, extra: str | None = None) -> str:
 
 def _prepare_api_config(
     cel_env: celpy.Environment, spec: dict
-) -> tuple[type[APIObject], celpy.celpy.Runner, bool] | PermFail:
+) -> tuple[type[APIObject], celpy.celpy.Runner, bool, bool] | PermFail:
     api_version = spec.get("apiVersion")
     kind = spec.get("kind")
     name = spec.get("name")
@@ -164,6 +171,7 @@ def _prepare_api_config(
 
     namespaced = spec.get("namespaced", True)
     owned = spec.get("owned", True)
+    readonly = spec.get("readonly", False)
 
     resource_id_cel = {"name": name}
 
@@ -193,23 +201,75 @@ def _prepare_api_config(
         namespaced=namespaced,
         asyncio=True,
     )
-    return (resource_api, resource_id, owned)
+    return (resource_api, resource_id, owned, readonly)
 
 
-def _prepare_base(cel_env: celpy.Environment, spec: dict) -> structure.Base | PermFail:
-    from_template_spec = spec.get("fromTemplate")
-    if from_template_spec:
-        from_template = cel_env.program(cel_env.compile(encode_cel(from_template_spec)))
-    else:
-        from_template = None
+def _prepare_resource_template(
+    cel_env: celpy.Environment, spec: dict, readonly: bool
+) -> structure.InlineResourceTemplate | structure.ResourceTemplateRef | PermFail:
+    match spec:
+        case {"resource": resource_template}:
+            match prepare_map_expression(
+                cel_env=cel_env, spec=resource_template, name="spec.resource"
+            ):
+                case PermFail() as err:
+                    return err
+                case None:
+                    if readonly:
+                        return structure.InlineResourceTemplate()
 
-    overlay_spec = spec.get("overlay")
-    if overlay_spec:
-        overlay = cel_env.program(cel_env.compile(encode_cel_template(overlay_spec)))
-    else:
-        overlay = None
+                    return PermFail(
+                        message=f"Empty resource template ({resource_template})",
+                        location="spec.resource",
+                    )
+                case celpy.Runner() as template_expression:
+                    return structure.InlineResourceTemplate(
+                        template=template_expression
+                    )
 
-    return structure.Base(from_template=from_template, overlay=overlay)
+        case {"resourceTemplateRef": resource_template_ref}:
+            name_cel = resource_template_ref.get("name")
+            if not name_cel:
+                return PermFail(
+                    message=f"`name` is required in `spec.resourceTemplateRef`",
+                    location="spec.resourceTemplateRef.name",
+                )
+            try:
+                name_expression = cel_env.program(
+                    cel_env.compile(encode_cel(name_cel)), functions=koreo_cel_functions
+                )
+            except celpy.CELParseError as err:
+                return PermFail(
+                    message=f"Parsing error ({err}) in ({name_cel})",
+                    location="spec.resourceTemplateRef.name",
+                )
+
+            overlay_cel = resource_template_ref.get("overlay")
+            if not overlay_cel:
+                return structure.ResourceTemplateRef(name=name_expression, overlay=None)
+
+            match prepare_map_expression(
+                cel_env=cel_env,
+                spec=overlay_cel,
+                name="spec.resourceTemplateRef.overlay",
+            ):
+                case PermFail() as err:
+                    return err
+                case None:
+                    return PermFail(
+                        message=f"Empty overlay ({overlay_cel})",
+                        location="spec.resourceTemplateRef.overlay",
+                    )
+                case celpy.Runner() as overlay_expression:
+                    return structure.ResourceTemplateRef(
+                        name=name_expression, overlay=overlay_expression
+                    )
+
+        case _:
+            return PermFail(
+                message="Either `resource` or `resourceTemplateRef` is required.",
+                location="spec",
+            )
 
 
 def _prepare_create(
@@ -225,10 +285,19 @@ def _prepare_create(
     delay = spec.get("delay", DEFAULT_CREATE_DELAY)
 
     overlay_spec = spec.get("overlay")
-    if overlay_spec:
-        overlay = cel_env.program(cel_env.compile(encode_cel_template(overlay_spec)))
-    else:
+    if not overlay_spec:
         overlay = None
+    else:
+        try:
+            overlay = cel_env.program(
+                cel_env.compile(encode_cel_template(overlay_spec)),
+                functions=koreo_cel_functions,
+            )
+        except celpy.CELParseError as err:
+            return PermFail(
+                message=f"Parsing error ({err}) in ({overlay_spec})",
+                location="spec.create.overlay",
+            )
 
     return structure.Create(enabled=enabled, delay=delay, overlay=overlay)
 

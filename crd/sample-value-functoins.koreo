@@ -64,3 +64,13 @@ spec:
       emptyMap: {}
       emptyList: []
       none: null
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: ValueFunction
+metadata:
+  name: resource-user-test.v1
+  namespace: koreo-testing
+spec:
+  return:
+    int: =inputs.computedInt
+    ref: =inputs.resourceRef
