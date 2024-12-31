@@ -1,3 +1,4 @@
+import json
 import logging
 
 
@@ -118,6 +119,7 @@ def start_controller(group: str, kind: str, version: str):
         trigger = celpy.json_to_cel({"metadata": dict(meta), "spec": dict(spec)})
 
         outcome = None
+        resource_ids = None
         for workflow_key in workflow_keys:
             workflow = get_resource_from_cache(
                 resource_class=Workflow, cache_key=workflow_key
@@ -130,12 +132,14 @@ def start_controller(group: str, kind: str, version: str):
                 break
             logging.info(f"Running Workflow {workflow_key}")
 
-            workflow_outcomes, workflow_conditions = await reconcile_workflow(
-                api=kr8s_api,
-                workflow_key=workflow_key,
-                owner=owner,
-                trigger=trigger,
-                workflow=workflow,
+            workflow_outcomes, workflow_conditions, resource_ids = (
+                await reconcile_workflow(
+                    api=kr8s_api,
+                    workflow_key=workflow_key,
+                    owner=owner,
+                    trigger=trigger,
+                    workflow=workflow,
+                )
             )
             outcome = workflow_outcomes
             for condition in workflow_conditions:
@@ -146,16 +150,25 @@ def start_controller(group: str, kind: str, version: str):
         if not outcome:
             return True
 
+        encoded_resource_ids = json.dumps(
+            resource_ids, separators=(",", ":"), indent=None
+        )
+
         if is_error(outcome):
             patch.update(
                 {
+                    "metadata": {
+                        "annotations": {
+                            "koreo.realkinetic.com/managed-resources": encoded_resource_ids
+                        }
+                    },
                     "status": {
                         "conditions": conditions,
                         "koreo": {
                             "errors": outcome.message,
                             "locations": outcome.location,
                         },
-                    }
+                    },
                 }
             )
             raise_for_error(outcome)
@@ -167,10 +180,15 @@ def start_controller(group: str, kind: str, version: str):
 
         patch.update(
             {
+                "metadata": {
+                    "annotations": {
+                        "koreo.realkinetic.com/managed-resources": encoded_resource_ids
+                    }
+                },
                 "status": {
                     "conditions": conditions,
                     "koreo": koreo_value,
                     "state": convert_bools(outcome),
-                }
+                },
             }
         )

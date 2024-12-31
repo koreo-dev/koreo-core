@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import NamedTuple, Sequence
 import asyncio
 import copy
 
@@ -22,14 +22,24 @@ TIMEOUT_RETRY_DELAY = 30
 UNKNOWN_ERROR_RETRY_DELAY = 60
 
 
+ResourceIds = dict | list["ResourceIds"] | None
+
+
+class Result(NamedTuple):
+    result: result.UnwrappedOutcome[celtypes.Value]
+    conditions: list[Condition]
+    resource_ids: dict[str, ResourceIds]
+
+
 async def reconcile_workflow(
     api: kr8s.Api,
     workflow_key: str,
     owner: tuple[str, dict],
     trigger: celtypes.Value,
     workflow: structure.Workflow,
-) -> tuple[result.UnwrappedOutcome[celtypes.Value], list[Condition]]:
+) -> Result:
     # This should block no-steps and any non-ok steps.
+    # TODO: Make sure to handle resource-ids so we don't cause a problem
     if not result.is_ok(workflow.steps_ready):
         updated_outcome = copy.deepcopy(workflow.steps_ready)
         updated_outcome.location = f"{workflow_key}:{updated_outcome.location}"
@@ -39,7 +49,7 @@ async def reconcile_workflow(
             outcome=updated_outcome,
             workflow_key=workflow_key,
         )
-        return (updated_outcome, [condition])
+        return Result(result=updated_outcome, conditions=[condition], resource_ids={})
 
     outcomes, conditions = await _reconcile_steps(
         api=api,
@@ -50,19 +60,23 @@ async def reconcile_workflow(
         trigger=trigger,
     )
 
+    outcome_results = {key: result.result for key, result in outcomes.items()}
+
+    outcome_resources = {key: result.resource_ids for key, result in outcomes.items()}
+
     conditions.extend(
         [
             _condition_helper(
                 condition_type=condition_spec.type_,
                 thing_name=condition_spec.name,
-                outcome=outcomes.get(condition_spec.step),
+                outcome=outcome_results.get(condition_spec.step),
                 workflow_key=workflow_key,
             )
             for condition_spec in workflow.status.conditions
         ]
     )
 
-    overall_outcome = result.unwrapped_combine(outcomes=outcomes.values())
+    overall_outcome = result.unwrapped_combine(outcomes=outcome_results.values())
     conditions.append(
         _condition_helper(
             condition_type="Ready",
@@ -73,17 +87,23 @@ async def reconcile_workflow(
     )
 
     if result.is_error(overall_outcome):
-        return (overall_outcome, conditions)
+        return Result(
+            result=overall_outcome,
+            conditions=conditions,
+            resource_ids=outcome_resources,
+        )
 
     ok_outcomes = celtypes.MapType(
         {
             celtypes.StringType(step): _outcome_encoder(outcome)
-            for step, outcome in outcomes.items()
+            for step, outcome in outcome_results.items()
         }
     )
 
     if not workflow.status.state:
-        return (ok_outcomes, conditions)
+        return Result(
+            result=ok_outcomes, conditions=conditions, resource_ids=outcome_resources
+        )
 
     try:
         state = workflow.status.state.evaluate(
@@ -93,29 +113,35 @@ async def reconcile_workflow(
             }
         )
     except Exception as err:
-        return (
-            result.PermFail(
+        return Result(
+            result=result.PermFail(
                 f"Error evaluating Workflow ({workflow_key}) state ({err})"
             ),
-            conditions,
+            conditions=conditions,
+            resource_ids=outcome_resources,
         )
 
-    return (state, conditions)
+    return Result(result=state, conditions=conditions, resource_ids=outcome_resources)
+
+
+class StepResult(NamedTuple):
+    result: result.Outcome[celtypes.Value] | result.UnwrappedOutcome[celtypes.Value]
+    resource_ids: ResourceIds = None
 
 
 async def _reconcile_config_step(
     api: kr8s.Api,
     workflow_key: str,
     step: structure.ConfigStep | structure.ErrorStep,
-    owner: tuple[str, celtypes.Value],
+    owner: tuple[str, dict],
     trigger: celtypes.Value,
-):
+) -> StepResult:
     location = f"{workflow_key}.{step.label}"
     if isinstance(step, structure.ErrorStep):
-        return step.outcome
+        return StepResult(result=step.outcome)
 
     if isinstance(step.logic, (result.PermFail, result.Retry)):
-        return step.logic
+        return StepResult(result=step.logic)
 
     if step.inputs:
         inputs = step.inputs.evaluate({"parent": trigger})
@@ -140,7 +166,7 @@ async def _reconcile_config_step(
 async def _reconcile_steps(
     api: kr8s.Api,
     workflow_key: str,
-    owner: tuple[str, celtypes.Value],
+    owner: tuple[str, dict],
     trigger: celtypes.Value,
     config_step: structure.ConfigStep | structure.ErrorStep | None,
     steps: Sequence[structure.Step | structure.ErrorStep],
@@ -149,7 +175,7 @@ async def _reconcile_steps(
         return {}, []
 
     outcome_map: dict[str, structure.StepConditionSpec | None] = {}
-    task_map: dict[str, asyncio.Task[result.UnwrappedOutcome]] = {}
+    task_map: dict[str, asyncio.Task[StepResult]] = {}
 
     try:
         async with asyncio.timeout(STEP_TIMEOUT), asyncio.TaskGroup() as task_group:
@@ -194,17 +220,19 @@ async def _reconcile_steps(
         # Exceptions will be processed for each task
         pass
 
-    outcomes = {}
+    outcomes: dict[str, StepResult] = {}
     conditions = []
 
     for task in task_map.values():
         task_name = task.get_name()
 
         if task.cancelled():
-            timeout_outcome = result.Retry(
-                message=f"Timeout running step ({task_name}), will retry.",
-                delay=TIMEOUT_RETRY_DELAY,
-                location=workflow_key,
+            timeout_outcome = StepResult(
+                result=result.Retry(
+                    message=f"Timeout running step ({task_name}), will retry.",
+                    delay=TIMEOUT_RETRY_DELAY,
+                    location=workflow_key,
+                )
             )
             outcomes[task_name] = timeout_outcome
             conditions.append(
@@ -217,10 +245,12 @@ async def _reconcile_steps(
             )
 
         elif task.exception():
-            error_outcome = result.Retry(
-                message=f"Unknown error ({task.exception()}) running Step ({task_name}), will retry.",
-                delay=UNKNOWN_ERROR_RETRY_DELAY,
-                location=workflow_key,
+            error_outcome = StepResult(
+                result=result.Retry(
+                    message=f"Unknown error ({task.exception()}) running Step ({task_name}), will retry.",
+                    delay=UNKNOWN_ERROR_RETRY_DELAY,
+                    location=workflow_key,
+                )
             )
             outcomes[task_name] = error_outcome
             conditions.append(
@@ -266,14 +296,14 @@ async def _reconcile_step(
     api: kr8s.Api,
     workflow_key: str,
     step: structure.Step | structure.ErrorStep,
-    dependencies: list[asyncio.Task[result.UnwrappedOutcome]],
-    owner: tuple[str, celtypes.Value],
+    dependencies: list[asyncio.Task[StepResult]],
+    owner: tuple[str, dict],
     trigger: celtypes.Value,
-):
+) -> StepResult:
     location = f"{workflow_key}.{step.label}"
 
     if isinstance(step, structure.ErrorStep):
-        return step.outcome
+        return StepResult(result=step.outcome)
 
     if not dependencies:
         if step.inputs:
@@ -294,10 +324,12 @@ async def _reconcile_step(
     [resolved, pending] = await asyncio.wait(dependencies)
     if pending:
         timed_out_tasks = ", ".join(task.get_name() for task in pending)
-        return result.Retry(
-            message=f"Timeout running Workflow Steps ({timed_out_tasks}), will retry.",
-            delay=15,
-            location=location,
+        return StepResult(
+            result=result.Retry(
+                message=f"Timeout running Workflow Steps ({timed_out_tasks}), will retry.",
+                delay=15,
+                location=location,
+            )
         )
 
     ok_outcomes = celtypes.MapType()
@@ -305,37 +337,45 @@ async def _reconcile_step(
     for task in resolved:
         step_label = task.get_name()
         step_result = task.result()
-        match step_result:
+        match step_result.result:
             case result.DepSkip(message=skip_message, location=skip_location):
-                return result.DepSkip(
-                    f"'{step_label}' is waiting on dependency ({skip_message} at {skip_location}).",
-                    location=location,
+                return StepResult(
+                    result=result.DepSkip(
+                        f"'{step_label}' is waiting on dependency ({skip_message} at {skip_location}).",
+                        location=location,
+                    )
                 )
 
             case result.Skip(message=skip_message, location=skip_location):
-                return result.DepSkip(
-                    f"'{step_label}' was skipped ({skip_message} at {skip_location}).",
-                    location=location,
+                return StepResult(
+                    result=result.DepSkip(
+                        f"'{step_label}' was skipped ({skip_message} at {skip_location}).",
+                        location=location,
+                    )
                 )
 
             case result.Retry(message=retry_message, location=retry_location):
-                return result.DepSkip(
-                    f"'{step_label}' is waiting ({retry_message} at {retry_location}).",
-                    location=location,
+                return StepResult(
+                    result=result.DepSkip(
+                        f"'{step_label}' is waiting ({retry_message} at {retry_location}).",
+                        location=location,
+                    )
                 )
 
             case result.PermFail(message=fail_message, location=fail_location):
-                return result.DepSkip(
-                    f"'{step_label}' is in failure state ({fail_message} at {fail_location}).",
-                    location=location,
+                return StepResult(
+                    result=result.DepSkip(
+                        f"'{step_label}' is in failure state ({fail_message} at {fail_location}).",
+                        location=location,
+                    )
                 )
 
             case result.Ok(data=data):
                 ok_outcomes[celtypes.StringType(step_label)] = data
 
-            case _:
+            case _ as data:
                 # This should be an UnwrappedOutcome (Ok)
-                ok_outcomes[celtypes.StringType(step_label)] = step_result
+                ok_outcomes[celtypes.StringType(step_label)] = data
 
     if not step.inputs:
         inputs = celtypes.MapType()
@@ -369,7 +409,7 @@ async def _reconcile_step_logic(
     api: kr8s.Api,
     workflow_key: str,
     trigger: celtypes.Value,
-    owner: tuple[str, celtypes.Value],
+    owner: tuple[str, dict],
     inputs: celtypes.Value,
     location: str,
     logic: (
@@ -379,41 +419,46 @@ async def _reconcile_step_logic(
         | structure.Workflow
         | result.ErrorOutcome
     ),
-):
+) -> StepResult:
     match logic:
         case structure.Workflow():
-            workflow, _ = await reconcile_workflow(
+            workflow, _, resource_ids = await reconcile_workflow(
                 api=api,
                 workflow_key=workflow_key,
                 owner=owner,
                 trigger=inputs,
                 workflow=logic,
             )
-            return workflow
+            return StepResult(result=workflow, resource_ids=resource_ids)
         case structure.ResourceFunction():
-            return await reconcile_resource_function(
+            result, resource_id = await reconcile_resource_function(
                 api=api,
                 location=location,
                 function=logic,
                 owner=owner,
                 inputs=inputs,
             )
+            return StepResult(result=result, resource_ids=resource_id)
         case structure.ValueFunction():
-            return await reconcile_value_function(
-                location=location,
-                function=logic,
-                inputs=inputs,
+            return StepResult(
+                result=await reconcile_value_function(
+                    location=location,
+                    function=logic,
+                    inputs=inputs,
+                )
             )
         case structure.Function():
-            return await reconcile_function(
-                api=api,
-                location=location,
-                function=logic,
-                trigger=trigger,
-                inputs=inputs,
+            return StepResult(
+                result=await reconcile_function(
+                    api=api,
+                    location=location,
+                    function=logic,
+                    trigger=trigger,
+                    inputs=inputs,
+                )
             )
 
-    return logic
+    return StepResult(result=logic)
 
 
 async def _reconcile_mapped_function(
@@ -422,21 +467,23 @@ async def _reconcile_mapped_function(
     workflow_key: str,
     location: str,
     steps: celtypes.MapType,
-    owner: tuple[str, celtypes.Value],
+    owner: tuple[str, dict],
     inputs: celtypes.Value,
     trigger: celtypes.Value,
-) -> result.UnwrappedOutcome[celtypes.ListType]:
+) -> StepResult:
     assert step.mapped_input
 
     source_iterator = step.mapped_input.source_iterator.evaluate({"steps": steps})
 
     if not isinstance(source_iterator, celtypes.ListType):
-        return result.PermFail(
-            message=f"Workflow Mapped Step source must be a list-type.",
-            location=location,
+        return StepResult(
+            result=result.PermFail(
+                message=f"Workflow Mapped Step source must be a list-type.",
+                location=location,
+            )
         )
 
-    tasks: list[asyncio.Task[result.UnwrappedOutcome[celtypes.Value]]] = []
+    tasks: list[asyncio.Task[StepResult]] = []
 
     async with asyncio.TaskGroup() as task_group:
         for idx, map_value in enumerate(source_iterator):
@@ -460,22 +507,30 @@ async def _reconcile_mapped_function(
     done, pending = await asyncio.wait(tasks)
     if pending:
         timed_out_tasks = ", ".join(task.get_name() for task in pending)
-        return result.Retry(
-            message=f"Timeout running Workflow Mapped Step ({timed_out_tasks}), will retry.",
-            delay=15,
-            location=location,
+        return StepResult(
+            result=result.Retry(
+                message=f"Timeout running Workflow Mapped Step ({timed_out_tasks}), will retry.",
+                delay=15,
+                location=location,
+            )
         )
 
     outcomes = [task.result() for task in done]
 
     error_outcome = result.combine(
-        [outcome for outcome in outcomes if result.is_error(outcome)]
+        [outcome.result for outcome in outcomes if result.is_error(outcome.result)]
     )
+    resource_ids = [outcome.resource_ids for outcome in outcomes]
 
     if result.is_error(error_outcome):
-        return error_outcome
+        return StepResult(result=error_outcome, resource_ids=resource_ids)
 
-    return celtypes.ListType([_outcome_encoder(outcome) for outcome in outcomes])
+    return StepResult(
+        result=celtypes.ListType(
+            [_outcome_encoder(outcome.result) for outcome in outcomes]
+        ),
+        resource_ids=resource_ids,
+    )
 
 
 def _condition_helper(
