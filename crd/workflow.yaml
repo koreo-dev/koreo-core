@@ -19,6 +19,7 @@ spec:
           properties:
             spec:
               type: object
+              nullable: false
               properties:
                 crdRef:
                   nullable: false
@@ -35,7 +36,7 @@ spec:
                       nullable: false
                   required: [apiGroup, version, kind]
                 configStep:
-                  nullable: true
+                  nullable: false
                   type: object
                   properties:
                     label:
@@ -69,9 +70,9 @@ spec:
                     inputs:
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
-                      nullable: true
+                      nullable: false
                     condition:
-                      nullable: true
+                      nullable: false
                       type: object
                       properties:
                         type:
@@ -92,7 +93,7 @@ spec:
                     - required: [functionRef]
                     - required: [workflowRef]
                 steps:
-                  nullable: true
+                  nullable: false
                   type: array
                   maxItems: 20
                   items:
@@ -125,23 +126,23 @@ spec:
                             type: string
                             nullable: false
                         required: [name]
-                      mappedInput:
+                      forEach:
                         type: object
-                        nullable: true
+                        nullable: false
                         properties:
-                          source:
+                          itemIn:
                             type: string
                             nullable: false
                           inputKey:
                             type: string
                             nullable: false
-                        required: [source, inputKey]
+                        required: [itemIn, inputKey]
                       inputs:
                         type: object
                         x-kubernetes-preserve-unknown-fields: true
-                        nullable: true
+                        nullable: false
                       condition:
-                        nullable: true
+                        nullable: false
                         type: object
                         properties:
                           type:
@@ -158,16 +159,17 @@ spec:
                             x-kubernetes-validations:
                               - rule: "!self.startsWith('=')"
                                 message: "name may not be a CEL expression."
+                        required: [type, name]
                     required: [label]
                     oneOf:
                       - required: [functionRef]
                       - required: [workflowRef]
                 status:
                   type: object
-                  nullable: true
+                  nullable: false
                   properties:
                     conditions:
-                      nullable: true
+                      nullable: false
                       type: array
                       maxItems: 20
                       items:
@@ -189,7 +191,7 @@ spec:
                                 message: "name may not be a CEL expression."
                           step:
                             type: string
-                            nullable: true
+                            nullable: false
                             maxLength: 40
                             x-kubernetes-validations:
                               - rule: self.matches("^[[:word:]]+$")
@@ -197,10 +199,8 @@ spec:
                         required: [type, name, step]
                     state:
                       type: object
-                      nullable: true
+                      nullable: false
                       maxProperties: 50
-                      additionalProperties:
-                        type: string
               x-kubernetes-validations:
                 - rule: |
                     !has(self.status) ||

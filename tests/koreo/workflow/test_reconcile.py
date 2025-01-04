@@ -31,7 +31,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
             steps=[
                 workflow_structure.Step(
                     label="input_source",
-                    mapped_input=None,
+                    for_each=None,
                     inputs=None,
                     dynamic_input_keys=[],
                     logic=function_structure.Function(
@@ -55,11 +55,12 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                         dynamic_input_keys=used_vars,
                     ),
                     condition=None,
+                    state=None,
                 )
             ],
         )
 
-        value, conditions = await reconcile.reconcile_workflow(
+        value, conditions, resource_ids = await reconcile.reconcile_workflow(
             api=None,
             workflow_key="test-case",
             owner=("unit-tests", celtypes.MapType({"uid": "sam-123"})),
@@ -91,7 +92,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
             steps=[
                 workflow_structure.Step(
                     label="sub_step",
-                    mapped_input=None,
+                    for_each=None,
                     inputs=None,
                     dynamic_input_keys=[],
                     logic=function_structure.Function(
@@ -118,10 +119,11 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                         dynamic_input_keys=set(),
                     ),
                     condition=None,
+                    state=None,
                 ),
                 workflow_structure.Step(
                     label="sub_step_two",
-                    mapped_input=None,
+                    for_each=None,
                     inputs=None,
                     dynamic_input_keys=[],
                     logic=function_structure.Function(
@@ -146,6 +148,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                         dynamic_input_keys=set(),
                     ),
                     condition=None,
+                    state=None,
                 ),
             ],
         )
@@ -160,16 +163,17 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
             steps=[
                 workflow_structure.Step(
                     label="sub_workflow",
-                    mapped_input=None,
+                    for_each=None,
                     inputs=None,
                     dynamic_input_keys=[],
                     logic=sub_workflow,
                     condition=None,
+                    state=None,
                 )
             ],
         )
 
-        value, conditions = await reconcile.reconcile_workflow(
+        value, conditions, resource_ids = await reconcile.reconcile_workflow(
             api=None,
             workflow_key="test-case",
             owner=("unit-tests", celtypes.MapType({"uid": "sam-123"})),

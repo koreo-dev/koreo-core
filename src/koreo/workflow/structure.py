@@ -3,7 +3,7 @@ from typing import NamedTuple, Sequence
 
 import celpy
 
-from koreo.result import Outcome, ErrorOutcome
+from koreo.result import NonOkOutcome, Outcome
 
 from koreo.function.structure import Function
 from koreo.resource_function.structure import ResourceFunction
@@ -16,11 +16,6 @@ class ConfigCRDRef(NamedTuple):
     kind: str
 
 
-class MappedInput(NamedTuple):
-    source_iterator: celpy.Runner
-    input_key: str
-
-
 class StepConditionSpec(NamedTuple):
     type_: str
     name: str
@@ -28,28 +23,36 @@ class StepConditionSpec(NamedTuple):
 
 class ConfigStep(NamedTuple):
     label: str
-    logic: ResourceFunction | ValueFunction | Function | Workflow | ErrorOutcome
+    logic: ResourceFunction | ValueFunction | Function | Workflow | NonOkOutcome
 
     inputs: celpy.Runner | None
 
     condition: StepConditionSpec | None
+    state: celpy.Runner | None
 
 
 class Step(NamedTuple):
     label: str
-    logic: ResourceFunction | ValueFunction | Function | Workflow | ErrorOutcome
+    logic: ResourceFunction | ValueFunction | Function | Workflow | NonOkOutcome
 
-    mapped_input: MappedInput | None
+    for_each: ForEach | None
     inputs: celpy.Runner | None
+
+    condition: StepConditionSpec | None
+    state: celpy.Runner | None
 
     dynamic_input_keys: Sequence[str]
 
+
+class ForEach(NamedTuple):
+    source_iterator: celpy.Runner
+    input_key: str
     condition: StepConditionSpec | None
 
 
 class ErrorStep(NamedTuple):
     label: str
-    outcome: Outcome
+    outcome: NonOkOutcome
 
     condition: StepConditionSpec | None
 

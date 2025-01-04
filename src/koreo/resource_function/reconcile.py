@@ -93,18 +93,18 @@ async def reconcile_resource_function(
     #########################
 
     return Result(
-        outcome=_reconcile_outcome(outcome=function.outcome, inputs=full_inputs),
+        outcome=_reconcile_outcome(outcome=function.outcome, inputs=full_inputs, name=location),
         resource_id=reconcile_result.resource_id,
     )
 
 
-def _reconcile_outcome(outcome: structure.Outcome, inputs: dict[str, celtypes.Value]):
+def _reconcile_outcome(outcome: structure.Outcome, inputs: dict[str, celtypes.Value], name: str):
     if err := evaluate_predicates(
-        predicates=outcome.validators, inputs=inputs, location="spec.outcome.validators"
+        predicates=outcome.validators, inputs=inputs, location=f"{name}:spec.outcome.validators"
     ):
         return err
 
-    return evaluate(outcome.return_value, inputs=inputs, location="spec.outcome.return")
+    return evaluate(outcome.return_value, inputs=inputs, location=f"{name}:spec.outcome.return")
 
 
 class ReconcileResult(NamedTuple):

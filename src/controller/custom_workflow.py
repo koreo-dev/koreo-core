@@ -92,6 +92,7 @@ def start_controller(group: str, kind: str, version: str):
 
         conditions: list[Condition] = status.get("conditions", [])
 
+        # TODO: We're going to allow exactly one workflow / trigger
         if len(workflow_keys) > 1:
             message = f"Multiple Workflows attempted to run ({','.join(workflow_keys)})"
             condition = Condition(
