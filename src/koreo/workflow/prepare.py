@@ -8,9 +8,10 @@ import celpy
 
 from koreo import ref_helpers
 from koreo import registry
+from koreo import schema
 from koreo.cache import get_resource_from_cache
-from koreo.cel.encoder import encode_cel
-from koreo.cel.functions import koreo_cel_functions, koreo_function_annotations
+from koreo.cel.functions import koreo_function_annotations
+from koreo.cel.prepare import prepare_expression, prepare_map_expression
 from koreo.cel.structure_extractor import extract_argument_structure
 from koreo.function.structure import Function
 from koreo.resource_function.structure import ResourceFunction
@@ -20,7 +21,8 @@ from koreo.result import (
     PermFail,
     Retry,
     UnwrappedOutcome,
-    is_error,
+    is_ok,
+    is_unwrapped_ok,
     unwrapped_combine,
 )
 from koreo.value_function.structure import ValueFunction
@@ -38,12 +40,17 @@ logger = logging.getLogger("koreo.workflow")
 
 
 async def prepare_workflow(
-    cache_key: str, spec: dict | None
+    cache_key: str, spec: dict
 ) -> UnwrappedOutcome[tuple[structure.Workflow, Sequence[registry.Resource]]]:
-    logger.info(f"Prepare workflow {cache_key}")
+    logger.debug(f"Prepare workflow {cache_key}")
 
-    if not spec:
-        spec = {}
+    if error := schema.validate(
+        resource_type=structure.Workflow, spec=spec, validation_required=True
+    ):
+        return PermFail(
+            message=error.message,
+            location=_location(cache_key, "spec"),
+        )
 
     cel_env = celpy.Environment(annotations=koreo_function_annotations)
 
@@ -60,7 +67,7 @@ async def prepare_workflow(
         config_step_label = None
 
     if config_step_spec:
-        location_base = f"Workflow:{cache_key}:configStep"
+        location_base = _location(cache_key, "spec.configStep")
         match ref_helpers.function_or_workflow_to_resource(
             config_step_spec, location_base=location_base
         ):
@@ -143,16 +150,28 @@ async def prepare_workflow(
             group=crd_ref.api_group, kind=crd_ref.kind, version=crd_ref.version
         )
 
+    status = _build_status(cel_env=cel_env, status_spec=spec.get("status"))
+    if not is_unwrapped_ok(status):
+        return status
+
     return (
         structure.Workflow(
             crd_ref=crd_ref,
             config_step=config_step,
             steps_ready=all_steps_ready,
             steps=steps,
-            status=_build_status(cel_env=cel_env, status_spec=spec.get("status")),
+            status=status,
         ),
         tuple(watched_resources),
     )
+
+
+def _location(cache_key: str, extra: str | None = None) -> str:
+    base = f"prepare:Workflow:{cache_key}"
+    if not extra:
+        return base
+
+    return f"{base}:{extra}"
 
 
 class WorkflowDeleteor: ...
@@ -239,7 +258,7 @@ def _load_config_step(
     if workflow_ref:
         logic_cache_key, logic = _load_workflow(step_label, workflow_ref)
 
-    if is_error(logic):
+    if not is_unwrapped_ok(logic):
         return structure.ErrorStep(label=step_label, outcome=logic, condition=None)
 
     if not (logic_cache_key and logic):
@@ -252,43 +271,28 @@ def _load_config_step(
         )
 
     input_mapper_spec = step_spec.get("inputs")
-    if not input_mapper_spec:
-        input_mapper = None
-    else:
-        encoded_input_extractor = encode_cel(input_mapper_spec)
-
-        try:
-            input_mapper_expression = cel_env.compile(encoded_input_extractor)
-        except celpy.CELParseError as err:
+    match prepare_map_expression(
+        cel_env=cel_env, spec=input_mapper_spec, name="spec.configStep.inputs"
+    ):
+        case None:
+            input_mapper = None
+            dynamic_input_keys: set[str] = set()
+        case celpy.Runner() as input_mapper:
+            used_vars = extract_argument_structure(input_mapper.ast)
+            dynamic_input_keys: set[str] = {
+                match.group("name")
+                for match in (STEPS_NAME_PATTERN.match(key) for key in used_vars)
+                if match
+            }
+        case PermFail(message=message):
             return structure.ErrorStep(
                 label=step_label,
                 outcome=PermFail(
-                    message=f"CELParseError {err} parsing inputs ({encoded_input_extractor})",
+                    message=message,
                     location=f"{step_label}:{logic_cache_key}",
                 ),
                 condition=None,
             )
-
-        used_vars = extract_argument_structure(input_mapper_expression)
-
-        dynamic_input_keys: set[str] = {
-            match.group("name")
-            for match in (STEPS_NAME_PATTERN.match(key) for key in used_vars)
-            if match
-        }
-        if dynamic_input_keys:
-            return structure.ErrorStep(
-                label=step_label,
-                outcome=PermFail(
-                    message=f"Config step ('{step_label}'), may not reference "
-                    f"steps ({dynamic_input_keys}). Can not prepare Workflow."
-                ),
-                condition=None,
-            )
-
-        input_mapper = cel_env.program(
-            input_mapper_expression, functions=koreo_cel_functions
-        )
 
     condition_spec = step_spec.get("condition")
     if not condition_spec:
@@ -299,11 +303,45 @@ def _load_config_step(
             name=condition_spec.get("name"),
         )
 
+    state_spec = step_spec.get("state")
+    match prepare_map_expression(
+        cel_env=cel_env, spec=state_spec, name="spec.configStep.state"
+    ):
+        case None:
+            state = None
+        case celpy.Runner() as state:
+            used_vars = extract_argument_structure(state.ast)
+            dynamic_input_keys: set[str] = {
+                match.group("name")
+                for match in (STEPS_NAME_PATTERN.match(key) for key in used_vars)
+                if match
+            }
+        case PermFail(message=message):
+            return structure.ErrorStep(
+                label=step_label,
+                outcome=PermFail(
+                    message=message,
+                    location=f"{step_label}:{logic_cache_key}",
+                ),
+                condition=None,
+            )
+
+    if dynamic_input_keys:
+        return structure.ErrorStep(
+            label=step_label,
+            outcome=PermFail(
+                message=f"Config step ('{step_label}'), may not reference "
+                f"steps ({dynamic_input_keys}). Can not prepare Workflow."
+            ),
+            condition=None,
+        )
+
     return structure.ConfigStep(
         label=step_label,
         logic=logic,
         inputs=input_mapper,
         condition=condition,
+        state=state,
     )
 
 
@@ -351,7 +389,7 @@ def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str
     if not step_label:
         return structure.ErrorStep(
             label="missing",
-            outcome=PermFail(message=f"Missing step-label can not prepare Workflow."),
+            outcome=PermFail(message="Missing step-label, can not prepare Workflow."),
             condition=None,
         )
 
@@ -366,7 +404,7 @@ def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str
     if workflow_ref:
         logic_cache_key, logic = _load_workflow(step_label, workflow_ref)
 
-    if is_error(logic):
+    if not is_unwrapped_ok(logic):
         return structure.ErrorStep(label=step_label, outcome=logic, condition=None)
 
     if not (logic_cache_key and logic):
@@ -378,70 +416,38 @@ def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str
             condition=None,
         )
 
-    mapped_input_spec = step_spec.get("mappedInput")
-    if not mapped_input_spec:
-        mapped_input = None
-        dynamic_input_keys = set()
-    else:
-        source_iterator = mapped_input_spec.get("source")
-        encoded_source_iterator = encode_cel(source_iterator)
-
-        source_iterator_expression = cel_env.compile(encoded_source_iterator)
-        used_vars = extract_argument_structure(source_iterator_expression)
-
-        dynamic_input_keys: set[str] = {
-            match.group("name")
-            for match in (STEPS_NAME_PATTERN.match(key) for key in used_vars)
-            if match
-        }
-
-        mapped_input = structure.MappedInput(
-            source_iterator=cel_env.program(
-                source_iterator_expression, functions=koreo_cel_functions
-            ),
-            input_key=mapped_input_spec.get("inputKey"),
-        )
+    for_each_spec = step_spec.get("forEach")
+    match _prepare_for_each(cel_env=cel_env, step_label=step_label, spec=for_each_spec):
+        case None:
+            for_each = None
+            dynamic_input_keys = set()
+        case structure.ErrorStep() as error:
+            return error
+        case (structure.ForEach() as for_each, dynamic_input_keys):
+            # Need for_each and dynamic_input_keys
+            pass
 
     input_mapper_spec = step_spec.get("inputs")
-    if not input_mapper_spec:
-        input_mapper = None
-    else:
-        encoded_input_extractor = encode_cel(input_mapper_spec)
-
-        try:
-            input_mapper_expression = cel_env.compile(encoded_input_extractor)
-        except celpy.CELParseError as err:
+    match prepare_map_expression(
+        cel_env=cel_env, spec=input_mapper_spec, name=f"{step_label}.inputs"
+    ):
+        case None:
+            input_mapper = None
+        case celpy.Runner() as input_mapper:
+            dynamic_input_keys.update(
+                match.group("name")
+                for match in (
+                    STEPS_NAME_PATTERN.match(key)
+                    for key in extract_argument_structure(input_mapper.ast)
+                )
+                if match
+            )
+        case PermFail() as failure:
             return structure.ErrorStep(
                 label=step_label,
-                outcome=PermFail(
-                    message=f"CELParseError {err} parsing inputs ({encoded_input_extractor})",
-                    location=f"{step_label}:{logic_cache_key}",
-                ),
+                outcome=failure,
                 condition=None,
             )
-
-        used_vars = extract_argument_structure(input_mapper_expression)
-
-        dynamic_input_keys.update(
-            match.group("name")
-            for match in (STEPS_NAME_PATTERN.match(key) for key in used_vars)
-            if match
-        )
-
-        input_mapper = cel_env.program(
-            input_mapper_expression, functions=koreo_cel_functions
-        )
-
-    out_of_order_steps = dynamic_input_keys.difference(known_steps)
-    if out_of_order_steps:
-        return structure.ErrorStep(
-            label=step_label,
-            outcome=PermFail(
-                message=f"Function ({logic_cache_key}), must come after {', '.join(out_of_order_steps)}.",
-                location=f"{step_label}:{logic_cache_key}",
-            ),
-            condition=None,
-        )
 
     condition_spec = step_spec.get("condition")
     if not condition_spec:
@@ -452,14 +458,113 @@ def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str
             name=condition_spec.get("name"),
         )
 
+    state_spec = step_spec.get("state")
+    match prepare_map_expression(
+        cel_env=cel_env, spec=state_spec, name=f"step:{step_label}.state"
+    ):
+        case None:
+            state = None
+        case celpy.Runner() as state:
+            dynamic_input_keys.update(
+                match.group("name")
+                for match in (
+                    STEPS_NAME_PATTERN.match(key)
+                    for key in extract_argument_structure(state.ast)
+                )
+                if match
+            )
+        case PermFail() as failure:
+            return structure.ErrorStep(
+                label=step_label,
+                outcome=failure,
+                condition=None,
+            )
+
+    out_of_order_steps = dynamic_input_keys.difference(known_steps)
+    if out_of_order_steps:
+        return structure.ErrorStep(
+            label=step_label,
+            outcome=PermFail(
+                message=f"Step ({logic_cache_key}), must come after {', '.join(out_of_order_steps)}.",
+                location=f"{step_label}:{logic_cache_key}",
+            ),
+            condition=None,
+        )
+
     return structure.Step(
         label=step_label,
         logic=logic,
-        mapped_input=mapped_input,
+        for_each=for_each,
         inputs=input_mapper,
         dynamic_input_keys=tuple(dynamic_input_keys),
         condition=condition,
+        state=state,
     )
+
+
+def _prepare_for_each(
+    cel_env: celpy.Environment,
+    step_label: str,
+    spec: dict | None,
+) -> None | structure.ErrorStep | tuple[structure.ForEach, set[str]]:
+    if not spec:
+        return None
+
+    source_iterator_spec = spec.get("itemIn")
+    match prepare_expression(
+        cel_env=cel_env, spec=source_iterator_spec, name=f"{step_label}.forEach.itemIn"
+    ):
+        case None:
+            return structure.ErrorStep(
+                label=step_label,
+                outcome=PermFail(
+                    message=f"Empty `{step_label}.forEach.itemIn`, can not prepare Workflow."
+                ),
+                condition=None,
+            )
+        case PermFail(message=message):
+            return structure.ErrorStep(
+                label=step_label,
+                outcome=PermFail(
+                    message=f"Error preparing `{step_label}.forEach.itemIn`: {message}."
+                ),
+                condition=None,
+            )
+        case celpy.Runner() as source_iterator:
+            used_vars = extract_argument_structure(source_iterator.ast)
+
+    input_key = spec.get("inputKey")
+    if not input_key:
+        return structure.ErrorStep(
+            label=step_label,
+            outcome=PermFail(
+                message=f"Missing `{step_label}.forEach.inputKey`, can not prepare Workflow."
+            ),
+            condition=None,
+        )
+
+    condition_spec = spec.get("condition")
+    if not condition_spec:
+        condition = None
+    else:
+        condition = structure.StepConditionSpec(
+            type_=condition_spec.get("type"),
+            name=condition_spec.get("name"),
+        )
+
+    dynamic_input_keys: set[str] = {
+        match.group("name")
+        for match in (STEPS_NAME_PATTERN.match(key) for key in used_vars)
+        if match
+    }
+
+    for_each = structure.ForEach(
+        source_iterator=source_iterator,
+        input_key=input_key,
+        condition=condition,
+    )
+
+    return (for_each, dynamic_input_keys)
 
 
 def _load_function(step_label: str, function_ref: dict):
@@ -468,50 +573,48 @@ def _load_function(step_label: str, function_ref: dict):
 
     if not function_kind:
         return function_cache_key, PermFail(
-            message=f"Missing functionRef Kind, can not prepare Workflow.",
-            location=f"{step_label}:{function_cache_key if function_cache_key else 'missing'}",
+            message=f"Missing `{step_label}.functionRef.kind`, can not prepare Workflow.",
+            location=f"{step_label}:<missing>:{function_cache_key if function_cache_key else '<missing>'}",
         )
 
     if not function_cache_key:
         return function_cache_key, PermFail(
-            message=f"Missing Function name, can not prepare Workflow.",
-            location=f"{step_label}:missing",
+            message=f"Missing `{step_label}.functionRef.name`, can not prepare Workflow.",
+            location=f"{step_label}:{function_kind}:<missing>",
         )
 
-    if function_kind == "ValueFunction":
-        function = get_resource_from_cache(
-            resource_class=ValueFunction,
-            cache_key=function_cache_key,
-        )
-    elif function_kind == "ResourceFunction":
-        function = get_resource_from_cache(
-            resource_class=ResourceFunction,
-            cache_key=function_cache_key,
-        )
-    elif function_kind == "Function":
-        function = get_resource_from_cache(
-            resource_class=Function,
-            cache_key=function_cache_key,
-        )
-    else:
+    function_kind_map = {
+        "ValueFunction": ValueFunction,
+        "ResourceFunction": ResourceFunction,
+        "Function": Function,
+    }
+
+    function_class = function_kind_map.get(function_kind)
+    if not function_class:
         return function_cache_key, PermFail(
-            message=f"Invalid Function kind ({function_kind}), can not prepare Workflow.",
-            location=f"{step_label}:{function_cache_key}",
+            message=f"Invalid `{step_label}.functionRef.kind` ({function_kind}), can not prepare Workflow.",
+            location=f"{step_label}:{function_kind}:{function_cache_key}",
         )
+
+    function = get_resource_from_cache(
+        resource_class=function_class,
+        cache_key=function_cache_key,
+    )
 
     if not function:
         return function_cache_key, Retry(
-            message=f"Missing Function ({function_cache_key}), can not prepare Workflow.",
+            message=f"Missing {function_kind}:{function_cache_key}, can not prepare Workflow.",
             delay=15,
-            location=f"{step_label}:{function_cache_key}",
+            location=f"{step_label}:{function_kind}:{function_cache_key}",
         )
 
-    if is_error(function):
+    if not is_unwrapped_ok(function):
         return function_cache_key, Retry(
-            message=f"Function ({function_cache_key}) is not healthy ({function.message}). Workflow prepare will retry.",
+            message=f"{function_kind}:{function_cache_key} is not healthy ({function.message}). Workflow prepare will retry.",
             delay=180,
-            location=f"{step_label}:{function_cache_key}",
+            location=f"{step_label}:{function_kind}:{function_cache_key}",
         )
+
     return function_cache_key, function
 
 
@@ -519,41 +622,55 @@ def _load_workflow(step_label: str, workflow_ref: dict):
     workflow_cache_key = workflow_ref.get("name")
     if not workflow_cache_key:
         return workflow_cache_key, PermFail(
-            message=f"Missing Workflow name, can not prepare Workflow.",
-            location=f"{step_label}",
+            message=f"Missing `{step_label}.workflowRef.name`, can not prepare Workflow.",
+            location=f"{step_label}:<missing>",
         )
 
     workflow = get_resource_from_cache(
         resource_class=structure.Workflow,
         cache_key=workflow_cache_key,
     )
+
     if not workflow:
         return workflow_cache_key, Retry(
-            message=f"Missing Workflow ({workflow_cache_key}), can not prepare Workflow.",
+            message=f"Missing Workflow:{workflow_cache_key}, can not prepare Workflow.",
             delay=15,
-            location=f"{step_label}:{workflow_cache_key}",
+            location=f"{step_label}:Workflow:{workflow_cache_key}",
         )
 
-    if is_error(workflow.steps_ready):
+    if not is_unwrapped_ok(workflow):
         return workflow_cache_key, Retry(
-            message=f"Workflow ({workflow_cache_key}) is not healthy ({workflow.steps_ready.message}). Workflow prepare will retry.",
+            message=f"Workflow {workflow_cache_key} is not ready ({workflow.message}). Workflow prepare will retry.",
             delay=180,
-            location=f"{step_label}:{workflow_cache_key}",
+            location=f"{step_label}:Workflow:{workflow_cache_key}",
         )
+
+    if not is_ok(workflow.steps_ready):
+        return workflow_cache_key, Retry(
+            message=f"Workflow {workflow_cache_key} is not healthy ({workflow.steps_ready.message}). Workflow prepare will retry.",
+            delay=180,
+            location=f"{step_label}:Workflow:{workflow_cache_key}",
+        )
+
     return workflow_cache_key, workflow
 
 
 def _build_status(
     cel_env: celpy.Environment, status_spec: dict | None
-) -> structure.Status:
+) -> structure.Status | PermFail:
     if not status_spec:
         return structure.Status(conditions=[], state=None)
 
     state_spec = status_spec.get("state")
-    if not state_spec:
-        state = None
-    else:
-        state = cel_env.program(cel_env.compile(encode_cel(state_spec)))
+    match prepare_map_expression(
+        cel_env=cel_env, spec=state_spec, name="spec.status.state"
+    ):
+        case None:
+            state = None
+        case celpy.Runner() as state:
+            pass
+        case PermFail() as failure:
+            return failure
 
     conditions_spec = status_spec.get("conditions")
     if not conditions_spec:

@@ -9,7 +9,7 @@ from celpy import celtypes
 from resources.k8s.conditions import Condition
 
 from koreo import result
-
+from koreo.cel.evaluation import evaluate
 from koreo.function.reconcile import reconcile_function
 from koreo.resource_function.reconcile import reconcile_resource_function
 from koreo.value_function.reconcile import reconcile_value_function
@@ -105,22 +105,14 @@ async def reconcile_workflow(
             result=ok_outcomes, conditions=conditions, resource_ids=outcome_resources
         )
 
-    try:
-        state = workflow.status.state.evaluate(
-            {
-                "trigger": trigger,
-                "steps": ok_outcomes,
-            }
-        )
-    except Exception as err:
-        return Result(
-            result=result.PermFail(
-                f"Error evaluating Workflow ({workflow_key}) state ({err})"
-            ),
-            conditions=conditions,
-            resource_ids=outcome_resources,
-        )
-
+    state = evaluate(
+        expression=workflow.status.state,
+        inputs={
+            "parent": trigger,
+            "steps": ok_outcomes,
+        },
+        location=f"{workflow_key}:spec.status.state",
+    )
     return Result(result=state, conditions=conditions, resource_ids=outcome_resources)
 
 
@@ -136,21 +128,35 @@ async def _reconcile_config_step(
     owner: tuple[str, dict],
     trigger: celtypes.Value,
 ) -> StepResult:
-    location = f"{workflow_key}.{step.label}"
+    location = f"{workflow_key}.spec.configStep"
+
     if isinstance(step, structure.ErrorStep):
         return StepResult(result=step.outcome)
 
-    if isinstance(step.logic, (result.PermFail, result.Retry)):
+    if not result.is_unwrapped_ok(step.logic):
         return StepResult(result=step.logic)
 
-    if step.inputs:
-        inputs = step.inputs.evaluate({"parent": trigger})
-    else:
+    if not step.inputs:
         inputs = celtypes.MapType()
 
-    inputs[celtypes.StringType("parent")] = trigger
+    else:
+        inputs = evaluate(
+            expression=step.inputs,
+            inputs={"parent": trigger},
+            location=f"{location}.inputs",
+        )
+        if not result.is_unwrapped_ok(inputs):
+            return StepResult(result=inputs)
 
-    # TODO: More robust error handling here?
+    if not isinstance(inputs, celtypes.MapType):
+        return StepResult(
+            result=result.PermFail(
+                message=f"Bad inputs type {type(inputs)}, expected map-type",
+                location=f"{location}.inputs",
+            )
+        )
+
+    inputs[celtypes.StringType("parent")] = trigger
 
     return await _reconcile_step_logic(
         api=api,
@@ -200,6 +206,7 @@ async def _reconcile_steps(
                                 task_map[dependency]
                                 for dependency in dynamic_input_keys
                             ]
+
                         case structure.ErrorStep():
                             # TODO: Could probably short-circuit here and set step.outcome?
                             step_dependencies = []
@@ -300,16 +307,22 @@ async def _reconcile_step(
     owner: tuple[str, dict],
     trigger: celtypes.Value,
 ) -> StepResult:
-    location = f"{workflow_key}.{step.label}"
+    location = f"{workflow_key}.spec.steps.{step.label}"
 
     if isinstance(step, structure.ErrorStep):
         return StepResult(result=step.outcome)
 
     if not dependencies:
-        if step.inputs:
-            inputs = step.inputs.evaluate({})
-        else:
+        if not step.inputs:
             inputs = celtypes.MapType()
+        else:
+            inputs = evaluate(
+                expression=step.inputs,
+                inputs={},
+                location=f"{location}.inputs",
+            )
+            if not result.is_unwrapped_ok(inputs):
+                return StepResult(result=inputs)
 
         return await _reconcile_step_logic(
             api=api,
@@ -380,10 +393,16 @@ async def _reconcile_step(
     if not step.inputs:
         inputs = celtypes.MapType()
     else:
-        inputs = step.inputs.evaluate({"steps": ok_outcomes})
+        inputs = evaluate(
+            expression=step.inputs,
+            inputs={"steps": ok_outcomes},
+            location=f"{location}.inputs",
+        )
+        if not result.is_unwrapped_ok(inputs):
+            return StepResult(result=inputs)
 
-    if step.mapped_input:
-        return await _reconcile_mapped_function(
+    if step.for_each:
+        return await _for_each_reconciler(
             api=api,
             workflow_key=workflow_key,
             location=location,
@@ -417,7 +436,7 @@ async def _reconcile_step_logic(
         | structure.ResourceFunction
         | structure.ValueFunction
         | structure.Workflow
-        | result.ErrorOutcome
+        | result.NonOkOutcome
     ),
 ) -> StepResult:
     match logic:
@@ -461,7 +480,7 @@ async def _reconcile_step_logic(
     return StepResult(result=logic)
 
 
-async def _reconcile_mapped_function(
+async def _for_each_reconciler(
     api: kr8s.Api,
     step: structure.Step,
     workflow_key: str,
@@ -471,24 +490,34 @@ async def _reconcile_mapped_function(
     inputs: celtypes.Value,
     trigger: celtypes.Value,
 ) -> StepResult:
-    assert step.mapped_input
+    assert step.for_each
 
-    source_iterator = step.mapped_input.source_iterator.evaluate({"steps": steps})
+    match evaluate(
+        expression=step.for_each.source_iterator,
+        inputs={"steps": steps},
+        location=f"{step.label}.forEach.itemIn",
+    ):
+        case result.PermFail() as failure:
+            return StepResult(result=failure)
 
-    if not isinstance(source_iterator, celtypes.ListType):
-        return StepResult(
-            result=result.PermFail(
-                message=f"Workflow Mapped Step source must be a list-type.",
-                location=location,
+        case celtypes.ListType() as source_iterator:
+            # Just need source_iterator
+            pass
+
+        case _ as bad_type:
+            return StepResult(
+                result=result.PermFail(
+                    message=f"Step `{location}.forEach.itemIn` must be a list-type, received {type(bad_type)}.",
+                    location=location,
+                )
             )
-        )
 
     tasks: list[asyncio.Task[StepResult]] = []
 
     async with asyncio.TaskGroup() as task_group:
         for idx, map_value in enumerate(source_iterator):
             iterated_inputs = copy.deepcopy(inputs)
-            iterated_inputs.update({step.mapped_input.input_key: map_value})
+            iterated_inputs[step.for_each.input_key] = map_value
             tasks.append(
                 task_group.create_task(
                     _reconcile_step_logic(
@@ -509,7 +538,7 @@ async def _reconcile_mapped_function(
         timed_out_tasks = ", ".join(task.get_name() for task in pending)
         return StepResult(
             result=result.Retry(
-                message=f"Timeout running Workflow Mapped Step ({timed_out_tasks}), will retry.",
+                message=f"Timeout running Workflow For Each Step ({timed_out_tasks}), will retry.",
                 delay=15,
                 location=location,
             )

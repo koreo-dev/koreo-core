@@ -46,8 +46,8 @@ spec:
       functionRef:
         kind: ResourceFunction
         name: resource-factory.v1
-      mappedInput:
-        source: =["a", "b", "c"]
+      forEach:
+        itemIn: =["a", "b", "c"]
         inputKey: suffix
       inputs:
         name: resource-function-test
