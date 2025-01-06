@@ -1,6 +1,7 @@
 from typing import Any
 import copy
 import json
+import base64
 
 from celpy import celtypes
 import celpy
@@ -369,6 +370,20 @@ def _from_json(value: celtypes.StringType) -> celtypes.Value | celpy.CELEvalErro
         return celpy.CELEvalError(f"JSON Decoding error {err}")
 
 
+def _b64encode(value: celtypes.Value) -> celtypes.StringType | celpy.CELEvalError:
+    try:
+        return celtypes.StringType(base64.b64encode(value.encode()).decode())
+    except Exception as err:
+        return celpy.CELEvalError(f"Base64 Encoding error {err}")
+
+
+def _b64decode(value: celtypes.Value) -> celtypes.StringType | celpy.CELEvalError:
+    try:
+        return celtypes.StringType(base64.b64decode(value))
+    except Exception as err:
+        return celpy.CELEvalError(f"Base64 Encoding error {err}")
+
+
 koreo_function_annotations: dict[str, celpy.Annotation] = {
     "to_ref": celtypes.FunctionType,
     "self_ref": celtypes.FunctionType,
@@ -388,6 +403,8 @@ koreo_function_annotations: dict[str, celpy.Annotation] = {
     "rstrip": celtypes.FunctionType,
     "to_json": celtypes.FunctionType,
     "from_json": celtypes.FunctionType,
+    "b64encode": _b64encode,
+    "b64decode": _b64decode,
 }
 
 koreo_cel_functions: dict[str, celpy.CELFunction] = {
@@ -409,4 +426,6 @@ koreo_cel_functions: dict[str, celpy.CELFunction] = {
     "rstrip": _rstrip,
     "to_json": _to_json,
     "from_json": _from_json,
+    "b64encode": _b64encode,
+    "b64decode": _b64decode,
 }
