@@ -1073,3 +1073,115 @@ class TestFromJson(unittest.TestCase):
 
         with self.assertRaises(celpy.CELEvalError):
             program.evaluate(inputs)
+
+
+class TestBase64Encode(unittest.TestCase):
+    def test_b64encode_null(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = 'b64encode()'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_b64encode_str(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "b64encode('isfun')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual("aXNmdW4=", result)
+
+    def test_b64encode_map(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = 'b64encode({"testKey": "testValue"})'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_b64encode_list(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = 'b64encode(["testKey", "testValue"])'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_b64encode_bool(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = 'b64encode(false)'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_b64encode_int(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = 'b64encode(3)'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+
+class TestBase64Decode(unittest.TestCase):
+    def test_b64decode_null(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = 'b64decode()'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_b64decode_str(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "b64decode('aXNmdW4=')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+        self.assertEqual("isfun", result)
+
+    def test_b64encode_invalid(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "b64decode('aXNmdW')"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
