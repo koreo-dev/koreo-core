@@ -121,6 +121,7 @@ def start_controller(group: str, kind: str, version: str):
 
         outcome = None
         resource_ids = None
+        state = None
         for workflow_key in workflow_keys:
             workflow = get_resource_from_cache(
                 resource_class=Workflow, cache_key=workflow_key
@@ -133,17 +134,17 @@ def start_controller(group: str, kind: str, version: str):
                 break
             logging.info(f"Running Workflow {workflow_key}")
 
-            workflow_outcomes, workflow_conditions, resource_ids = (
-                await reconcile_workflow(
-                    api=kr8s_api,
-                    workflow_key=workflow_key,
-                    owner=owner,
-                    trigger=trigger,
-                    workflow=workflow,
-                )
+            workflow_result = await reconcile_workflow(
+                api=kr8s_api,
+                workflow_key=workflow_key,
+                owner=owner,
+                trigger=trigger,
+                workflow=workflow,
             )
-            outcome = workflow_outcomes
-            for condition in workflow_conditions:
+            outcome = workflow_result.result
+            resource_ids = workflow_result.resource_ids
+            state = workflow_result.state
+            for condition in workflow_result.conditions:
                 conditions = update_condition(
                     conditions=conditions, condition=condition
                 )
@@ -169,6 +170,7 @@ def start_controller(group: str, kind: str, version: str):
                             "errors": outcome.message,
                             "locations": outcome.location,
                         },
+                        "state": convert_bools(state),
                     },
                 }
             )
@@ -189,7 +191,7 @@ def start_controller(group: str, kind: str, version: str):
                 "status": {
                     "conditions": conditions,
                     "koreo": koreo_value,
-                    "state": convert_bools(outcome),
+                    "state": convert_bools(state),
                 },
             }
         )

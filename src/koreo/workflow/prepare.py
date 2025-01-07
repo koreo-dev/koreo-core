@@ -303,7 +303,7 @@ def _load_config_step(
             name=condition_spec.get("name"),
         )
 
-    state_spec = step_spec.get("state")
+    state_spec = step_spec.get("state", {step_label: "=value"})
     match prepare_map_expression(
         cel_env=cel_env, spec=state_spec, name="spec.configStep.state"
     ):
@@ -458,7 +458,7 @@ def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str
             name=condition_spec.get("name"),
         )
 
-    state_spec = step_spec.get("state")
+    state_spec = step_spec.get("state", {step_label: "=value"})
     match prepare_map_expression(
         cel_env=cel_env, spec=state_spec, name=f"step:{step_label}.state"
     ):
@@ -583,7 +583,7 @@ def _load_function(step_label: str, function_ref: dict):
             location=f"{step_label}:{function_kind}:<missing>",
         )
 
-    function_kind_map = {
+    function_kind_map: dict[str, type[ValueFunction | ResourceFunction | Function]] = {
         "ValueFunction": ValueFunction,
         "ResourceFunction": ResourceFunction,
         "Function": Function,

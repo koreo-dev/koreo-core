@@ -69,8 +69,8 @@ spec:
                       required: [name]
                     inputs:
                       type: object
-                      x-kubernetes-preserve-unknown-fields: true
                       nullable: false
+                      x-kubernetes-preserve-unknown-fields: true
                     condition:
                       nullable: false
                       type: object
@@ -89,6 +89,11 @@ spec:
                           x-kubernetes-validations:
                             - rule: "!self.startsWith('=')"
                               message: "name may not be a CEL expression."
+                    state:
+                      type: object
+                      nullable: false
+                      maxProperties: 10
+                      x-kubernetes-preserve-unknown-fields: true
                   oneOf:
                     - required: [functionRef]
                     - required: [workflowRef]
@@ -160,6 +165,11 @@ spec:
                               - rule: "!self.startsWith('=')"
                                 message: "name may not be a CEL expression."
                         required: [type, name]
+                      state:
+                        type: object
+                        nullable: false
+                        maxProperties: 10
+                        x-kubernetes-preserve-unknown-fields: true
                     required: [label]
                     oneOf:
                       - required: [functionRef]
@@ -201,6 +211,7 @@ spec:
                       type: object
                       nullable: false
                       maxProperties: 50
+                      x-kubernetes-preserve-unknown-fields: true
               x-kubernetes-validations:
                 - rule: |
                     !has(self.status) ||
@@ -210,7 +221,7 @@ spec:
                       size(self.steps.filter(step, step.label == condition.step)) == 1
                     )
                   message: "conditions step must exist as steps label"
-              required: [crdRef, steps]
+              required: [steps]
             status:
               x-kubernetes-preserve-unknown-fields: true
               type: object
