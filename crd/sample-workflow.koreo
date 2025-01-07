@@ -27,6 +27,10 @@ spec:
       inputs:
         string: =steps.config.string
         int: =steps.config.int
+      state:
+        config:
+          nested_string: =value.nested.a_string
+          empty_list: =value.empties.emptyList
     - label: resource_reader
       functionRef:
         kind: ResourceFunction
@@ -42,6 +46,7 @@ spec:
         values:
           string: =steps.config.string
           int: =steps.config.int
+      state: {}
     - label: resource_factory
       functionRef:
         kind: ResourceFunction
@@ -60,6 +65,8 @@ spec:
         values:
           string: =steps.config.string
           int: =steps.config.int
+      state:
+        resources: =value.map(resource, resource.computedInt)
     - label: resource_value_user
       functionRef:
         kind: ValueFunction
@@ -67,31 +74,94 @@ spec:
       inputs:
         computedInt: =steps.resource_reader.computedInt
         resourceRef: =steps.resource_reader.ref
+    - label: maybe_or_default_example
+      workflowRef:
+        name: run-or-default.v1
+      inputs:
+        use_default: =steps.config.use_default
+    - label: optional_skips
+      workflowRef:
+        name: optional-skips.v1
+      inputs:
+        skips: =steps.config.skips
+    - label: combine_optional_skips
+      functionRef:
+        kind: ValueFunction
+        name: combine-optional-skips.v1
+      inputs:
+        optionals: =steps.optional_skips
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: Workflow
 metadata:
-  name: duplicate-workflow
+  name: run-or-default.v1
   namespace: koreo-testing
 spec:
-  crdRef:
-    apiGroup: koreo.realkinetic.com
-    version: v1alpha8
-    kind: TriggerDummy
-
   configStep:
     functionRef:
       kind: ValueFunction
-      name: config-test.v1
+      name: maybe-or-default-config-test.v1
 
   steps:
-    - label: return_value
+    - label: maybe_return_value
       functionRef:
         kind: ValueFunction
-        name: return-test.v1
+        name: maybe-return-value.v1
       inputs:
-        string: =steps.config.string
-        int: =steps.config.int
+        use_default: =steps.config.use_default
+        value: Non-default Return Value
+      state:
+        value: =value.value
+    - label: default_return_value
+      functionRef:
+        kind: ValueFunction
+        name: maybe-default-return-value.v1
+      inputs:
+        use_default: =steps.config.use_default
+        value: Default Return Value
+      state:
+        value: =value.value
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Workflow
+metadata:
+  name: optional-skips.v1
+  namespace: koreo-testing
+spec:
+  configStep:
+    functionRef:
+      kind: ValueFunction
+      name: optional-skip-config.v1
+    state: {}
+
+  steps:
+    - label: option_one
+      functionRef:
+        kind: ValueFunction
+        name: maybe-skip.v1
+      inputs:
+        name: One
+        should_skip: =steps.config.skips.one
+      state:
+        one: =value.value
+    - label: option_two
+      functionRef:
+        kind: ValueFunction
+        name: maybe-skip.v1
+      inputs:
+        name: Two
+        should_skip: =steps.config.skips.two
+      state:
+        two: =value.value
+    - label: option_three
+      functionRef:
+        kind: ValueFunction
+        name: maybe-skip.v1
+      inputs:
+        name: Three
+        should_skip: =steps.config.skips.three
+      state:
+        three: =value.value
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: TriggerDummy
@@ -111,3 +181,9 @@ spec:
   values:
     string: A test string
     int: 89
+
+  use_default: yes
+  optionalSkips:
+   one: no
+   two: yes
+   three: no

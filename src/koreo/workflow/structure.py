@@ -23,7 +23,7 @@ class StepConditionSpec(NamedTuple):
 
 class ConfigStep(NamedTuple):
     label: str
-    logic: ResourceFunction | ValueFunction | Function | Workflow | NonOkOutcome
+    logic: ResourceFunction | ValueFunction | Function | Workflow
 
     inputs: celpy.Runner | None
 
@@ -33,7 +33,7 @@ class ConfigStep(NamedTuple):
 
 class Step(NamedTuple):
     label: str
-    logic: ResourceFunction | ValueFunction | Function | Workflow | NonOkOutcome
+    logic: ResourceFunction | ValueFunction | Function | Workflow
 
     for_each: ForEach | None
     inputs: celpy.Runner | None
@@ -55,6 +55,7 @@ class ErrorStep(NamedTuple):
     outcome: NonOkOutcome
 
     condition: StepConditionSpec | None
+    state: None = None
 
 
 class ConditionSpec(NamedTuple):

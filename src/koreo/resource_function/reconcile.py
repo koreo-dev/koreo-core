@@ -169,6 +169,7 @@ async def reconcile_krm_resource(
     resource_id = {
         "apiVersion": crud_config.resource_api.version,
         "kind": crud_config.resource_api.kind,
+        "plural": crud_config.resource_api.plural,
         "name": name,
         "readonly": crud_config.readonly,
     }
