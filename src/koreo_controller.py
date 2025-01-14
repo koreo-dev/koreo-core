@@ -99,6 +99,8 @@ def main():
     try:
         loop.run_until_complete(kopf.operator(namespace=RESOURCE_NAMESPACE))
     except:
+        logging.exception("Shutting down due to exception.")
+
         for resource_key in registry._SUBSCRIPTION_QUEUES:
             registry._kill_resource(resource_key=resource_key)
 
