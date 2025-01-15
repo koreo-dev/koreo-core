@@ -29,7 +29,7 @@ spec:
                   nullable: false
                   x-kubernetes-embedded-resource: true
                   x-kubernetes-preserve-unknown-fields: true
-              required: [managedResource, template]
+              required: [template]
             status:
               x-kubernetes-preserve-unknown-fields: true
               type: object

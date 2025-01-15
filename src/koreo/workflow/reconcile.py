@@ -11,7 +11,6 @@ from resources.k8s.conditions import Condition
 
 from koreo import result
 from koreo.cel.evaluation import evaluate
-from koreo.function.reconcile import reconcile_function
 from koreo.resource_function.reconcile import reconcile_resource_function
 from koreo.value_function.reconcile import reconcile_value_function
 
@@ -476,8 +475,7 @@ async def _reconcile_step_logic(
     inputs: celtypes.Value,
     location: str,
     logic: (
-        structure.Function
-        | structure.ResourceFunction
+        structure.ResourceFunction
         | structure.ValueFunction
         | structure.Workflow
         | result.NonOkOutcome
@@ -516,16 +514,6 @@ async def _reconcile_step_logic(
                 result=await reconcile_value_function(
                     location=location,
                     function=logic,
-                    inputs=inputs,
-                )
-            )
-        case structure.Function():
-            return StepResult(
-                result=await reconcile_function(
-                    api=api,
-                    location=location,
-                    function=logic,
-                    trigger=trigger,
                     inputs=inputs,
                 )
             )

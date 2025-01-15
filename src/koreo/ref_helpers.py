@@ -3,15 +3,12 @@ from typing import Any
 from koreo import registry
 from koreo import result
 
-from koreo.function.structure import Function
 from koreo.resource_function.structure import ResourceFunction
 from koreo.value_function.structure import ValueFunction
 from koreo.workflow.structure import Workflow
 
 FunctionResource = (
-    registry.Resource[ResourceFunction]
-    | registry.Resource[ValueFunction]
-    | registry.Resource[Function]
+    registry.Resource[ResourceFunction] | registry.Resource[ValueFunction]
 )
 
 
@@ -74,12 +71,10 @@ def function_ref_spec_to_resource(
         return registry.Resource(resource_type=ValueFunction, name=name)
     elif kind == "ResourceFunction":
         return registry.Resource(resource_type=ResourceFunction, name=name)
-    elif kind == "Function":
-        return registry.Resource(resource_type=Function, name=name)
 
     return result.PermFail(
         message=f"Invalid `kind` ({kind}) in functionRef, kind must be one of "
-        "`ResourceFunction`, `ValueFunction`, or `Function`.",
+        "`ResourceFunction` or `ValueFunction`.",
         location=location,
     )
 

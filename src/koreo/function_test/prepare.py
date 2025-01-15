@@ -8,7 +8,7 @@ from koreo import registry
 from koreo.cache import get_resource_from_cache
 from koreo.result import DepSkip, PermFail, UnwrappedOutcome
 
-from koreo.function.reconcile import _predicate_to_koreo_result
+from koreo.predicate_helpers import predicate_to_koreo_result
 from koreo.value_function.structure import ValueFunction
 
 from . import structure
@@ -83,8 +83,8 @@ async def prepare_function_test(
     expected_outcome_spec = spec.get("expectedOutcome")
     if expected_outcome_spec and isinstance(expected_outcome_spec, dict):
         expected_outcome_spec["assert"] = True
-        expected_outcome = _predicate_to_koreo_result(
-            [expected_outcome_spec], location=cache_key
+        expected_outcome = predicate_to_koreo_result(
+            celpy.json_to_cel([expected_outcome_spec]), location=cache_key
         )
     else:
         expected_outcome = None

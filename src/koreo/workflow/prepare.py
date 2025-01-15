@@ -13,7 +13,6 @@ from koreo.cache import get_resource_from_cache
 from koreo.cel.functions import koreo_function_annotations
 from koreo.cel.prepare import prepare_expression, prepare_map_expression
 from koreo.cel.structure_extractor import extract_argument_structure
-from koreo.function.structure import Function
 from koreo.resource_function.structure import ResourceFunction
 from koreo.result import (
     Ok,
@@ -583,10 +582,9 @@ def _load_function(step_label: str, function_ref: dict):
             location=f"{step_label}:{function_kind}:<missing>",
         )
 
-    function_kind_map: dict[str, type[ValueFunction | ResourceFunction | Function]] = {
+    function_kind_map: dict[str, type[ValueFunction | ResourceFunction]] = {
         "ValueFunction": ValueFunction,
         "ResourceFunction": ResourceFunction,
-        "Function": Function,
     }
 
     function_class = function_kind_map.get(function_kind)
