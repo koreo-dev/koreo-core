@@ -6,6 +6,9 @@ import kr8s
 from koreo.cache import delete_resource_from_cache, prepare_and_cache
 
 
+RECONNECT_TIMEOUT = 900
+
+
 async def load_cache(
     namespace: str,
     api_version: str,
@@ -51,7 +54,7 @@ async def maintain_cache(
     while True:
         try:
             kr8s_api = kr8s.api()
-            kr8s_api.timeout = 600
+            kr8s_api.timeout = RECONNECT_TIMEOUT
 
             resource_class = kr8s.objects.new_class(
                 version=api_version,
@@ -64,26 +67,32 @@ async def maintain_cache(
 
             watcher = kr8s_api.async_watch(kind=resource_class, namespace=namespace)
 
-            async for event, resource in watcher:
-                if event == "DELETED":
-                    logging.debug(
-                        f"Deleting {plural_kind}.{api_version} from cache due to {event} for {resource.name}."
-                    )
-                    await delete_resource_from_cache(
-                        resource_class=resource_class,
-                        metadata=resource.metadata,
-                    )
-                    continue
+            async with asyncio.timeout(RECONNECT_TIMEOUT):
+                async for event, resource in watcher:
+                    if event == "DELETED":
+                        logging.debug(
+                            f"Deleting {plural_kind}.{api_version} from cache due to {event} for {resource.name}."
+                        )
+                        await delete_resource_from_cache(
+                            resource_class=resource_class,
+                            metadata=resource.metadata,
+                        )
+                        continue
 
-                logging.debug(
-                    f"Updating {plural_kind}.{api_version} cache due to {event} for {resource.name}."
-                )
-                await prepare_and_cache(
-                    resource_class=resource_class,
-                    preparer=preparer,
-                    metadata=resource.metadata,
-                    spec=resource.raw.get("spec"),
-                )
+                    logging.debug(
+                        f"Updating {plural_kind}.{api_version} cache due to {event} for {resource.name}."
+                    )
+                    await prepare_and_cache(
+                        resource_class=resource_class,
+                        preparer=preparer,
+                        metadata=resource.metadata,
+                        spec=resource.raw.get("spec"),
+                    )
+        except asyncio.TimeoutError:
+            logging.debug(
+                f"Restarting {plural_kind}.{api_version} cache maintainer watch "
+                "due to normal reconnect timeout."
+            )
         except:
             logging.exception(
                 f"Restarting {plural_kind}.{api_version} cache maintainer watch."
