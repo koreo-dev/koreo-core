@@ -5,7 +5,6 @@ import celpy
 
 from koreo.result import NonOkOutcome, Outcome
 
-from koreo.function.structure import Function
 from koreo.resource_function.structure import ResourceFunction
 from koreo.value_function.structure import ValueFunction
 
@@ -23,7 +22,7 @@ class StepConditionSpec(NamedTuple):
 
 class ConfigStep(NamedTuple):
     label: str
-    logic: ResourceFunction | ValueFunction | Function | Workflow
+    logic: ResourceFunction | ValueFunction | Workflow
 
     inputs: celpy.Runner | None
 
@@ -33,7 +32,7 @@ class ConfigStep(NamedTuple):
 
 class Step(NamedTuple):
     label: str
-    logic: ResourceFunction | ValueFunction | Function | Workflow
+    logic: ResourceFunction | ValueFunction | Workflow
 
     for_each: ForEach | None
     inputs: celpy.Runner | None

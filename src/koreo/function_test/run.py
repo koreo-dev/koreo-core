@@ -9,8 +9,6 @@ from celpy import celtypes
 from koreo.cel.encoder import convert_bools
 from koreo.result import Outcome, UnwrappedOutcome, is_unwrapped_ok
 
-from koreo.function.reconcile import reconcile_function
-from koreo.function.structure import Function
 from koreo.resource_function.reconcile import reconcile_resource_function
 from koreo.resource_function.structure import ResourceFunction
 from koreo.value_function.reconcile import reconcile_value_function
@@ -91,14 +89,6 @@ async def run_function_test(location: str, function_test: FunctionTest) -> TestR
         result = function_test.function_under_test
     else:
         match function_test.function_under_test:
-            case Function():
-                result = await reconcile_function(
-                    api=api,
-                    location=location,
-                    function=function_test.function_under_test,
-                    trigger=celtypes.MapType({}),
-                    inputs=function_test.inputs,
-                )
             case ResourceFunction():
                 result, _ = await reconcile_resource_function(
                     api=api,
