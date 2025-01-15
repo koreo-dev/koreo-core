@@ -49,6 +49,22 @@ async def login_fn(logger, *_, **__):
     )
 
 
+@kopf.on.startup()
+def startup_fn(settings: kopf.OperatorSettings, *_, **__):
+    logging.getLogger().handlers[:] = []
+
+    settings.networking.connect_timeout = 60
+    settings.networking.request_timeout = 60
+
+    settings.watching.reconnect_backoff = 0.2
+    settings.watching.connect_timeout = 60
+    settings.watching.server_timeout = 600
+    settings.watching.client_timeout = 600
+
+    # Limit the load on the API server
+    settings.execution.max_workers = 5
+
+
 __active_controllers: set[str] = set()
 
 
