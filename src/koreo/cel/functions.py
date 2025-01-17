@@ -97,6 +97,58 @@ def _to_ref(
     return reference
 
 
+def _group_ref(
+    source: celtypes.MapType,
+) -> celtypes.MapType | celpy.CELEvalError:
+    reference = celtypes.MapType()
+
+    api_group_key = celtypes.StringType("apiGroup")
+    api_group = source.get(api_group_key)
+    if api_group:
+        reference[api_group_key] = api_group
+    else:
+        api_version_key = celtypes.StringType("apiVersion")
+        api_version = source.get(api_version_key)
+        if api_version and isinstance(api_version, celtypes.StringType):
+            parts = api_version.split("/", 1)
+            api_group = parts[0]
+            reference[api_group_key] = celtypes.StringType(api_group)
+
+    kind_key = celtypes.StringType("kind")
+    kind = source.get(kind_key)
+    if kind:
+        reference[kind_key] = kind
+
+    if "external" in source:
+        external_key = celtypes.StringType("external")
+        external = source.get(external_key)
+        if not external:
+            return celpy.CELEvalError(f"`external` must contain a value.")
+
+        reference[external_key] = external
+        return reference
+
+    if "name" not in source:
+        return celpy.CELEvalError(
+            f"`external` or `name` are required to build a reference."
+        )
+
+    name_key = celtypes.StringType("name")
+    name = source.get(name_key)
+
+    if not name:
+        return celpy.CELEvalError(f"`name` must contain a value.")
+
+    reference[name_key] = name
+
+    namespace_key = celtypes.StringType("namespace")
+    namespace = source.get(namespace_key)
+    if namespace:
+        reference[namespace_key] = namespace
+
+    return reference
+
+
 def _kindless_ref(
     source: celtypes.MapType,
 ) -> celtypes.MapType | celpy.CELEvalError:
@@ -387,6 +439,7 @@ def _b64decode(value: celtypes.Value) -> celtypes.StringType | celpy.CELEvalErro
 koreo_function_annotations: dict[str, celpy.Annotation] = {
     "to_ref": celtypes.FunctionType,
     "self_ref": celtypes.FunctionType,
+    "group_ref": celtypes.FunctionType,
     "kindless_ref": celtypes.FunctionType,
     "config_connect_ready": celtypes.FunctionType,
     "overlay": celtypes.FunctionType,
@@ -403,13 +456,14 @@ koreo_function_annotations: dict[str, celpy.Annotation] = {
     "rstrip": celtypes.FunctionType,
     "to_json": celtypes.FunctionType,
     "from_json": celtypes.FunctionType,
-    "b64encode": _b64encode,
-    "b64decode": _b64decode,
+    "b64encode": celtypes.FunctionType,
+    "b64decode": celtypes.FunctionType,
 }
 
 koreo_cel_functions: dict[str, celpy.CELFunction] = {
     "to_ref": _to_ref,
     "self_ref": _self_ref,
+    "group_ref": _group_ref,
     "kindless_ref": _kindless_ref,
     "config_connect_ready": _config_connect_ready,
     "overlay": _overlay,

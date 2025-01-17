@@ -1,4 +1,4 @@
-from typing import NamedTuple
+from typing import NamedTuple, Sequence
 import copy
 import logging
 
@@ -93,18 +93,26 @@ async def reconcile_resource_function(
     #########################
 
     return Result(
-        outcome=_reconcile_outcome(outcome=function.outcome, inputs=full_inputs, name=location),
+        outcome=_reconcile_outcome(
+            outcome=function.outcome, inputs=full_inputs, name=location
+        ),
         resource_id=reconcile_result.resource_id,
     )
 
 
-def _reconcile_outcome(outcome: structure.Outcome, inputs: dict[str, celtypes.Value], name: str):
+def _reconcile_outcome(
+    outcome: structure.Outcome, inputs: dict[str, celtypes.Value], name: str
+):
     if err := evaluate_predicates(
-        predicates=outcome.validators, inputs=inputs, location=f"{name}:spec.outcome.validators"
+        predicates=outcome.validators,
+        inputs=inputs,
+        location=f"{name}:spec.outcome.validators",
     ):
         return err
 
-    return evaluate(outcome.return_value, inputs=inputs, location=f"{name}:spec.outcome.return")
+    return evaluate(
+        outcome.return_value, inputs=inputs, location=f"{name}:spec.outcome.return"
+    )
 
 
 class ReconcileResult(NamedTuple):
@@ -202,7 +210,6 @@ async def reconcile_krm_resource(
     if api_resource and crud_config.readonly:
         return ReconcileResult(result=api_resource.raw, resource_id=resource_id)
 
-    # TODO: Load template, if specified
     forced_overlay = _forced_overlay(
         resource_api=crud_config.resource_api, name=name, namespace=namespace
     )
@@ -249,7 +256,8 @@ async def reconcile_krm_resource(
 
     converted_resource = convert_bools(expected_resource)
 
-    if _validate_match(converted_resource, api_resource.raw) and owner_reffed:
+    resource_match = _validate_match(converted_resource, api_resource.raw)
+    if resource_match.match and owner_reffed:
         logger.debug(f"{full_resource_name} matched spec, no update required.")
 
         return ReconcileResult(result=api_resource.raw, resource_id=resource_id)
@@ -265,7 +273,10 @@ async def reconcile_krm_resource(
             await api_resource.delete()
             return ReconcileResult(
                 result=Retry(
-                    message=f"Deleting {full_resource_name} to recreate.",
+                    message=(
+                        f"Deleting {full_resource_name} to recreate due to "
+                        f"{' -> '.join(resource_match.differences)}."
+                    ),
                     delay=delay,
                     location="spec.update.recreate",
                 ),
@@ -283,7 +294,10 @@ async def reconcile_krm_resource(
             await api_resource.patch(converted_resource)
             return ReconcileResult(
                 result=Retry(
-                    message=f"Patching {full_resource_name} to update.",
+                    message=(
+                        f"Patching {full_resource_name} to update due to "
+                        f"{' -> '.join(resource_match.differences)}."
+                    ),
                     delay=delay,
                     location="spec.update.patch",
                 ),
@@ -494,9 +508,17 @@ async def _create_api_resource(
         else:
             match functions._overlay(resource=resource_view, overlay=create_view):
                 case celpy.CELEvalError() as err:
-                    return check_for_celevalerror(
+                    if updated_err := check_for_celevalerror(
                         err, location="spec.create.overlay(apply)"
+                    ):
+                        return updated_err
+
+                    # This should never happen.
+                    return PermFail(
+                        message=f"Error applying create overlay: {err}",
+                        location="spec.create.overlay(apply)",
                     )
+
                 case celtypes.MapType() as resource_view:
                     pass
 
@@ -511,7 +533,16 @@ async def _create_api_resource(
 
     match functions._overlay(resource=resource_view, overlay=forced_overlay):
         case celpy.CELEvalError() as err:
-            return check_for_celevalerror(err, location="spec.create.overlay(apply)")
+            if updated_err := check_for_celevalerror(
+                err, location="spec.create.overlay(name apply)"
+            ):
+                return updated_err
+
+            # This should never happen.
+            return PermFail(
+                message=f"Error applying name/namesace overlay: {err}",
+                location="spec.create.overlay(apply)",
+            )
         case celtypes.MapType() as resource_view:
             pass
 
@@ -654,39 +685,70 @@ def _validate_owner_reffed(resource_view: dict, owner_ref: dict):
     return False
 
 
-def _validate_match(target, actual):
+class ResourceMatch(NamedTuple):
+    match: bool
+    differences: Sequence[str]
+
+
+def _validate_match(target, actual) -> ResourceMatch:
     """Compare the specified (`target`) state against the actual (`actual`)
     reosurce state. We compare all target fields and ignore anything extra.
     """
-    if isinstance(target, dict) and isinstance(actual, dict):
-        return _validate_dict_match(target, actual)
+    if type(target) != type(actual):
+        return ResourceMatch(
+            match=False,
+            differences=[f"<target:{type(target)}, resource:{type(actual)}>"],
+        )
 
-    if isinstance(target, (list, tuple)) and isinstance(actual, (list, tuple)):
-        return _validate_list_match(target, actual)
+    match (target, actual):
+        case dict(), dict():
+            return _validate_dict_match(target, actual)
+        case (list() | tuple(), list() | tuple()):
+            return _validate_list_match(target, actual)
+        case _:
+            # Hopefully simple type.
+            if target == actual:
+                return ResourceMatch(match=True, differences=())
+            else:
+                return ResourceMatch(
+                    match=False,
+                    differences=[f"<target:[{target}], resource:[{actual}]>"],
+                )
 
-    return target == actual
 
-
-def _validate_dict_match(target: dict, actual: dict) -> bool:
+def _validate_dict_match(target: dict, actual: dict) -> ResourceMatch:
     for target_key in target.keys():
         if target_key == "ownerReferences":
             continue
 
         if target_key not in actual:
-            return False
+            return ResourceMatch(
+                match=False, differences=[f"<missing '{target_key}' in resource>"]
+            )
 
-        if not _validate_match(target[target_key], actual[target_key]):
-            return False
+        key_match = _validate_match(target[target_key], actual[target_key])
+        if not key_match.match:
+            differences = [f"'{target_key}'"]
+            differences.extend(key_match.differences)
+            return ResourceMatch(match=False, differences=differences)
 
-    return True
+    return ResourceMatch(match=True, differences=())
 
 
-def _validate_list_match(target: list | tuple, actual: list | tuple) -> bool:
+def _validate_list_match(target: list | tuple, actual: list | tuple) -> ResourceMatch:
     if len(target) != len(actual):
-        return False
+        return ResourceMatch(
+            match=False,
+            differences=[
+                f"<length mismatch target:{len(target)}, actual:{len(actual)}"
+            ],
+        )
 
-    for target_value, actual_value in zip(target, actual):
-        if not _validate_match(target_value, actual_value):
-            return False
+    for idx, (target_value, actual_value) in enumerate(zip(target, actual)):
+        item_match = _validate_match(target_value, actual_value)
+        if not item_match.match:
+            differences = [f"at index '{idx}'"]
+            differences.extend(item_match.differences)
+            return ResourceMatch(match=False, differences=differences)
 
-    return True
+    return ResourceMatch(match=True, differences=())

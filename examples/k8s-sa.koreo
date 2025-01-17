@@ -1,0 +1,289 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: koreo-demo
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Workflow
+metadata:
+  name: deployment-service-account.v1
+  namespace: koreo-demo
+spec:
+  # This is used for testing. This workflow is meant to be a sub-workflow.
+  crdRef:
+    apiGroup: koreo.realkinetic.com
+    version: v1alpha8
+    kind: TriggerDummy
+
+  configStep:
+    functionRef:
+      kind: ValueFunction
+      name: service-account-config.v1
+
+  steps:
+    - label: service_account
+      functionRef:
+        kind: ResourceFunction
+        name: deployment-service-account.v1
+      inputs:
+        metadata: =steps.config.metadata
+      state:
+        ref: =resource.self_ref()
+    - label: role
+      functionRef:
+        kind: ResourceFunction
+        name: deployment-service-account-role.v1
+      inputs:
+        metadata: =steps.config.metadata
+        resources: =steps.config.resources
+    - label: binding
+      functionRef:
+        kind: ResourceFunction
+        name: deployment-service-account-binding.v1
+      inputs:
+        metadata: =steps.config.metadata
+        service_account: =steps.service_account
+        role: =steps.role
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: ValueFunction
+metadata:
+  name: service-account-config.v1
+  namespace: koreo-demo
+spec:
+  locals:
+    service_account: =inputs.parent.spec.name + "-workload"
+
+  return:
+    metadata:
+      name: =locals.service_account
+      namespace: =inputs.parent.metadata.namespace
+    resources: =inputs.parent.spec.resources
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: FunctionTest
+metadata:
+  name: service-account-config.v1
+  namespace: koreo-demo
+spec:
+  functionRef:
+    kind: ValueFunction
+    name: service-account-config.v1
+
+  inputs:
+    parent:
+      metadata:
+        namespace: test-namespace
+      spec:
+        name: test-account
+        resources:
+          - kind: secret
+            name: test-secret
+          - kind: configmap
+            name: test-configmap
+
+  expectReturn:
+    metadata:
+      name: test-account-workload
+      namespace: test-namespace
+    resources:
+    - kind: secret
+      name: test-secret
+    - kind: configmap
+      name: test-configmap
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: ResourceTemplate
+metadata:
+  name: deployment-service-account.v1
+  namespace: koreo-demo
+spec:
+  template:
+    apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      labels:
+        workloads.realkinetic.com/auto-sa: "true"
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: ResourceFunction
+metadata:
+  name: deployment-service-account.v1
+  namespace: koreo-demo
+spec:
+  apiConfig:
+    apiVersion: v1
+    kind: ServiceAccount
+
+    name: =inputs.metadata.name
+    namespace: =inputs.metadata.namespace
+
+  resourceTemplateRef:
+      name: deployment-service-account.v1
+
+  outcome:
+      return:
+        ref: =resource.self_ref()
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: FunctionTest
+metadata:
+  name: deployment-service-account.v1
+  namespace: koreo-demo
+spec:
+  functionRef:
+    kind: ResourceFunction
+    name: deployment-service-account.v1
+
+  inputs:
+    metadata:
+      namespace: test-namespace
+      name: test-account
+
+  expectResource:
+    apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      labels:
+        workloads.realkinetic.com/auto-sa: 'true'
+      name: test-account
+      namespace: test-namespace
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: ResourceFunction
+metadata:
+  name: deployment-service-account-role.v1
+  namespace: koreo-demo
+spec:
+  apiConfig:
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: Role
+
+    name: =inputs.metadata.name
+    namespace: =inputs.metadata.namespace
+
+  locals:
+    rules: |
+      =inputs.resources.map(
+          resource,
+          {'apiGroups': [resource.apiGroup],
+           'resources': [resource.kind.lower() + "s"],
+           'verbs': ["get"],
+           'resourceNames': [resource.name]
+          }
+      )
+
+  resource:
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: Role
+    rules: = locals.rules
+
+  outcome:
+      return:
+        ref: =resource.self_ref()
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: FunctionTest
+metadata:
+  name: deployment-service-account-role.v1
+  namespace: koreo-demo
+spec:
+  functionRef:
+    kind: ResourceFunction
+    name: deployment-service-account-role.v1
+
+  inputs:
+    metadata:
+      name: test-workload
+      namespace: test-namespace
+    resources:
+      - apiGroup: v1
+        kind: Secret
+        name: contact-list-api-key
+
+  expectResource:
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: Role
+    metadata:
+      name: test-workload
+      namespace: test-namespace
+    rules:
+    - apiGroups: [v1]
+      resourceNames: [contact-list-api-key]
+      resources: [secrets]
+      verbs: [get]
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: ResourceFunction
+metadata:
+  name: deployment-service-account-binding.v1
+  namespace: koreo-demo
+spec:
+  apiConfig:
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+
+    name: =inputs.metadata.name
+    namespace: =inputs.metadata.namespace
+
+  locals:
+    sa_ref:
+      kind: ServiceAccount
+      name: =inputs.service_account.ref.name
+    role_group_ref: =inputs.role.ref.group_ref()
+
+  resource:
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    subjects: [=locals.sa_ref]
+    roleRef:
+      apiGroup: =locals.role_group_ref.apiGroup
+      kind: =locals.role_group_ref.kind
+      name: =locals.role_group_ref.name
+
+  outcome:
+      return:
+        ref: =resource.self_ref()
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: FunctionTest
+metadata:
+  name: deployment-service-account-binding.v1
+  namespace: koreo-demo
+spec:
+  functionRef:
+    kind: ResourceFunction
+    name: deployment-service-account-binding.v1
+
+  inputs:
+    metadata:
+      name: test-workload
+      namespace: test-namespace
+    service_account:
+      ref:
+        apiVersion: v1
+        kind: ServiceAccount
+        name: contect-list-sa
+        namespace: koreo-demo
+    role:
+      ref:
+        apiGroup: rbac.authorization.k8s.io
+        kind: Role
+        name: secret-contact-list-api-key
+        namespace: koreo-demo
+
+
+  expectResource:
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      name: test-workload
+      namespace: test-namespace
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: Role
+      name: secret-contact-list-api-key
+    subjects:
+    - kind: ServiceAccount
+      name: contect-list-sa
+

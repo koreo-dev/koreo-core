@@ -55,10 +55,10 @@ async def prepare_function_test(
             location=location,
         )
 
-    expected_resource = spec.get("expectedResource")
+    expected_resource = spec.get("expectResource")
     if expected_resource is not None and not isinstance(expected_resource, dict):
         return PermFail(
-            message=f"FunctionTest '{cache_key}' `spec.expectedResource` must be an object.",
+            message=f"FunctionTest '{cache_key}' `spec.expectResource` must be an object.",
             location=location,
         )
 
@@ -68,7 +68,7 @@ async def prepare_function_test(
         return PermFail(
             message=(
                 f"`FunctionTest` for `{watched_function.resource_type.__name__}` "
-                f"('{cache_key}') may not set `spec.currentResource` or `spec.expectedResource`."
+                f"('{cache_key}') may not set `spec.currentResource` or `spec.expectResource`."
             ),
             location=location,
         )
@@ -80,7 +80,7 @@ async def prepare_function_test(
             location=location,
         )
 
-    expected_outcome_spec = spec.get("expectedOutcome")
+    expected_outcome_spec = spec.get("expectOutcome")
     if expected_outcome_spec and isinstance(expected_outcome_spec, dict):
         expected_outcome_spec["assert"] = True
         expected_outcome = predicate_to_koreo_result(
@@ -89,7 +89,7 @@ async def prepare_function_test(
     else:
         expected_outcome = None
 
-    expected_return = spec.get("expectedReturn")
+    expected_return = spec.get("expectReturn")
 
     return (
         structure.FunctionTest(

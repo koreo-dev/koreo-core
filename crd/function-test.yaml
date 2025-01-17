@@ -44,18 +44,18 @@ spec:
                   x-kubernetes-embedded-resource: true
                   x-kubernetes-preserve-unknown-fields: true
 
-                expectedResource:
+                expectResource:
                   type: object
                   nullable: true
                   x-kubernetes-embedded-resource: true
                   x-kubernetes-preserve-unknown-fields: true
 
-                expectedReturn:
+                expectReturn:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
                   nullable: true
 
-                expectedOutcome:
+                expectOutcome:
                   type: object
                   properties:
                     ok:
