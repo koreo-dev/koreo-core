@@ -222,6 +222,124 @@ class TestSelfRef(unittest.TestCase):
         )
 
 
+class TestGroupRef(unittest.TestCase):
+    def test_invalid_resource_type(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = '"".group_ref()'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_missing_api_version(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = '{"kind": "TestCase", "metadata": {"name": "a-name-value", "namespace": "some-namespace"}}.group_ref()'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_missing_kind(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = '{"apiVersion": "some.api.group/v2", "metadata": {"name": "a-name-value", "namespace": "some-namespace"}}.group_ref()'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_missing_metadata(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = (
+            '{"apiVersion": "some.api.group/v2", "kind": "TestCase"}.group_ref()'
+        )
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_missing_name(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = '{"apiVersion": "some.api.group/v2", "kind": "TestCase", "metadata": {"namespace": "some-namespace"}}.group_ref()'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_missing_namespace(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = '{"apiVersion": "some.api.group/v2", "kind": "TestCase", "metadata": {"name": "a-name-value"}}.group_ref()'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+    def test_group_ref_from_api_version(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = '{"apiVersion": "some.api.group/v2", "kind": "TestCase", "name": "a-name-value", "namespace": "some-namespace"}.group_ref()'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+
+        self.assertDictEqual(
+            {
+                "apiGroup": "some.api.group",
+                "kind": "TestCase",
+                "name": "a-name-value",
+                "namespace": "some-namespace",
+            },
+            result,
+        )
+
+    def test_group_ref_from_api_group(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = '{"apiGroup": "some.api.group", "kind": "TestCase", "name": "a-name-value", "namespace": "some-namespace"}.group_ref()'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+
+        self.assertDictEqual(
+            {
+                "apiGroup": "some.api.group",
+                "kind": "TestCase",
+                "name": "a-name-value",
+                "namespace": "some-namespace",
+            },
+            result,
+        )
+
+
 class TestConfigConnectReady(unittest.TestCase):
     def test_invalid_resource_type(self):
         cel_env = celpy.Environment(annotations=koreo_function_annotations)
@@ -931,7 +1049,7 @@ class TestToJson(unittest.TestCase):
     def test_to_json_null(self):
         cel_env = celpy.Environment(annotations=koreo_function_annotations)
 
-        test_cel_expression = 'to_json()'
+        test_cel_expression = "to_json()"
         inputs = {}
 
         compiled = cel_env.compile(test_cel_expression)
@@ -979,33 +1097,33 @@ class TestToJson(unittest.TestCase):
     def test_to_json_bool(self):
         cel_env = celpy.Environment(annotations=koreo_function_annotations)
 
-        test_cel_expression = 'to_json(false)'
+        test_cel_expression = "to_json(false)"
         inputs = {}
 
         compiled = cel_env.compile(test_cel_expression)
         program = cel_env.program(compiled, functions=koreo_cel_functions)
 
         result = program.evaluate(inputs)
-        self.assertEqual('0', result)
+        self.assertEqual("0", result)
 
     def test_to_json_int(self):
         cel_env = celpy.Environment(annotations=koreo_function_annotations)
 
-        test_cel_expression = 'to_json(3)'
+        test_cel_expression = "to_json(3)"
         inputs = {}
 
         compiled = cel_env.compile(test_cel_expression)
         program = cel_env.program(compiled, functions=koreo_cel_functions)
 
         result = program.evaluate(inputs)
-        self.assertEqual('3', result)
+        self.assertEqual("3", result)
 
 
 class TestFromJson(unittest.TestCase):
     def test_from_json_null(self):
         cel_env = celpy.Environment(annotations=koreo_function_annotations)
 
-        test_cel_expression = 'from_json()'
+        test_cel_expression = "from_json()"
         inputs = {}
 
         compiled = cel_env.compile(test_cel_expression)
@@ -1053,7 +1171,7 @@ class TestFromJson(unittest.TestCase):
     def test_from_json_bool(self):
         cel_env = celpy.Environment(annotations=koreo_function_annotations)
 
-        test_cel_expression = 'from_json(false)'
+        test_cel_expression = "from_json(false)"
         inputs = {}
 
         compiled = cel_env.compile(test_cel_expression)
@@ -1065,7 +1183,7 @@ class TestFromJson(unittest.TestCase):
     def test_from_json_int(self):
         cel_env = celpy.Environment(annotations=koreo_function_annotations)
 
-        test_cel_expression = 'from_json(3)'
+        test_cel_expression = "from_json(3)"
         inputs = {}
 
         compiled = cel_env.compile(test_cel_expression)
@@ -1079,7 +1197,7 @@ class TestBase64Encode(unittest.TestCase):
     def test_b64encode_null(self):
         cel_env = celpy.Environment(annotations=koreo_function_annotations)
 
-        test_cel_expression = 'b64encode()'
+        test_cel_expression = "b64encode()"
         inputs = {}
 
         compiled = cel_env.compile(test_cel_expression)
@@ -1127,7 +1245,7 @@ class TestBase64Encode(unittest.TestCase):
     def test_b64encode_bool(self):
         cel_env = celpy.Environment(annotations=koreo_function_annotations)
 
-        test_cel_expression = 'b64encode(false)'
+        test_cel_expression = "b64encode(false)"
         inputs = {}
 
         compiled = cel_env.compile(test_cel_expression)
@@ -1139,7 +1257,7 @@ class TestBase64Encode(unittest.TestCase):
     def test_b64encode_int(self):
         cel_env = celpy.Environment(annotations=koreo_function_annotations)
 
-        test_cel_expression = 'b64encode(3)'
+        test_cel_expression = "b64encode(3)"
         inputs = {}
 
         compiled = cel_env.compile(test_cel_expression)
@@ -1153,7 +1271,7 @@ class TestBase64Decode(unittest.TestCase):
     def test_b64decode_null(self):
         cel_env = celpy.Environment(annotations=koreo_function_annotations)
 
-        test_cel_expression = 'b64decode()'
+        test_cel_expression = "b64decode()"
         inputs = {}
 
         compiled = cel_env.compile(test_cel_expression)
