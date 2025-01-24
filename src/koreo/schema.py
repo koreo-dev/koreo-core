@@ -7,6 +7,7 @@ logger = logging.getLogger("koreo.schema")
 import fastjsonschema
 import yaml
 
+from koreo.function_test.structure import FunctionTest
 from koreo.resource_function.structure import ResourceFunction
 from koreo.resource_template.structure import ResourceTemplate
 from koreo.result import PermFail
@@ -22,6 +23,7 @@ CRD_MAP = {
     ResourceTemplate: CRD_ROOT.joinpath("resource-template.yaml"),
     ValueFunction: CRD_ROOT.joinpath("value-function.yaml"),
     Workflow: CRD_ROOT.joinpath("workflow.yaml"),
+    FunctionTest: CRD_ROOT.joinpath("function-test.yaml"),
 }
 
 _SCHEMA_VALIDATORS = {}
@@ -48,7 +50,9 @@ def validate(
         schema_validator(spec)
     except fastjsonschema.JsonSchemaValueException as err:
         # This is hacky, and likely buggy, but it makes the messages easier to grok.
-        validation_err = f"{err}".replace("data.", "spec.").replace("data ", "spec ")
+        validation_err = f"{err.rule_definition} {err}".replace(
+            "data.", "spec."
+        ).replace("data ", "spec ")
         return PermFail(validation_err)
 
     return None

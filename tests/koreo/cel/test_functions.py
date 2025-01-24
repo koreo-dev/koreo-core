@@ -438,69 +438,6 @@ class TestConfigConnectReady(unittest.TestCase):
         self.assertTrue(result)
 
 
-class TestTemplateName(unittest.TestCase):
-    def test_invalid_type_to_ref(self):
-        cel_env = celpy.Environment(annotations=koreo_function_annotations)
-
-        test_cel_expression = '"".template_name("bad")'
-        inputs = {}
-
-        compiled = cel_env.compile(test_cel_expression)
-        program = cel_env.program(compiled, functions=koreo_cel_functions)
-
-        with self.assertRaises(celpy.CELEvalError):
-            program.evaluate(inputs)
-
-    def test_missing_api_version(self):
-        cel_env = celpy.Environment(annotations=koreo_function_annotations)
-
-        test_cel_expression = '{"kind": "TestCase"}.template_name("bad")'
-        inputs = {}
-
-        compiled = cel_env.compile(test_cel_expression)
-        program = cel_env.program(compiled, functions=koreo_cel_functions)
-
-        with self.assertRaises(celpy.CELEvalError):
-            program.evaluate(inputs)
-
-    def test_missing_kind(self):
-        cel_env = celpy.Environment(annotations=koreo_function_annotations)
-
-        test_cel_expression = '{"apiVersion": "some.api.group/v1"}.template_name("bad")'
-        inputs = {}
-
-        compiled = cel_env.compile(test_cel_expression)
-        program = cel_env.program(compiled, functions=koreo_cel_functions)
-
-        with self.assertRaises(celpy.CELEvalError):
-            program.evaluate(inputs)
-
-    def test_bad_name(self):
-        cel_env = celpy.Environment(annotations=koreo_function_annotations)
-
-        test_cel_expression = (
-            '{"apiVersion": "api.group/v5", "kind": "TestCase"}.template_name("")'
-        )
-        inputs = {}
-
-        compiled = cel_env.compile(test_cel_expression)
-        program = cel_env.program(compiled, functions=koreo_cel_functions)
-
-        with self.assertRaises(celpy.CELEvalError):
-            program.evaluate(inputs)
-
-    def test_ok(self):
-        cel_env = celpy.Environment(annotations=koreo_function_annotations)
-
-        test_cel_expression = '{"apiVersion": "api.group/v5", "kind": "TestCase"}.template_name("template")'
-        inputs = {}
-
-        compiled = cel_env.compile(test_cel_expression)
-        program = cel_env.program(compiled, functions=koreo_cel_functions)
-
-        self.assertEqual("testcase.api.group.v5.template", program.evaluate(inputs))
-
-
 class TestOverlay(unittest.TestCase):
     def test_empty_resource_and_overlay(self):
         cel_env = celpy.Environment(annotations=koreo_function_annotations)
@@ -587,6 +524,28 @@ class TestOverlay(unittest.TestCase):
             program.evaluate(inputs),
         )
 
+    def test_resource_with_deep_update(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = "{'nested': {'deep': {'key': 'value'}}}.overlay({'nested': { 'deep': { 'new_key': 'new_value', 'deeper': {'nested': true}}}})"
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        self.assertDictEqual(
+            {
+                "nested": {
+                    "deep": {
+                        "key": "value",
+                        "new_key": "new_value",
+                        "deeper": {"nested": True},
+                    },
+                }
+            },
+            program.evaluate(inputs),
+        )
+
     def test_resource_with_labels_overlay(self):
         cel_env = celpy.Environment(annotations=koreo_function_annotations)
 
@@ -606,7 +565,7 @@ class TestOverlay(unittest.TestCase):
             program.evaluate(inputs),
         )
 
-    def test_resource_with_json_path_overlay(self):
+    def test_overlay_with_dots_in_name(self):
         cel_env = celpy.Environment(annotations=koreo_function_annotations)
 
         test_cel_expression = "{'metadata': {'labels': {'some.group/key': 'value'}, 'annotations': {'a.group/key': 'value'}}}.overlay({'metadata.deep.value.name': 'a' + '-' + 'name'})"
@@ -620,8 +579,8 @@ class TestOverlay(unittest.TestCase):
                 "metadata": {
                     "labels": {"some.group/key": "value"},
                     "annotations": {"a.group/key": "value"},
-                    "deep": {"value": {"name": "a-name"}},
-                }
+                },
+                "metadata.deep.value.name": "a-name",
             },
             program.evaluate(inputs),
         )

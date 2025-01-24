@@ -16,9 +16,11 @@ spec:
       schema:
         openAPIV3Schema:
           type: object
+          required: [spec]
           properties:
             spec:
               type: object
+              nullable: false
               properties:
                 functionRef:
                   type: object
@@ -27,7 +29,7 @@ spec:
                     kind:
                       type: string
                       nullable: false
-                      enum: [ResourceFunction, ValueFunction, Function]
+                      enum: [ResourceFunction, ValueFunction]
                     name:
                       type: string
                       nullable: false
@@ -36,24 +38,123 @@ spec:
                 inputs:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
-                  nullable: true
+                  nullable: false
 
                 currentResource:
                   type: object
-                  nullable: true
+                  nullable: false
                   x-kubernetes-embedded-resource: true
                   x-kubernetes-preserve-unknown-fields: true
 
+                testCases:
+                  type: array
+                  nullable: false
+                  maxItems: 10
+                  items:
+                    type: object
+                    properties:
+                      label:
+                        type: string
+                        nullable: false
+
+                      variant:
+                        type: boolean
+                        nullable: false
+
+                      skip:
+                        type: boolean
+                        nullable: false
+                        default: false
+
+                      inputOverrides:
+                        type: object
+                        nullable: false
+                        x-kubernetes-preserve-unknown-fields: true
+
+                      currentResource:
+                        type: object
+                        nullable: false
+                        x-kubernetes-embedded-resource: true
+                        x-kubernetes-preserve-unknown-fields: true
+
+                      overlayResource:
+                        type: object
+                        nullable: false
+                        x-kubernetes-preserve-unknown-fields: true
+
+                      expectResource:
+                        type: object
+                        nullable: false
+                        x-kubernetes-embedded-resource: true
+                        x-kubernetes-preserve-unknown-fields: true
+
+                      expectDelete:
+                        type: boolean
+                        nullable: false
+
+                      expectReturn:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                        nullable: false
+
+                      expectOutcome:
+                        type: object
+                        properties:
+                          ok:
+                            type: object
+                            nullable: true
+                          skip:
+                            type: object
+                            nullable: false
+                            properties:
+                              message:
+                                type: string
+                                nullable: false
+                            required: [message]
+                          depSkip:
+                            type: object
+                            nullable: false
+                            properties:
+                              message:
+                                type: string
+                                nullable: false
+                            required: [message]
+                          retry:
+                            type: object
+                            nullable: false
+                            properties:
+                              message:
+                                type: string
+                                nullable: false
+                              delay:
+                                type: integer
+                                nullable: false
+                            required: [message, delay]
+                          permFail:
+                            type: object
+                            nullable: false
+                            properties:
+                              message:
+                                type: string
+                                nullable: false
+                            required: [message]
+                        oneOf:
+                          - required: [ok]
+                          - required: [skip]
+                          - required: [depSkip]
+                          - required: [retry]
+                          - required: [permFail]
+
                 expectResource:
                   type: object
-                  nullable: true
+                  nullable: false
                   x-kubernetes-embedded-resource: true
                   x-kubernetes-preserve-unknown-fields: true
 
                 expectReturn:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
-                  nullable: true
+                  nullable: false
 
                 expectOutcome:
                   type: object
@@ -63,7 +164,7 @@ spec:
                       nullable: true
                     skip:
                       type: object
-                      nullable: true
+                      nullable: false
                       properties:
                         message:
                           type: string
@@ -71,7 +172,7 @@ spec:
                       required: [message]
                     depSkip:
                       type: object
-                      nullable: true
+                      nullable: false
                       properties:
                         message:
                           type: string
@@ -79,7 +180,7 @@ spec:
                       required: [message]
                     retry:
                       type: object
-                      nullable: true
+                      nullable: false
                       properties:
                         message:
                           type: string
@@ -90,7 +191,7 @@ spec:
                       required: [message, delay]
                     permFail:
                       type: object
-                      nullable: true
+                      nullable: false
                       properties:
                         message:
                           type: string
@@ -98,16 +199,11 @@ spec:
                       required: [message]
                   required: [assert]
                   oneOf:
-                    - properties:
-                      required: [ok]
-                    - properties:
-                      required: [skip]
-                    - properties:
-                      required: [depSkip]
-                    - properties:
-                      required: [retry]
-                    - properties:
-                      required: [permFail]
+                    - required: [ok]
+                    - required: [skip]
+                    - required: [depSkip]
+                    - required: [retry]
+                    - required: [permFail]
 
             status:
               x-kubernetes-preserve-unknown-fields: true

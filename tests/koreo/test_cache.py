@@ -102,7 +102,7 @@ class TestCache(unittest.IsolatedAsyncioTestCase):
 
     async def test_roundtrip(self):
         resource_name = _name_generator()
-        resource_version = f"v{random.randint(1000, 1000000)}"
+        resource_version = f"v{random.randint(10, 1000000)}"
 
         metadata = {"name": resource_name, "resourceVersion": resource_version}
         spec = {"name": resource_name}
@@ -162,7 +162,7 @@ class TestCache(unittest.IsolatedAsyncioTestCase):
 
     async def test_prepare_fail(self):
         resource_name = _name_generator()
-        resource_version = f"v{random.randint(1000, 100000)}"
+        resource_version = f"v{random.randint(10, 1000000)}"
 
         metadata = {"name": resource_name, "resourceVersion": resource_version}
 
@@ -178,7 +178,7 @@ class TestCache(unittest.IsolatedAsyncioTestCase):
 
     async def test_duplicate_not_reprepared(self):
         resource_name = _name_generator()
-        resource_version = f"v{random.randint(1000, 100000)}"
+        resource_version = f"v{random.randint(10, 1000000)}"
 
         metadata = {"name": resource_name, "resourceVersion": resource_version}
 
@@ -223,7 +223,7 @@ class TestCacheRegistry(unittest.IsolatedAsyncioTestCase):
         registry.register(registerer=reg_resource, queue=check_queue)
 
         # Build a resource that watches.
-        resource_version = f"v{random.randint(1000, 100000)}"
+        resource_version = f"v{random.randint(10, 1000000)}"
         metadata = {"name": resource_name, "resourceVersion": resource_version}
         spec = {"name": resource_name}
         await prepare_and_cache(
@@ -277,7 +277,7 @@ class TestCacheRegistry(unittest.IsolatedAsyncioTestCase):
         registry.register(registerer=reg_resource, queue=check_queue)
 
         # Build a resource that watches.
-        resource_version = f"v{random.randint(1000, 100000)}"
+        resource_version = f"v{random.randint(10, 1000000)}"
         metadata = {"name": resource_name, "resourceVersion": resource_version}
         spec = {"name": resource_name}
         await prepare_and_cache(

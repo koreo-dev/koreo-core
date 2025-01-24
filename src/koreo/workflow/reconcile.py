@@ -542,8 +542,8 @@ async def _for_each_reconciler(
             return StepResult(result=failure)
 
         case celtypes.ListType() as source_iterator:
-            # Just need source_iterator
-            pass
+            if not source_iterator:
+                return StepResult(result=celtypes.ListType())
 
         case _ as bad_type:
             return StepResult(

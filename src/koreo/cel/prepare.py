@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, NamedTuple
 import logging
 
 import celpy
@@ -47,3 +47,50 @@ def prepare_map_expression(
         return PermFail(message=f"Malformed {message_name}, expected a mapping")
 
     return prepare_expression(cel_env=cel_env, spec=spec, name=name)
+
+
+Index = dict[str, "Index"] | int
+
+
+class Overlay(NamedTuple):
+    value_index: Index
+    values: celpy.Runner
+
+
+def prepare_overlay_expression(
+    cel_env: celpy.Environment, spec: Any | None, name: str | None = None
+) -> None | Overlay | PermFail:
+    if not spec:
+        return None
+
+    message_name = f"`{name}`" if name else "overlay"
+
+    if not isinstance(spec, dict):
+        return PermFail(message=f"Malformed {message_name}, expected a mapping")
+
+    overlay_index, overlay_values = _overlay_indexer(spec=spec, base=0)
+
+    match prepare_expression(cel_env=cel_env, spec=overlay_values, name=name):
+        case None:
+            return None
+        case PermFail() as err:
+            return err
+        case celpy.Runner() as value_expression:
+            return Overlay(value_index=overlay_index, values=value_expression)
+
+
+def _overlay_indexer(spec: dict, base: int = 0) -> tuple[Index, list]:
+    index = {}
+    values = []
+    for key, value in spec.items():
+        match value:
+            case dict():
+                index[key], key_values = _overlay_indexer(
+                    value, base=len(values) + base
+                )
+                values.extend(key_values)
+            case _:
+                index[key] = len(values) + base
+                values.append(value)
+
+    return index, values

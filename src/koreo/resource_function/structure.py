@@ -4,10 +4,12 @@ from kr8s._objects import APIObject
 
 import celpy
 
+from koreo.cel.prepare import Overlay
+
 
 class ResourceTemplateRef(NamedTuple):
     name: celpy.Runner | None
-    overlay: celpy.Runner | None = None
+    overlay: Overlay | None = None
 
 
 class InlineResourceTemplate(NamedTuple):
@@ -17,7 +19,7 @@ class InlineResourceTemplate(NamedTuple):
 class Create(NamedTuple):
     enabled: bool = True
     delay: int = 30
-    overlay: celpy.Runner | None = None
+    overlay: Overlay | None = None
 
 
 class UpdatePatch(NamedTuple):

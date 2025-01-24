@@ -13,7 +13,12 @@ from celpy import celtypes
 from koreo import cache
 from koreo.cel import functions
 from koreo.cel.encoder import convert_bools
-from koreo.cel.evaluation import evaluate, evaluate_predicates, check_for_celevalerror
+from koreo.cel.evaluation import (
+    evaluate,
+    evaluate_overlay,
+    evaluate_predicates,
+    check_for_celevalerror,
+)
 from koreo.resource_template.structure import ResourceTemplate
 from koreo.result import PermFail, Retry, UnwrappedOutcome, is_unwrapped_ok
 
@@ -295,7 +300,7 @@ async def reconcile_krm_resource(
             return ReconcileResult(
                 result=Retry(
                     message=(
-                        f"Patching {full_resource_name} to update due to "
+                        f"Patching `{full_resource_name}` due to "
                         f"{' -> '.join(resource_match.differences)}."
                     ),
                     delay=delay,
@@ -408,12 +413,13 @@ async def _construct_resource_template(
                     delay=DEFAULT_LOAD_RETRY_DELAY,
                 )
 
-            materialized = dynamic_resource_template.template
-
-            if overlay:
-                match evaluate(
-                    expression=overlay,
+            if not overlay:
+                materialized = dynamic_resource_template.template
+            else:
+                match evaluate_overlay(
+                    overlay=overlay,
                     inputs=inputs,
+                    base=dynamic_resource_template.template,
                     location="spec.resourceTemplateRef.overlay",
                 ):
                     case PermFail(message=message, location=err_location):
@@ -425,7 +431,8 @@ async def _construct_resource_template(
                                 else "spec.resourceTemplateRef.overlay"
                             ),
                         )
-                    case celtypes.MapType() as base_overlay:
+                    case celtypes.MapType() as materialized:
+                        # Just needed materialized
                         pass
                     case _ as bad_type:
                         return PermFail(
@@ -433,9 +440,6 @@ async def _construct_resource_template(
                             location="spec.resourceTemplateRef.overlay",
                         )
 
-                materialized = functions._overlay(
-                    resource=dynamic_resource_template.template, overlay=base_overlay
-                )
                 if err := check_for_celevalerror(
                     materialized, location="spec.resourceTemplateRef.overlay<apply>"
                 ):
@@ -486,16 +490,20 @@ async def _create_api_resource(
     forced_overlay: celtypes.MapType,
     full_resource_name: str,
 ):
-    # TODO: Should we overlay the create.overlay onto the base view _before_
-    # or _after_ evaluating the create.overlay?
+    if not resource_view:
+        resource_view = celtypes.MapType()
 
     if create.overlay:
-        match evaluate(
-            expression=create.overlay, inputs=inputs, location="spec.create.overlay"
+        match evaluate_overlay(
+            overlay=create.overlay,
+            inputs=inputs,
+            base=resource_view,
+            location="spec.create.overlay",
         ):
             case PermFail() as failure:
                 return failure
-            case celtypes.MapType() as create_view:
+            case celtypes.MapType() as resource_view:
+                # Just needed to update resource_view
                 pass
             case _ as bad_type:
                 return PermFail(
@@ -503,33 +511,11 @@ async def _create_api_resource(
                     location="spec.create.overlay",
                 )
 
-        if not resource_view:
-            resource_view = create_view
-        else:
-            match functions._overlay(resource=resource_view, overlay=create_view):
-                case celpy.CELEvalError() as err:
-                    if updated_err := check_for_celevalerror(
-                        err, location="spec.create.overlay(apply)"
-                    ):
-                        return updated_err
-
-                    # This should never happen.
-                    return PermFail(
-                        message=f"Error applying create overlay: {err}",
-                        location="spec.create.overlay(apply)",
-                    )
-
-                case celtypes.MapType() as resource_view:
-                    pass
-
         if err := check_for_celevalerror(resource_view, location="spec.create.overlay"):
             return err
 
         # Purely for TypeChecker; check_for_celevalerror eliminates these.
         assert not isinstance(resource_view, celpy.CELEvalError)
-
-    if not resource_view:
-        resource_view = celtypes.MapType()
 
     match functions._overlay(resource=resource_view, overlay=forced_overlay):
         case celpy.CELEvalError() as err:
@@ -694,19 +680,38 @@ def _validate_match(target, actual) -> ResourceMatch:
     """Compare the specified (`target`) state against the actual (`actual`)
     reosurce state. We compare all target fields and ignore anything extra.
     """
-    if type(target) != type(actual):
-        return ResourceMatch(
-            match=False,
-            differences=[f"<target:{type(target)}, resource:{type(actual)}>"],
-        )
 
     match (target, actual):
+        # Objects need a special comparator
         case dict(), dict():
             return _validate_dict_match(target, actual)
+        case dict(), _:
+            return ResourceMatch(
+                match=False,
+                differences=[f"<target:object, resource:{type(actual)}>"],
+            )
+        case _, dict():
+            return ResourceMatch(
+                match=False,
+                differences=[f"<target:{type(target)}, resource:object>"],
+            )
+
+        # Arrays need a special comparator
         case (list() | tuple(), list() | tuple()):
             return _validate_list_match(target, actual)
-        case _:
-            # Hopefully simple type.
+        case (list() | tuple(), _):
+            return ResourceMatch(
+                match=False,
+                differences=[f"<target:array, resource:{type(actual)}>"],
+            )
+        case (_, list() | tuple()):
+            return ResourceMatch(
+                match=False,
+                differences=[f"<target:{type(target)}, resource:array>"],
+            )
+
+        # Bool needs a special comparator, due to Python's int truthiness rules
+        case bool(), bool():
             if target == actual:
                 return ResourceMatch(match=True, differences=())
             else:
@@ -714,6 +719,25 @@ def _validate_match(target, actual) -> ResourceMatch:
                     match=False,
                     differences=[f"<target:[{target}], resource:[{actual}]>"],
                 )
+        case bool(), _:
+            return ResourceMatch(
+                match=False,
+                differences=[f"<target:bool, resource:{type(actual)}>"],
+            )
+        case _, bool():
+            return ResourceMatch(
+                match=False,
+                differences=[f"<target:{type(target)}, resource:bool>"],
+            )
+
+    # Hopefully anything else is a simple type.
+    if target == actual:
+        return ResourceMatch(match=True, differences=())
+    else:
+        return ResourceMatch(
+            match=False,
+            differences=[f"<target:[{target}], resource:[{actual}]>"],
+        )
 
 
 def _validate_dict_match(target: dict, actual: dict) -> ResourceMatch:
