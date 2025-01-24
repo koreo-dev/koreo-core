@@ -1,0 +1,296 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: koreo-update-loop
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: Workflow
+metadata:
+  name: update-loop.v1
+  namespace: koreo-update-loop
+spec:
+  crdRef:
+    apiGroup: koreo.realkinetic.com
+    version: v1alpha8
+    kind: TriggerDummy
+
+  configStep:
+    functionRef:
+      kind: ValueFunction
+      name: update-loop-config.v1
+
+  steps:
+    - label: patcher
+      functionRef:
+        kind: ResourceFunction
+        name: patch-looper.v1
+      inputs:
+        metadata: =steps.config.metadata
+      condition:
+        type: PatchLooper
+        name: Patch Loop Difference Testing
+
+    - label: recreater
+      functionRef:
+        kind: ResourceFunction
+        name: recreate-looper.v1
+      inputs:
+        metadata: =steps.config.metadata
+      condition:
+        type: RecreateLooper
+        name: Recreate Loop Difference Testing
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: ValueFunction
+metadata:
+  name: update-loop-config.v1
+  namespace: koreo-update-loop
+spec:
+  return:
+    metadata:
+      name: =inputs.parent.metadata.name
+      namespace: =inputs.parent.metadata.namespace
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: ResourceFunction
+metadata:
+  name: patch-looper.v1
+  namespace: koreo-update-loop
+spec:
+  apiConfig:
+    apiVersion: koreo.realkinetic.com/v1alpha8
+    kind: TestDummy
+    plural: testdummies
+
+    name: =inputs.metadata.name + "-patch-loop"
+    namespace: =inputs.metadata.namespace
+
+  resource:
+    spec:
+      simpleValue: "simple-update"
+      nested:
+        map:
+          value:
+             a: complex
+             difference: here
+             and:
+              - a
+              - list
+              - here
+      list:
+        - value: one
+        - value: two
+        - structure: three
+        - and: four
+
+  create:
+    delay: 15
+    overlay:
+      spec:
+        list:
+        - structure: wrong
+        - value: one
+        - and: four
+        - value: two
+        nested:
+          map:
+            value:
+             difference: happens
+             stuff:
+              - at
+              - bad
+              - spots
+
+  update:
+    patch:
+      delay: 15
+
+  outcome:
+    return:
+      ref: =resource.self_ref()
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: FunctionTest
+metadata:
+  name: patch-looper.v1
+  namespace: koreo-update-loop
+spec:
+  functionRef:
+    kind: ResourceFunction
+    name: patch-looper.v1
+
+  inputs:
+    metadata:
+      name: basic-test-case
+      namespace: testing
+
+  testCases:
+    - label: Creation Values
+      expectResource:
+        apiVersion: koreo.realkinetic.com/v1alpha8
+        kind: TestDummy
+        metadata:
+          name: basic-test-case-patch-loop
+          namespace: testing
+        spec:
+          simpleValue: "simple-update"
+          nested:
+            map:
+              value:
+                 a: complex
+                 difference: happens
+                 and:
+                  - a
+                  - list
+                  - here
+                 stuff:
+                  - at
+                  - bad
+                  - spots
+          list:
+          - structure: wrong
+          - value: one
+          - and: four
+          - value: two
+    - # This test will catch the "unexpected" update-loop.
+      label: Check return value
+      skip: true
+      expectOutcome:
+        ok: {}
+    - label: Unexpected update Values
+      expectResource:
+        apiVersion: koreo.realkinetic.com/v1alpha8
+        kind: TestDummy
+        metadata:
+          name: basic-test-case-patch-loop
+          namespace: testing
+        spec:
+          simpleValue: "simple-update"
+          nested:
+            map:
+              value:
+                 a: complex
+                 difference: here
+                 and:
+                  - a
+                  - list
+                  - here
+          list:
+          - value: one
+          - value: two
+          - structure: three
+          - and: four
+    - label: Stable return value
+      expectReturn:
+        ref:
+          apiVersion: koreo.realkinetic.com/v1alpha8
+          kind: TestDummy
+          name: basic-test-case-patch-loop
+          namespace: testing
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: ResourceFunction
+metadata:
+  name: recreate-looper.v1
+  namespace: koreo-update-loop
+spec:
+  apiConfig:
+    apiVersion: koreo.realkinetic.com/v1alpha8
+    kind: TestDummy
+    plural: testdummies
+
+    name: =inputs.metadata.name + "-recreate-loop"
+    namespace: =inputs.metadata.namespace
+
+  resource:
+    spec:
+      simpleValue: "simple-update"
+      nested:
+        map:
+          value:
+             a: complex
+             difference: here
+             and:
+              - a
+              - list
+              - here
+      list:
+        - value: one
+        - value: two
+        - structure: three
+        - missing: value
+          and: four
+
+  create:
+    delay: 15
+    overlay:
+      spec:
+        nested:
+          map:
+            value:
+               difference: value
+
+  update:
+    recreate:
+      delay: 15
+
+  outcome:
+      return:
+        ref: =resource.self_ref()
+---
+apiVersion: koreo.realkinetic.com/v1alpha8
+kind: FunctionTest
+metadata:
+  name: recreate-looper.v1
+  namespace: koreo-update-loop
+spec:
+  functionRef:
+    kind: ResourceFunction
+    name: recreate-looper.v1
+
+  inputs:
+    metadata:
+      name: basic-test-case
+      namespace: testing
+
+  testCases:
+    - label: Creation Values
+      expectResource:
+        apiVersion: koreo.realkinetic.com/v1alpha8
+        kind: TestDummy
+        metadata:
+          name: basic-test-case-recreate-loop
+          namespace: testing
+        spec:
+          simpleValue: "simple-update"
+          nested:
+            map:
+              value:
+                 a: complex
+                 difference: value
+                 and:
+                  - a
+                  - list
+                  - here
+          list:
+            - value: one
+            - value: two
+            - structure: three
+            - missing: value
+              and: four
+    - # This would indicate stability
+      label: Check return value
+      skip: true
+      expectOutcome:
+        ok: {}
+    - # This indicates a loop, since we'll create... delete.. create... 
+      label: Check the delete call
+      expectDelete: true
+    - label: Yet another create...
+      expectOutcome:
+        retry:
+          delay: 0 # Any delay is OK
+          message: Creating
+    - # This indicates a loop, since we'll create... delete.. create... 
+      label: Check the delete call
+      expectDelete: true

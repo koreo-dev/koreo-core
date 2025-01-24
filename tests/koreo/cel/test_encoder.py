@@ -83,7 +83,11 @@ class TestEncodeCel(unittest.TestCase):
 
     def test_str_with_quote(self):
         value = 'This is a "test."'
-        self.assertEqual('"This is a \"test.\""', encode_cel(value))  # fmt: skip
+        self.assertEqual('"""This is a \\\"test.\\\""""', encode_cel(value))  # fmt: skip
+
+    def test_str_with_tripple_quote(self):
+        value = 'This is a """test."""'
+        self.assertEqual('"""This is a \\\"\\\"\\\"test.\\\"\\\"\\\""""', encode_cel(value))  # fmt: skip
 
     def test_expression_str(self):
         value = "=1 + 1"
@@ -125,6 +129,7 @@ class TestEncodeCel(unittest.TestCase):
         value = {
             "a_string": "testing",
             "a_quoted_string": 'you should "test"',
+            "a_tripple_quoted_string": 'you """should""" "test"',
             "an_int": 7,
             "an_int_str": "29",
             "a_float": 82.34,
@@ -148,7 +153,7 @@ class TestEncodeCel(unittest.TestCase):
         # fmt: off
         self.maxDiff = None
         self.assertEqual(
-            '{"a_string":"testing","a_quoted_string":"you should \"test\"","an_int":7,"an_int_str":29,"a_float":82.34,"a_float_str":94.55,"bool_true":true,"bool_false":false,"empty_list":[],"complex_list":["a",2,4,3.2,53.4,true,false],"nested_list":[[1,2,3],[true,false,false],["a","b","c"]],"cel_expr":8 + 3,"cel_expr_list":[8 + 3,\'a\' + \'b\'],"cel_expr_list_list":[[8 + 3,\'a\' + \'b\'],[has(value)]],"false":false,"true":true,"yes":true,"no":false,"none":null,"null":null}',
+            '{"a_string":"testing","a_quoted_string":"""you should \\\"test\\\"""","a_tripple_quoted_string":"""you \\\"\\\"\\\"should\\\"\\\"\\\" \\\"test\\\"""","an_int":7,"an_int_str":29,"a_float":82.34,"a_float_str":94.55,"bool_true":true,"bool_false":false,"empty_list":[],"complex_list":["a",2,4,3.2,53.4,true,false],"nested_list":[[1,2,3],[true,false,false],["a","b","c"]],"cel_expr":8 + 3,"cel_expr_list":[8 + 3,\'a\' + \'b\'],"cel_expr_list_list":[[8 + 3,\'a\' + \'b\'],[has(value)]],"false":false,"true":true,"yes":true,"no":false,"none":null,"null":null}',
             encode_cel(value),
         )
         # fmt: on
@@ -184,7 +189,7 @@ class TestEncodeCel(unittest.TestCase):
         self.maxDiff = None
         # fmt: off
         self.assertEqual(
-            '{"strings":{"a_string":"testing","a_quoted_string":"\"testing\" is important","an_int_str":29,"a_float_str":94.55},"numbers":{"an_int":7,"a_float":82.34},"bools":{"bool_true":true,"bool_false":false},"lists":{"empty_list":[],"complex_list":["a",2,4,3.2,53.4,true,false],"nested_list":[[1,2,3],[true,false,false],["a","b","c"]]},"cel":{"cel_expr":8 + 3,"cel_expr_list":[8 + 3,\'a\' + \'b\'],"cel_expr_list_list":[[8 + 3,\'a\' + \'b\'],[has(value)]]},"dicts":{"level_one":{"level_two":{"value":"deep","cel":has(formula)},"sibling":8 + 99},"sibling":"a"}}',
+            '{"strings":{"a_string":"testing","a_quoted_string":"""\\\"testing\\\" is important""","an_int_str":29,"a_float_str":94.55},"numbers":{"an_int":7,"a_float":82.34},"bools":{"bool_true":true,"bool_false":false},"lists":{"empty_list":[],"complex_list":["a",2,4,3.2,53.4,true,false],"nested_list":[[1,2,3],[true,false,false],["a","b","c"]]},"cel":{"cel_expr":8 + 3,"cel_expr_list":[8 + 3,\'a\' + \'b\'],"cel_expr_list_list":[[8 + 3,\'a\' + \'b\'],[has(value)]]},"dicts":{"level_one":{"level_two":{"value":"deep","cel":has(formula)},"sibling":8 + 99},"sibling":"a"}}',
             encode_cel(value),
         )
         # fmt: on

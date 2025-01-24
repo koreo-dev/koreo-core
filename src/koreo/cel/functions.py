@@ -1,4 +1,3 @@
-from typing import Any
 import copy
 import json
 import base64
@@ -6,7 +5,6 @@ import base64
 from celpy import celtypes
 import celpy
 
-import jsonpath_ng
 
 # NOTE: Annotations and Function List are at the bottom of the file. Sorry.
 
@@ -232,81 +230,33 @@ def _overlay(
     resource: celtypes.MapType,
     overlay: celtypes.MapType,
 ) -> celtypes.MapType | celpy.CELEvalError:
-    updated_resource = copy.deepcopy(resource)
-
-    computed_overlay = __build_overlay_structure(overlay)
-
-    for field_path, value in computed_overlay:
-        try:
-            path = jsonpath_ng.parse(field_path)
-            path.update_or_create(updated_resource, value)
-        except Exception as err:
-            return celpy.CELEvalError(f"Error applying template overlay ({err}).")
-
-    return updated_resource
+    return _deep_overlay(copy.deepcopy(resource), overlay)
 
 
-def __build_overlay_structure(overlay: celtypes.MapType, base: str | None = None):
-    output: list[tuple[str, Any]] = []
-
-    for field, value in overlay.items():
-        if not base:
-            field_path = f"{field}"
-        else:
-            if base.endswith("labels") or base.endswith("annotations"):
-                field_path = f"{base}['{field}']"
-            else:
-                field_path = f"{base}.{field}"
-
-        if isinstance(value, celtypes.MapType):
-            output.extend(__build_overlay_structure(value, base=field_path))
-        else:
-            output.append((field_path, value))
-
-    return output
-
-
-def _map_overlay(
+def _deep_overlay(
     resource: celtypes.MapType,
-    path: celtypes.StringType,
     overlay: celtypes.MapType,
 ) -> celtypes.MapType | celpy.CELEvalError:
-    if not resource:
-        return celpy.CELEvalError(f"Can not map-overlay an empty resource.")
+    resource = copy.deepcopy(resource)
 
-    updated_resource = copy.deepcopy(resource)
+    for field, overlay_value in overlay.items():
+        if field in resource:
+            resource_value = resource[field]
+            if isinstance(overlay_value, celtypes.MapType) and isinstance(
+                resource_value, celtypes.MapType
+            ):
+                updated_value = _deep_overlay(resource_value, overlay_value)
 
-    path_expression = jsonpath_ng.parse(path)
+                if isinstance(updated_value, celpy.CELEvalError):
+                    return updated_value
 
-    for match in path_expression.find(resource):
+                resource[field] = updated_value
 
-        value = copy.deepcopy(match.value) if match.value else celtypes.MapType()
+                continue
 
-        new_value = _overlay(value, overlay)
+        resource[field] = overlay_value
 
-        match.full_path.update(updated_resource, new_value)
-
-    return updated_resource
-
-
-def _extract_vars(
-    resource: celtypes.MapType,
-    var_map: celtypes.MapType,
-) -> celtypes.MapType | celpy.CELEvalError:
-    if not resource:
-        return celpy.CELEvalError(f"Can not extract values from empty resource.")
-
-    variables = celtypes.MapType()
-
-    for variable, path in var_map.items():
-        path_expression = jsonpath_ng.parse(path)
-        values = [match.value for match in path_expression.find(resource)]
-        if len(values) == 1:
-            variables[variable] = values[0]
-        elif len(values) > 1:
-            variables[variable] = celtypes.ListType(values)
-
-    return variables
+    return resource
 
 
 def _flatten(resource: celtypes.ListType) -> celtypes.ListType | celpy.CELEvalError:
@@ -319,29 +269,6 @@ def _flatten(resource: celtypes.ListType) -> celtypes.ListType | celpy.CELEvalEr
         merged.extend(nested)
 
     return merged
-
-
-def _template_name(
-    resource: celtypes.MapType, name: celtypes.StringType
-) -> celtypes.StringType | celpy.CELEvalError:
-    api_version_key = celtypes.StringType("apiVersion")
-    api_version = resource.get(api_version_key)
-    if not api_version:
-        return celpy.CELEvalError(f"Missing `apiVersion`.")
-
-    api_version = api_version.replace("/", ".")
-
-    kind_key = celtypes.StringType("kind")
-    kind = resource.get(kind_key)
-    if not kind:
-        return celpy.CELEvalError(f"Missing `kind`.")
-
-    kind = kind.lower()
-
-    if not name:
-        return celpy.CELEvalError(f"Missing `name`.")
-
-    return celtypes.StringType(f"{kind}.{api_version}.{name}")
 
 
 def _lower(string: celtypes.StringType) -> celtypes.StringType | celpy.CELEvalError:
@@ -443,10 +370,7 @@ koreo_function_annotations: dict[str, celpy.Annotation] = {
     "kindless_ref": celtypes.FunctionType,
     "config_connect_ready": celtypes.FunctionType,
     "overlay": celtypes.FunctionType,
-    "map_overlay": celtypes.FunctionType,
-    "template_name": celtypes.FunctionType,
     "lower": celtypes.FunctionType,
-    "extract_vars": celtypes.FunctionType,
     "flatten": celtypes.FunctionType,
     "split": celtypes.FunctionType,
     "split_first": celtypes.FunctionType,
@@ -467,10 +391,7 @@ koreo_cel_functions: dict[str, celpy.CELFunction] = {
     "kindless_ref": _kindless_ref,
     "config_connect_ready": _config_connect_ready,
     "overlay": _overlay,
-    "map_overlay": _map_overlay,
-    "template_name": _template_name,
     "lower": _lower,
-    "extract_vars": _extract_vars,
     "flatten": _flatten,
     "split": _split,
     "split_first": _split_first,

@@ -9,7 +9,6 @@ authors = [
 dependencies = [
     "cel-python==0.1.5",
     "kopf==1.37.4",
-    "jsonpath-ng==1.7.0",
     "PyYAML==6.0.2",
     "kr8s==0.18.1",
     "uvloop==0.21.0",

@@ -1,5 +1,4 @@
-from typing import Any, Sequence
-import re
+from typing import Any
 
 from celpy import celtypes
 
@@ -34,7 +33,7 @@ def convert_bools(
             return cel_object
 
 
-def encode_cel(value) -> str:
+def encode_cel(value: Any) -> str:
     if isinstance(value, dict):
         return f"{{{ ",".join(
             f'"{f"{key}".replace('"', '\"')}":{encode_cel(value)}'
@@ -57,41 +56,15 @@ def encode_cel(value) -> str:
         return '""'
 
     if not value.startswith(CEL_PREFIX):
-        return f'"{ value.replace('"', '\"') }"'  # fmt: skip
+        if "\n" in value:
+            return f'r"""{ value.replace('"', '\"') }"""'  # fmt: skip
+
+        if '"' in value:
+            return f'"""{ value.replace('"', r'\"') }"""'  # fmt: skip
+
+        return f'"{value}"'  # fmt: skip
 
     return value.lstrip(CEL_PREFIX)
-
-
-def encode_cel_template(template_spec: dict) -> str:
-    return f"{{{','.join([f'"{field}": {expression}'
-     for field, expression in _encode_template_dict("", template_spec)
-     ])}}}"
-
-
-QUOTED_NAME = re.compile(".*[^a-zA-Z0-9-_]+.*")
-
-
-def _encode_template_dict(base: str, template_spec: dict) -> Sequence[tuple[str, str]]:
-    output: list[tuple[str, str]] = []
-
-    for field, expression in template_spec.items():
-        if not isinstance(field, str):
-            field = f"{field}"
-        safe_field = field.replace('"', '\"')  # fmt: skip
-
-        field_name = safe_field
-        if base:
-            if QUOTED_NAME.match(safe_field):
-                field_name = f"{base}['{safe_field.replace("'", "\'")}']"  # fmt: skip
-            else:
-                field_name = f"{base}.{safe_field}"
-
-        if isinstance(expression, dict):
-            output.extend(_encode_template_dict(field_name, expression))
-        else:
-            output.append((field_name, encode_cel(expression)))
-
-    return output
 
 
 def _encode_plain(maybe_number) -> bool:
