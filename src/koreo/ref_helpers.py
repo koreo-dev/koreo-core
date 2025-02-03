@@ -13,7 +13,7 @@ FunctionResource = (
 
 
 def function_or_workflow_to_resource(
-    spec: Any, location_base: str | None = None
+    spec: Any, location: str
 ) -> FunctionResource | registry.Resource[Workflow] | None | result.PermFail:
     if not spec:
         return None
@@ -24,25 +24,27 @@ def function_or_workflow_to_resource(
                 "Expected object with a `functionRef` or `workflowRef`. "
                 f"received {type(spec)}"
             ),
-            location=location_base,
+            location=location,
         )
 
-    if resource := function_ref_spec_to_resource(spec=spec.get("functionRef")):
+    if resource := function_ref_spec_to_resource(
+        spec=spec.get("functionRef"), location=f"{location}:functionRef"
+    ):
         return resource
 
-    if resource := workflow_ref_spec_to_resource(spec=spec.get("workflowRef")):
+    if resource := workflow_ref_spec_to_resource(
+        spec=spec.get("workflowRef"), location=f"{location}:workflowRef"
+    ):
         return resource
 
     return None
 
 
 def function_ref_spec_to_resource(
-    spec: Any, location_base: str | None = None
-) -> FunctionResource | None | result.PermFail:
-    if not spec:
+    spec: Any, location: str
+) -> None | result.PermFail | FunctionResource:
+    if spec is None:
         return None
-
-    location = f"{location_base}:functionRef" if location_base else "functionRef"
 
     if not isinstance(spec, dict):
         return result.PermFail(
@@ -80,12 +82,10 @@ def function_ref_spec_to_resource(
 
 
 def workflow_ref_spec_to_resource(
-    spec: Any, location_base: str | None = None
-) -> registry.Resource[Workflow] | None | result.PermFail:
-    if not spec:
+    spec: Any, location: str
+) -> None | registry.Resource[Workflow] | result.PermFail:
+    if spec is None:
         return None
-
-    location = f"{location_base}:workflowRef" if location_base else "workflowRef"
 
     if not isinstance(spec, dict):
         return result.PermFail(

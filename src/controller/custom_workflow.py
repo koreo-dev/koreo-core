@@ -138,6 +138,7 @@ def start_controller(group: str, kind: str, version: str):
         outcome = None
         resource_ids = None
         state = None
+        state_errors = None
         for workflow_key in workflow_keys:
             workflow = get_resource_from_cache(
                 resource_class=Workflow, cache_key=workflow_key
@@ -160,6 +161,7 @@ def start_controller(group: str, kind: str, version: str):
             outcome = workflow_result.result
             resource_ids = workflow_result.resource_ids
             state = workflow_result.state
+            state_errors = workflow_result.state_errors
             for condition in workflow_result.conditions:
                 conditions = update_condition(
                     conditions=conditions, condition=condition
@@ -172,42 +174,32 @@ def start_controller(group: str, kind: str, version: str):
             resource_ids, separators=(",", ":"), indent=None
         )
 
-        if is_error(outcome):
-            patch.update(
-                {
-                    "metadata": {
-                        "annotations": {
-                            "koreo.realkinetic.com/managed-resources": encoded_resource_ids
-                        }
-                    },
-                    "status": {
-                        "conditions": conditions,
-                        "koreo": {
-                            "errors": outcome.message,
-                            "locations": outcome.location,
-                        },
-                        "state": convert_bools(state),
-                    },
+        object_patch = {
+            "metadata": {
+                "annotations": {
+                    "koreo.realkinetic.com/managed-resources": encoded_resource_ids
                 }
-            )
+            },
+            "status": {
+                "conditions": conditions,
+                "state": convert_bools(state),
+            },
+        }
+
+        if is_error(outcome):
+            object_patch["status"]["koreo"] = {
+                "errors": outcome.message,
+                "locations": outcome.location,
+                "state_errors": state_errors if state_errors else None,
+            }
+            patch.update(object_patch)
             raise_for_error(outcome)
 
         koreo_value = {
             "errors": None,
             "locations": None,
+            "state_errors": state_errors if state_errors else None,
         }
+        object_patch["status"]["koreo"] = koreo_value
 
-        patch.update(
-            {
-                "metadata": {
-                    "annotations": {
-                        "koreo.realkinetic.com/managed-resources": encoded_resource_ids
-                    }
-                },
-                "status": {
-                    "conditions": conditions,
-                    "koreo": koreo_value,
-                    "state": convert_bools(state),
-                },
-            }
-        )
+        patch.update(object_patch)

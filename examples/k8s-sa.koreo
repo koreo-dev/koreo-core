@@ -29,6 +29,7 @@ spec:
         metadata: =steps.config.metadata
       state:
         ref: =resource.self_ref()
+
     - label: role
       functionRef:
         kind: ResourceFunction
@@ -36,6 +37,7 @@ spec:
       inputs:
         metadata: =steps.config.metadata
         resources: =steps.config.resources
+
     - label: binding
       functionRef:
         kind: ResourceFunction
@@ -82,15 +84,16 @@ spec:
           - kind: configmap
             name: test-configmap
 
-  expectReturn:
-    metadata:
-      name: test-account-workload
-      namespace: test-namespace
-    resources:
-    - kind: secret
-      name: test-secret
-    - kind: configmap
-      name: test-configmap
+  testCases:
+   - expectReturn:
+       metadata:
+         name: test-account-workload
+         namespace: test-namespace
+       resources:
+       - kind: secret
+         name: test-secret
+       - kind: configmap
+         name: test-configmap
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: ResourceTemplate
@@ -121,6 +124,14 @@ spec:
   resourceTemplateRef:
       name: deployment-service-account.v1
 
+  create:
+    delay: 10
+
+  update:
+    recreate:
+      delay: 10
+
+
   outcome:
       return:
         ref: =resource.self_ref()
@@ -140,14 +151,21 @@ spec:
       namespace: test-namespace
       name: test-account
 
-  expectResource:
-    apiVersion: v1
-    kind: ServiceAccount
-    metadata:
-      labels:
-        workloads.realkinetic.com/auto-sa: 'true'
-      name: test-account
-      namespace: test-namespace
+  testCases:
+  - expectResource:
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        labels:
+          workloads.realkinetic.com/auto-sa: 'true'
+        name: test-account
+        namespace: test-namespace
+  - expectReturn:
+      ref:
+        apiVersion: v1
+        kind: ServiceAccount
+        name: test-account
+        namespace: test-namespace
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: ResourceFunction
@@ -201,17 +219,18 @@ spec:
         kind: Secret
         name: contact-list-api-key
 
-  expectResource:
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: Role
-    metadata:
-      name: test-workload
-      namespace: test-namespace
-    rules:
-    - apiGroups: [v1]
-      resourceNames: [contact-list-api-key]
-      resources: [secrets]
-      verbs: [get]
+  testCases:
+  - expectResource:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: Role
+      metadata:
+        name: test-workload
+        namespace: test-namespace
+      rules:
+      - apiGroups: [v1]
+        resourceNames: [contact-list-api-key]
+        resources: [secrets]
+        verbs: [get]
 ---
 apiVersion: koreo.realkinetic.com/v1alpha8
 kind: ResourceFunction
@@ -272,18 +291,17 @@ spec:
         name: secret-contact-list-api-key
         namespace: koreo-demo
 
-
-  expectResource:
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: RoleBinding
-    metadata:
-      name: test-workload
-      namespace: test-namespace
-    roleRef:
-      apiGroup: rbac.authorization.k8s.io
-      kind: Role
-      name: secret-contact-list-api-key
-    subjects:
-    - kind: ServiceAccount
-      name: contect-list-sa
-
+  testCases:
+  - expectResource:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: test-workload
+        namespace: test-namespace
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: Role
+        name: secret-contact-list-api-key
+      subjects:
+      - kind: ServiceAccount
+        name: contect-list-sa

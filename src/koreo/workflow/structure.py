@@ -57,22 +57,9 @@ class ErrorStep(NamedTuple):
     state: None = None
 
 
-class ConditionSpec(NamedTuple):
-    type_: str
-    name: str
-    step: str
-
-
-class Status(NamedTuple):
-    conditions: Sequence[ConditionSpec]
-    state: celpy.Runner | None
-
-
 class Workflow(NamedTuple):
     crd_ref: ConfigCRDRef | None
 
     steps_ready: Outcome
     config_step: ConfigStep | ErrorStep | None
     steps: Sequence[Step | ErrorStep]
-
-    status: Status

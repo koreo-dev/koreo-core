@@ -30,6 +30,7 @@ class Result(NamedTuple):
     conditions: list[Condition]
     resource_ids: dict[str, ResourceIds]
     state: celtypes.MapType
+    state_errors: dict[str, str]
 
 
 async def reconcile_workflow(
@@ -55,9 +56,10 @@ async def reconcile_workflow(
             conditions=[condition],
             resource_ids={},
             state=celtypes.MapType({}),
+            state_errors={},
         )
 
-    outcomes, conditions, step_state = await _reconcile_steps(
+    outcomes, conditions, step_state, state_errors = await _reconcile_steps(
         api=api,
         workflow_key=workflow_key,
         config_step=workflow.config_step,
@@ -70,18 +72,6 @@ async def reconcile_workflow(
 
     outcome_resources = {key: result.resource_ids for key, result in outcomes.items()}
 
-    conditions.extend(
-        [
-            _condition_helper(
-                condition_type=condition_spec.type_,
-                thing_name=condition_spec.name,
-                outcome=outcome_results.get(condition_spec.step),
-                workflow_key=workflow_key,
-            )
-            for condition_spec in workflow.status.conditions
-        ]
-    )
-
     overall_outcome = result.unwrapped_combine(outcomes=outcome_results.values())
     conditions.append(
         _condition_helper(
@@ -92,51 +82,13 @@ async def reconcile_workflow(
         )
     )
 
-    if result.is_error(overall_outcome) or not workflow.status.state:
-        return Result(
-            result=overall_outcome,
-            conditions=conditions,
-            resource_ids=outcome_resources,
-            state=step_state,
-        )
-
-    # This is to prevent returning the result-set in state and result.
-    if result.is_unwrapped_ok(overall_outcome):
-        overall_outcome = None
-
-    ok_outcomes = celtypes.MapType(
-        {
-            celtypes.StringType(step): _outcome_encoder(outcome)
-            for step, outcome in outcome_results.items()
-        }
+    return Result(
+        result=overall_outcome,
+        conditions=conditions,
+        resource_ids=outcome_resources,
+        state=step_state,
+        state_errors=state_errors,
     )
-
-    match evaluate(
-        expression=workflow.status.state,
-        inputs={"steps": ok_outcomes},
-        location=f"{workflow_key}:spec.status.state",
-    ):
-        case celtypes.MapType() as state:
-            return Result(
-                result=overall_outcome,
-                conditions=conditions,
-                resource_ids=outcome_resources,
-                state=state,
-            )
-        case result.PermFail() as failure:
-            return Result(
-                result=failure,
-                conditions=conditions,
-                resource_ids=outcome_resources,
-                state=celtypes.MapType({}),
-            )
-        case _ as state:
-            return Result(
-                result=overall_outcome,
-                conditions=conditions,
-                resource_ids=outcome_resources,
-                state=celtypes.MapType({workflow_key: state}),
-            )
 
 
 class StepResult(NamedTuple):
@@ -199,9 +151,9 @@ async def _reconcile_steps(
     trigger: celtypes.Value,
     config_step: structure.ConfigStep | structure.ErrorStep | None,
     steps: Sequence[structure.Step | structure.ErrorStep],
-) -> tuple[dict[str, StepResult], list[Condition], celtypes.MapType]:
+) -> tuple[dict[str, StepResult], list[Condition], celtypes.MapType, dict[str, str]]:
     if not (config_step or steps):
-        return {}, [], celtypes.MapType({})
+        return {}, [], celtypes.MapType({}), {}
 
     outcome_map: dict[
         str, tuple[structure.StepConditionSpec | None, celpy.Runner | None]
@@ -258,6 +210,7 @@ async def _reconcile_steps(
     outcomes: dict[str, StepResult] = {}
     conditions = []
     state = celtypes.MapType({})
+    state_errors: dict[str, str] = {}
 
     for task in task_map.values():
         task_name = task.get_name()
@@ -319,14 +272,14 @@ async def _reconcile_steps(
                 ):
                     case celtypes.MapType() as step_state:
                         state.update(step_state)
-                    case result.PermFail():
-                        # TODO: ... what to do here?
-                        pass
-                    case _:
-                        # This is an impossible state
-                        pass
+                    case result.PermFail() as err:
+                        state_errors[task_name] = f"{err.message} at {err.location}"
+                    case _ as bad_state:
+                        state_errors[task_name] = (
+                            f"Invalid state type ({type(bad_state)})"
+                        )
 
-    return outcomes, conditions, state
+    return outcomes, conditions, state, state_errors
 
 
 def _outcome_encoder(outcome: result.UnwrappedOutcome):
@@ -367,15 +320,27 @@ async def _reconcile_step(
             if not result.is_unwrapped_ok(inputs):
                 return StepResult(result=inputs)
 
-        return await _reconcile_step_logic(
-            api=api,
-            workflow_key=workflow_key,
-            location=location,
-            logic=step.logic,
-            owner=owner,
-            trigger=trigger,
-            inputs=inputs,
-        )
+        if step.for_each:
+            return await _for_each_reconciler(
+                api=api,
+                workflow_key=workflow_key,
+                location=location,
+                step=step,
+                steps=celtypes.MapType(),
+                owner=owner,
+                trigger=trigger,
+                inputs=inputs,
+            )
+        else:
+            return await _reconcile_step_logic(
+                api=api,
+                workflow_key=workflow_key,
+                location=location,
+                logic=step.logic,
+                owner=owner,
+                trigger=trigger,
+                inputs=inputs,
+            )
 
     [resolved, pending] = await asyncio.wait(dependencies)
     if pending:

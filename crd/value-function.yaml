@@ -25,6 +25,10 @@ spec:
                   nullable: false
                   type: array
                   maxItems: 20
+                  description: |
+                    Optional set of preconditions which will be evaluated to
+                    determine if the Function can, or should, be run and if not
+                    specifies the outcome.
                   items:
                     type: object
                     properties:
@@ -33,10 +37,18 @@ spec:
                         nullable: false
                         x-kubernetes-validations:
                           - rule: self.startsWith('=')
-                            message: "assertion must be a cel expression (start with '=')."
-                      ok:
+                            message: |
+                              assertion must be an expression (start with '=')
+                        description: |
+                          A predicate which must evaluate to `true`, if it does
+                          not the specified outcome is returned. This should be
+                          a Koreo Expression and it may access the function's
+                          `inputs`.
+                      defaultReturn:
                         type: object
                         nullable: false
+                        x-kubernetes-preserve-unknown-fields: true
+                        description: A static, default return value.
                       skip:
                         type: object
                         nullable: false
@@ -45,6 +57,10 @@ spec:
                             type: string
                             nullable: false
                         required: [message]
+                        description: |
+                          Indicates that the Function did not run due to a
+                          condition, such as a config value. Use message to
+                          indicate why. Note this is not an error.
                       depSkip:
                         type: object
                         nullable: false
@@ -53,6 +69,10 @@ spec:
                             type: string
                             nullable: false
                         required: [message]
+                        description: |
+                          Indicates that the Function did not run due to a
+                          dependency not being ready or being skipped. Use
+                          message to indicate why. Note this is not an error.
                       retry:
                         type: object
                         nullable: false
@@ -64,6 +84,10 @@ spec:
                             type: integer
                             nullable: false
                         required: [message, delay]
+                        description: |
+                          Indicates that a condition is not yet met, so the
+                          function can not (or should not) evaluate yet. Wait
+                          and retry after delay seconds.
                       permFail:
                         type: object
                         nullable: false
@@ -72,6 +96,11 @@ spec:
                             type: string
                             nullable: false
                         required: [message]
+                        description: |
+                          Indicates that an unrecoverable error has occurred,
+                          intervention is required to correct this condition.
+                          This will cause Workflows to stop retrying. Use
+                          message to provide information to correct the issue.
                     required: [assert]
                     oneOf:
                       - required: [ok]
@@ -83,10 +112,17 @@ spec:
                   type: object
                   nullable: false
                   x-kubernetes-preserve-unknown-fields: true
+                  description: |
+                    Constant values or Koreo Expressions which will make
+                    `return` more ergonomic to write.
                 return:
                   nullable: false
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
+                  description: |
+                    The return value expression for this ValueFunction. It must
+                    be an object composed of constant values or Koreo
+                    Expressions with access to both `inputs` and `locals`.
               anyOf:
                 - required: [validators]
                 - required: [return]

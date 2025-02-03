@@ -300,17 +300,12 @@ async def _run_test_case(
                 actual_outcome=reconcile_result,
             )
         case ExpectDelete(expected=expected):
-            passed = api._delete_called and expected
-            if not passed:
-                if expected:
-                    message = "Delete not called as expected."
-                else:
-                    message = "Delete unexpectedly called."
+            passed = api._delete_called == expected
+
+            if api._delete_called:
+                message = "Delete called"
             else:
-                if expected:
-                    message = "Delete called as expected."
-                else:
-                    message = "Delete not called or expected."
+                message = "Delete not called."
 
             outcome_result = TestCaseResult(
                 test_pass=passed,
@@ -362,11 +357,16 @@ def _validate_resource_match(
     actual_outcome: result.UnwrappedOutcome[celtypes.Value] | None,
 ):
     if materialized is None and expected is not None:
+        if actual_outcome and not result.is_unwrapped_ok(actual_outcome):
+            outcome_message = actual_outcome.message
+        else:
+            outcome_message = "unexpected Ok result"
+
         return TestCaseResult(
             test_pass=False,
             expected_outcome=result.Ok(expected),
             outcome=actual_outcome,
-            message="Resource changes expected, but none attempted.",
+            message=f"No resource changes attempted: {outcome_message}",
         )
 
     if not isinstance(actual_outcome, result.Retry):
@@ -390,12 +390,6 @@ def _validate_outcome_match(
     expected: result.Outcome | None,
     actual: result.UnwrappedOutcome[celtypes.Value] | None,
 ):
-    if expected and not actual:
-        return TestCaseResult(
-            test_pass=True,
-            expected_outcome=expected,
-            outcome=actual,
-        )
 
     test_pass = False
     message = None
@@ -496,7 +490,7 @@ class ResourceMatch(NamedTuple):
     differences: Difference
 
 
-def _validate_match(target, actual) -> ResourceMatch:
+def _validate_match(target, actual, compare_list_as_set: bool = False) -> ResourceMatch:
     """Compare the specified (`target`) state against the actual (`actual`)
     reosurce state. We compare all target fields and ignore anything extra.
     """
@@ -517,7 +511,11 @@ def _validate_match(target, actual) -> ResourceMatch:
 
         # Arrays need a special comparator
         case (list() | tuple(), list() | tuple()):
+            if compare_list_as_set:
+                return _validate_set_match(target, actual)
+
             return _validate_list_match(target, actual)
+
         case (list() | tuple(), _):
             return ResourceMatch(
                 match=False,
@@ -555,15 +553,41 @@ def _validate_match(target, actual) -> ResourceMatch:
 
     return ResourceMatch(
         match=False,
-        differences=f"expected `{target}` but found `{actual}`",
+        differences=f"expected '`{target}`' but found '`{actual}`'",
     )
+
+
+KOREO_DIRECTIVE_KEYS: set[str] = {
+    "x-koreo-compare-as-set",
+    "x-koreo-compare-as-map",
+}
+
+
+def _obj_to_key(obj: dict, fields: Sequence[int | str]) -> str:
+    return "$".join(f"{obj.get(field)}".strip() for field in fields)
+
+
+def _list_to_object(
+    obj_list: Sequence[dict], key_fields: Sequence[int | str]
+) -> dict[str, dict]:
+    return {_obj_to_key(obj, key_fields): obj for obj in obj_list}
 
 
 def _validate_dict_match(target: dict, actual: dict) -> ResourceMatch:
     differences: dict[str, str | Difference] = {}
 
-    target_keys = set(target.keys())
-    actual_keys = set(actual.keys())
+    compare_list_as_set_keys = {
+        key for key in target.get("x-koreo-compare-as-set", ()) if key
+    }
+
+    compare_as_map = {
+        key: [field_name for field_name in fields if field_name]
+        for key, fields in target.get("x-koreo-compare-as-map", {}).items()
+        if key
+    }
+
+    target_keys = set(target.keys()) - KOREO_DIRECTIVE_KEYS
+    actual_keys = set(actual.keys()) - KOREO_DIRECTIVE_KEYS
 
     for missing_key in target_keys - actual_keys:
         differences[missing_key] = "missing"
@@ -572,7 +596,18 @@ def _validate_dict_match(target: dict, actual: dict) -> ResourceMatch:
         differences[unexpected_key] = "unexpected"
 
     for compare_key in target_keys.intersection(actual_keys):
-        key_match = _validate_match(target[compare_key], actual[compare_key])
+        if compare_key in compare_as_map:
+            key_match = _validate_match(
+                _list_to_object(target[compare_key], compare_as_map[compare_key]),
+                _list_to_object(actual[compare_key], compare_as_map[compare_key]),
+            )
+        else:
+            key_match = _validate_match(
+                target[compare_key],
+                actual[compare_key],
+                compare_list_as_set=(compare_key in compare_list_as_set_keys),
+            )
+
         if not key_match.match:
             differences[compare_key] = key_match.differences
 
@@ -597,3 +632,43 @@ def _validate_list_match(target: list | tuple, actual: list | tuple) -> Resource
             differences.append(item_match.differences)
 
     return ResourceMatch(match=not has_differences, differences=differences)
+
+
+def _validate_set_match(target: list | tuple, actual: list | tuple) -> ResourceMatch:
+    try:
+        target_set = set(target)
+        actual_set = set(actual)
+    except TypeError as err:
+        if "dict" in f"{err}":
+            return ResourceMatch(
+                match=False,
+                differences=f"Could not compare array-as-set, try: `x-koreo-compare-as-map`",
+            )
+
+        return ResourceMatch(
+            match=False, differences=f"Could not compare array-as-set ({err})"
+        )
+    except Exception as err:
+        return ResourceMatch(
+            match=False, differences=f"Could not compare array-as-set ({err})"
+        )
+
+    missing_values = target_set - actual_set
+    unexpected_values = actual_set - target_set
+
+    if not (missing_values or unexpected_values):
+        return ResourceMatch(match=True, differences=())
+
+    differences = []
+
+    for missing_value in missing_values:
+        differences.append(
+            f"<missing '{missing_value}'>",
+        )
+
+    for unexpected_value in unexpected_values:
+        differences.append(
+            f"<unexpectedly found '{unexpected_value}'>",
+        )
+
+    return ResourceMatch(match=False, differences=differences)

@@ -45,13 +45,15 @@ base_object = celpy.json_to_cel(
 
 def _make_a_string(words: int) -> str:
     generated = " ".join(
-        "".join(
-            (char if r"\\" != char else r"\\\\")
-            for char in random.choices(string.printable, k=random.randint(3, 15))
-        )
+        (
+            "".join(
+                (char if r"\\" != char else r"\\\\")
+                for char in random.choices(string.printable, k=random.randint(3, 15))
+            )
+        ).strip()
         for _ in range(words)
     )
-    return generated.lstrip(CEL_PREFIX)
+    return generated.strip().lstrip(CEL_PREFIX)
 
 
 def _perform_overlay(overlay_spec, failureException):
@@ -61,7 +63,7 @@ def _perform_overlay(overlay_spec, failureException):
     cel_env = celpy.Environment()
 
     match prepare.prepare_overlay_expression(
-        cel_env=cel_env, spec=overlay_spec, name="unit-test-prepare"
+        cel_env=cel_env, spec=overlay_spec, location="unit-test-prepare"
     ):
         case None:
             raise failureException(f"Failed to prepare overlay {overlay_spec}")
@@ -83,6 +85,47 @@ def _perform_overlay(overlay_spec, failureException):
             raise failureException(f"PermFail overlaying {message}")
         case overlaid:
             return json.loads(json.dumps(convert_bools(overlaid)))
+
+
+class TestEvaluation(unittest.TestCase):
+    def test_encodings(self):
+        pass
+
+    def test_string_encodings(self):
+        cel_env = celpy.Environment()
+
+        random_string = _make_a_string(50)
+
+        match prepare.prepare_expression(
+            cel_env=cel_env, spec=random_string, location="unit-test-prepare"
+        ):
+            case None:
+                raise self.failureException(
+                    f"Failed to prepare overlay {random_string}"
+                )
+            case PermFail(message=message):
+                raise self.failureException(
+                    f"PermFail preparing string.\nMessage:\n{message}\nOverlay:\n{random_string}"
+                )
+            case prepared_string:
+                pass
+
+        match evaluation.evaluate(
+            expression=prepared_string,
+            inputs={},
+            location="unit-test-evaluation",
+        ):
+            case PermFail(message=message):
+                raise self.failureException(
+                    f"PermFail evaluating string.\nMessage:\n{message}\nString:\n{random_string}"
+                )
+            case output_string:
+                self.maxDiff = None
+                print(f"End Quote: {output_string[-1] == '"'}")
+                self.assertEqual(random_string, output_string)
+                # raise self.failureException(
+                #    f"Ok evaluating string.\nString:\n{output_string}"
+                # )
 
 
 class TestOverlay(unittest.TestCase):

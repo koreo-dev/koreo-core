@@ -68,7 +68,7 @@ async def prepare_workflow(
     if config_step_spec:
         location_base = _location(cache_key, "spec.configStep")
         match ref_helpers.function_or_workflow_to_resource(
-            config_step_spec, location_base=location_base
+            config_step_spec, location=location_base
         ):
             case None:
                 return PermFail(
@@ -112,7 +112,7 @@ async def prepare_workflow(
             step_label = step.get("label")
             location_base = f"Workflow:{cache_key}:{step_label}"
             match ref_helpers.function_or_workflow_to_resource(
-                step, location_base=location_base
+                step, location=location_base
             ):
                 case None:
                     return PermFail(
@@ -149,17 +149,12 @@ async def prepare_workflow(
             group=crd_ref.api_group, kind=crd_ref.kind, version=crd_ref.version
         )
 
-    status = _build_status(cel_env=cel_env, status_spec=spec.get("status"))
-    if not is_unwrapped_ok(status):
-        return status
-
     return (
         structure.Workflow(
             crd_ref=crd_ref,
             config_step=config_step,
             steps_ready=all_steps_ready,
             steps=steps,
-            status=status,
         ),
         tuple(watched_resources),
     )
@@ -271,7 +266,7 @@ def _load_config_step(
 
     input_mapper_spec = step_spec.get("inputs")
     match prepare_map_expression(
-        cel_env=cel_env, spec=input_mapper_spec, name="spec.configStep.inputs"
+        cel_env=cel_env, spec=input_mapper_spec, location="spec.configStep.inputs"
     ):
         case None:
             input_mapper = None
@@ -302,19 +297,19 @@ def _load_config_step(
             name=condition_spec.get("name"),
         )
 
-    state_spec = step_spec.get("state", {step_label: "=value"})
+    state_spec = step_spec.get("state")
     match prepare_map_expression(
-        cel_env=cel_env, spec=state_spec, name="spec.configStep.state"
+        cel_env=cel_env, spec=state_spec, location="spec.configStep.state"
     ):
         case None:
             state = None
         case celpy.Runner() as state:
             used_vars = extract_argument_structure(state.ast)
-            dynamic_input_keys: set[str] = {
+            dynamic_input_keys.update(
                 match.group("name")
                 for match in (STEPS_NAME_PATTERN.match(key) for key in used_vars)
                 if match
-            }
+            )
         case PermFail(message=message):
             return structure.ErrorStep(
                 label=step_label,
@@ -428,7 +423,7 @@ def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str
 
     input_mapper_spec = step_spec.get("inputs")
     match prepare_map_expression(
-        cel_env=cel_env, spec=input_mapper_spec, name=f"{step_label}.inputs"
+        cel_env=cel_env, spec=input_mapper_spec, location=f"{step_label}.inputs"
     ):
         case None:
             input_mapper = None
@@ -457,9 +452,9 @@ def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str
             name=condition_spec.get("name"),
         )
 
-    state_spec = step_spec.get("state", {step_label: "=value"})
+    state_spec = step_spec.get("state")
     match prepare_map_expression(
-        cel_env=cel_env, spec=state_spec, name=f"step:{step_label}.state"
+        cel_env=cel_env, spec=state_spec, location=f"step:{step_label}.state"
     ):
         case None:
             state = None
@@ -511,7 +506,9 @@ def _prepare_for_each(
 
     source_iterator_spec = spec.get("itemIn")
     match prepare_expression(
-        cel_env=cel_env, spec=source_iterator_spec, name=f"{step_label}.forEach.itemIn"
+        cel_env=cel_env,
+        spec=source_iterator_spec,
+        location=f"{step_label}.forEach.itemIn",
     ):
         case None:
             return structure.ErrorStep(
@@ -651,36 +648,3 @@ def _load_workflow(step_label: str, workflow_ref: dict):
         )
 
     return workflow_cache_key, workflow
-
-
-def _build_status(
-    cel_env: celpy.Environment, status_spec: dict | None
-) -> structure.Status | PermFail:
-    if not status_spec:
-        return structure.Status(conditions=[], state=None)
-
-    state_spec = status_spec.get("state")
-    match prepare_map_expression(
-        cel_env=cel_env, spec=state_spec, name="spec.status.state"
-    ):
-        case None:
-            state = None
-        case celpy.Runner() as state:
-            pass
-        case PermFail() as failure:
-            return failure
-
-    conditions_spec = status_spec.get("conditions")
-    if not conditions_spec:
-        conditions = []
-    else:
-        conditions = [
-            structure.ConditionSpec(
-                type_=condition_spec.get("type"),
-                name=condition_spec.get("name"),
-                step=condition_spec.get("step"),
-            )
-            for condition_spec in conditions_spec
-        ]
-
-    return structure.Status(conditions=conditions, state=state)
