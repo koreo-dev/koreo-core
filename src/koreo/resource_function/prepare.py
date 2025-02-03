@@ -61,7 +61,7 @@ async def prepare_resource_function(
             used_vars.update(extract_argument_structure(input_validators.ast))
 
     match prepare_map_expression(
-        cel_env=env, spec=spec.get("locals"), name="spec.locals"
+        cel_env=env, spec=spec.get("locals"), location="spec.locals"
     ):
         case PermFail(message=message):
             return PermFail(
@@ -192,7 +192,7 @@ def _prepare_api_config(
         )
 
     match prepare_map_expression(
-        cel_env=cel_env, spec=resource_id_cel, name="spec.apiConfig"
+        cel_env=cel_env, spec=resource_id_cel, location="spec.apiConfig"
     ):
         case PermFail(message=message):
             return PermFail(message=message)
@@ -218,7 +218,7 @@ def _prepare_resource_template(
     match spec:
         case {"resource": resource_template}:
             match prepare_map_expression(
-                cel_env=cel_env, spec=resource_template, name="spec.resource"
+                cel_env=cel_env, spec=resource_template, location="spec.resource"
             ):
                 case PermFail() as err:
                     return err
@@ -238,7 +238,7 @@ def _prepare_resource_template(
         case {"resourceTemplateRef": resource_template_ref}:
             name_cel = resource_template_ref.get("name")
             match prepare_expression(
-                cel_env=cel_env, spec=name_cel, name="spec.resourceTemplateRef.name"
+                cel_env=cel_env, spec=name_cel, location="spec.resourceTemplateRef.name"
             ):
                 case None:
                     return PermFail(
@@ -258,7 +258,7 @@ def _prepare_resource_template(
             match prepare_overlay_expression(
                 cel_env=cel_env,
                 spec=overlay_spec,
-                name="spec.resourceTemplateRef.overlay",
+                location="spec.resourceTemplateRef.overlay",
             ):
                 case None:
                     return PermFail(
@@ -295,7 +295,7 @@ def _prepare_create(
     match prepare_overlay_expression(
         cel_env=cel_env,
         spec=overlay_spec,
-        name="spec.create.overlay",
+        location="spec.create.overlay",
     ):
         case PermFail() as err:
             return err
@@ -342,7 +342,7 @@ def _prepare_outcome(
             pass
 
     match prepare_map_expression(
-        cel_env=cel_env, spec=outcome_spec.get("return"), name="spec.outcome.return"
+        cel_env=cel_env, spec=outcome_spec.get("return"), location="spec.outcome.return"
     ):
         case PermFail(message=message):
             return PermFail(message=message)

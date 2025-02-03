@@ -49,7 +49,7 @@ async def prepare_value_function(
             used_vars.update(extract_argument_structure(validators.ast))
 
     match prepare_map_expression(
-        cel_env=env, spec=spec.get("locals"), name="spec.locals"
+        cel_env=env, spec=spec.get("locals"), location="spec.locals"
     ):
         case PermFail(message=message):
             return PermFail(
@@ -62,7 +62,7 @@ async def prepare_value_function(
             used_vars.update(extract_argument_structure(local_values.ast))
 
     match prepare_map_expression(
-        cel_env=env, spec=spec.get("return"), name="spec.return"
+        cel_env=env, spec=spec.get("return"), location="spec.return"
     ):
         case PermFail(message=message):
             return PermFail(

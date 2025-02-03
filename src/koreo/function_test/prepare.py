@@ -7,16 +7,20 @@ from koreo import ref_helpers
 from koreo import registry
 from koreo import schema
 from koreo.cache import get_resource_from_cache
-from koreo.result import DepSkip, PermFail, UnwrappedOutcome, is_error
+from koreo.cel.evaluation import evaluate
+from koreo.cel.functions import _overlay
+from koreo.cel.structure_extractor import extract_argument_structure
+from koreo.result import DepSkip, PermFail, UnwrappedOutcome, is_error, is_unwrapped_ok
 
 from koreo.predicate_helpers import predicate_to_koreo_result
-from koreo.resource_function.structure import ResourceFunction
+from koreo.resource_function.structure import ResourceFunction, ResourceTemplateRef
+from koreo.resource_template.structure import ResourceTemplate
 
 from . import structure
 
 
 async def prepare_function_test(
-    cache_key: str, spec: dict | None
+    cache_key: str, spec: dict
 ) -> UnwrappedOutcome[tuple[structure.FunctionTest, Sequence[registry.Resource]]]:
     location = f"prepare:FunctionTest:{cache_key}"
 
@@ -28,19 +32,17 @@ async def prepare_function_test(
             location=f"{cache_key}:spec",
         )
 
-    if not spec:
-        return PermFail(
-            message=f"Missing `spec` for FunctionTest '{cache_key}'.", location=location
-        )
-
-    match ref_helpers.function_ref_spec_to_resource(spec.get("functionRef")):
-        case None:
-            return PermFail(
-                message=f"Missing `functionRef.name` for FunctionTest '{cache_key}'.",
-                location=location,
-            )
+    match ref_helpers.function_ref_spec_to_resource(
+        spec.get("functionRef"),
+        location=f"{cache_key}:spec.functionRef",
+    ):
         case PermFail() as perm_fail:
             return perm_fail
+        case None:
+            return PermFail(
+                "Missing `spec.functionRef`",
+                location=f"{cache_key}:spec.functionRef",
+            )
         case registry.Resource() as watched_function:
             # Just needed to set `watched_function`
             pass
@@ -58,51 +60,20 @@ async def prepare_function_test(
         )
 
     initial_resource = spec.get("currentResource")
-    if initial_resource is not None and not isinstance(initial_resource, dict):
-        return PermFail(
-            message=f"FunctionTest '{cache_key}' `spec.currentResource` must be an object.",
-            location=location,
-        )
-
-    if initial_resource and watched_function.resource_type != ResourceFunction:
+    if (
+        initial_resource is not None
+        and watched_function.resource_type != ResourceFunction
+    ):
         return PermFail(
             message=f"`{location}.currentResource` only valid for `ResourceFunction` tests.",
             location=f"{location}.currentResource",
         )
 
-    v1_expect_resource = spec.get("expectResource")
-    v1_expect_outcome = spec.get("expectOutcome")
-    v1_expect_return = spec.get("expectReturn")
-
     test_cases_spec = spec.get("testCases")
-
-    if (
-        v1_expect_resource or v1_expect_outcome or v1_expect_return
-    ) and test_cases_spec:
-        return PermFail(
-            message=f"FunctionTest '{cache_key}' must place all expect "
-            "assertions within `spec.testCases`",
-            location=location,
-        )
-    elif not test_cases_spec:
-        v1_test_case = [
-            {
-                "label": "default",
-                "expectResource": v1_expect_resource,
-                "expectOutcome": v1_expect_outcome,
-                "expectReturn": v1_expect_return,
-            }
-        ]
-        test_cases = _prepare_test_cases(
-            spec=v1_test_case,
-            resource_function=watched_function.resource_type == ResourceFunction,
-        )
-
-    else:
-        test_cases = _prepare_test_cases(
-            spec=test_cases_spec,
-            resource_function=watched_function.resource_type == ResourceFunction,
-        )
+    test_cases = _prepare_test_cases(
+        spec=test_cases_spec,
+        resource_function=watched_function.resource_type == ResourceFunction,
+    )
 
     if is_error(test_cases):
         return PermFail(
@@ -121,6 +92,14 @@ async def prepare_function_test(
                 location=location,
             )
 
+    watched_resources: list[registry.Resource] = [watched_function]
+
+    resource_template_resources = _check_for_resource_template_ref(
+        function_under_test, inputs, test_cases
+    )
+    if resource_template_resources:
+        watched_resources.extend(resource_template_resources)
+
     return (
         structure.FunctionTest(
             function_under_test=function_under_test,
@@ -128,7 +107,7 @@ async def prepare_function_test(
             test_cases=test_cases,
             initial_resource=initial_resource,
         ),
-        [watched_function],
+        watched_resources,
     )
 
 
@@ -155,18 +134,13 @@ def _prepare_test_cases(
 def _prepare_test_case(
     spec: dict, idx: int, resource_function: bool
 ) -> structure.TestCase | PermFail:
-    variant_raw = spec.get("variant", False)
-    if variant_raw is not None:
-        variant = variant_raw
-    else:
-        # If it is checking for an outcome, probably a variant
-        variant = "expectOutcome" in spec
+    variant = spec.get("variant", False)
 
     label = spec.get("label")
     if not label:
         label = f"Test Case {idx + 1}"
 
-    if variant and "variant" not in label:
+    if variant and "variant" not in label.lower():
         label = f"[variant] {label}"
 
     location = f'spec.testCases[{idx}: "{label}"]'
@@ -312,3 +286,73 @@ def _prepare_test_case(
         label=label,
         skip=spec.get("skip", False),
     )
+
+
+def _check_for_resource_template_ref(
+    function_under_test, base_inputs, test_cases: Sequence[structure.TestCase]
+) -> None | Sequence[registry.Resource[ResourceTemplate]]:
+    if not is_unwrapped_ok(function_under_test):
+        return None
+
+    if not isinstance(function_under_test, ResourceFunction):
+        return None
+
+    if not isinstance(
+        function_under_test.crud_config.resource_template, ResourceTemplateRef
+    ):
+        return None
+
+    if not function_under_test.crud_config.resource_template.name:
+        return None
+
+    template_name = function_under_test.crud_config.resource_template.name
+    name_args = extract_argument_structure(template_name.ast)
+
+    # There are no inputs used, just compute the value.
+    if not name_args:
+        match evaluate(expression=template_name, inputs={}, location="templateName"):
+            case celtypes.StringType() as name:
+                return (registry.Resource(resource_type=ResourceTemplate, name=name),)
+            case _:
+                return None
+
+    templates_used = set()
+    for test_case in test_cases:
+
+        if base_inputs and test_case.input_overrides:
+            inputs = _overlay(base_inputs, test_case.input_overrides)
+            if isinstance(inputs, celpy.CELEvalError):
+                continue
+        elif base_inputs:
+            inputs = base_inputs
+        elif test_case.input_overrides:
+            inputs = test_case.input_overrides
+        else:
+            inputs = celtypes.MapType()
+
+        if function_under_test.local_values:
+            locals = function_under_test.local_values.evaluate(
+                {
+                    "inputs": inputs,
+                }
+            )
+        else:
+            locals = celtypes.MapType()
+
+        match evaluate(
+            expression=template_name,
+            inputs={
+                "locals": locals,
+                "inputs": inputs,
+            },
+            location="templateName",
+        ):
+            case celtypes.StringType() as name:
+                templates_used.add(name)
+            case _:
+                continue
+
+    return [
+        registry.Resource(resource_type=ResourceTemplate, name=name)
+        for name in templates_used
+    ]

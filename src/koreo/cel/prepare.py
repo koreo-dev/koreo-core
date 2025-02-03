@@ -9,25 +9,23 @@ from koreo.result import PermFail
 
 
 def prepare_expression(
-    cel_env: celpy.Environment, spec: Any | None, name: str | None = None
+    cel_env: celpy.Environment, spec: Any | None, location: str
 ) -> None | celpy.Runner | PermFail:
     if not spec:
         return None
-
-    message_name = f"`{name}`" if name else "expression"
 
     try:
         encoded = encode_cel(spec)
     except Exception as err:
         return PermFail(
-            message=f"Structural error in {message_name}, while building expression '{err}'.",
+            message=f"Structural error in {location}, while building expression '{err}'.",
         )
 
     try:
         value = cel_env.program(cel_env.compile(encoded), functions=koreo_cel_functions)
     except celpy.CELParseError as err:
         return PermFail(
-            message=f"Parsing error at line {err.line}, column {err.column}. '{err}' in {message_name} ('{encoded}')",
+            message=f"Parsing error at line {err.line}, column {err.column}. '{err}' in {location} ('{encoded}')",
         )
 
     value.logger.setLevel(logging.WARNING)
@@ -36,17 +34,15 @@ def prepare_expression(
 
 
 def prepare_map_expression(
-    cel_env: celpy.Environment, spec: Any | None, name: str | None = None
+    cel_env: celpy.Environment, spec: Any | None, location: str
 ) -> None | celpy.Runner | PermFail:
     if not spec:
         return None
 
-    message_name = f"`{name}`" if name else "expression map"
-
     if not isinstance(spec, dict):
-        return PermFail(message=f"Malformed {message_name}, expected a mapping")
+        return PermFail(message=f"Malformed {location}, expected a mapping")
 
-    return prepare_expression(cel_env=cel_env, spec=spec, name=name)
+    return prepare_expression(cel_env=cel_env, spec=spec, location=location)
 
 
 Index = dict[str, "Index"] | int
@@ -58,19 +54,17 @@ class Overlay(NamedTuple):
 
 
 def prepare_overlay_expression(
-    cel_env: celpy.Environment, spec: Any | None, name: str | None = None
+    cel_env: celpy.Environment, spec: Any | None, location: str
 ) -> None | Overlay | PermFail:
     if not spec:
         return None
 
-    message_name = f"`{name}`" if name else "overlay"
-
     if not isinstance(spec, dict):
-        return PermFail(message=f"Malformed {message_name}, expected a mapping")
+        return PermFail(message=f"Malformed {location}, expected a mapping")
 
     overlay_index, overlay_values = _overlay_indexer(spec=spec, base=0)
 
-    match prepare_expression(cel_env=cel_env, spec=overlay_values, name=name):
+    match prepare_expression(cel_env=cel_env, spec=overlay_values, location=location):
         case None:
             return None
         case PermFail() as err:

@@ -9,11 +9,6 @@ metadata:
   name: simple-template.v1
   namespace: koreo-testing
 spec:
-  managedResource:
-    apiVersion: koreo.realkinetic.com/v1alpha8
-    kind: TestDummy
-    plural: testdummies
-    namespaced: true
   template:
     apiVersion: koreo.realkinetic.com/v1alpha8
     kind: TestDummy
@@ -41,11 +36,6 @@ metadata:
   name: template-a.v1
   namespace: koreo-testing
 spec:
-  managedResource:
-    apiVersion: koreo.realkinetic.com/v1alpha8
-    kind: TestDummy
-    plural: testdummies
-    namespaced: true
   template:
     apiVersion: koreo.realkinetic.com/v1alpha8
     kind: TestDummy
@@ -65,11 +55,6 @@ metadata:
   name: template-b.v1
   namespace: koreo-testing
 spec:
-  managedResource:
-    apiVersion: koreo.realkinetic.com/v1alpha8
-    kind: TestDummy
-    plural: testdummies
-    namespaced: true
   template:
     apiVersion: koreo.realkinetic.com/v1alpha8
     kind: TestDummy

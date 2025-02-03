@@ -27,7 +27,6 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                 api_group="tests.koreo.realkinetic.com", version="v1", kind="TestCase"
             ),
             steps_ready=Ok(None),
-            status=workflow_structure.Status(conditions=[], state=None),
             config_step=None,
             steps=[
                 workflow_structure.Step(
@@ -71,7 +70,6 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                 api_group="tests.koreo.realkinetic.com", version="v1", kind="TestCase"
             ),
             steps_ready=Ok(None),
-            status=workflow_structure.Status(conditions=[], state=None),
             config_step=None,
             steps=[
                 workflow_structure.Step(
@@ -112,7 +110,6 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                 api_group="tests.koreo.realkinetic.com", version="v1", kind="TestCase"
             ),
             steps_ready=Ok(None),
-            status=workflow_structure.Status(conditions=[], state=None),
             config_step=None,
             steps=[
                 workflow_structure.Step(
@@ -152,7 +149,6 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                 api_group="tests.koreo.realkinetic.com", version="v1", kind="TestCase"
             ),
             steps_ready=Ok(None),
-            status=workflow_structure.Status(conditions=[], state=None),
             config_step=None,
             steps=[
                 workflow_structure.Step(
