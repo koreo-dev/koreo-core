@@ -44,25 +44,20 @@ async def reconcile_resource_function(
         "inputs": inputs,
     }
 
-    if validator_error := evaluate_predicates(
-        predicates=function.input_validators,
+    if precondition_error := evaluate_predicates(
+        predicates=function.preconditions,
         inputs=full_inputs,
-        location="spec.inputValidators",
+        location=f"{location}:spec.preconditions",
     ):
-        return Result(outcome=validator_error)
+        return Result(outcome=precondition_error)
 
     match evaluate(
-        expression=function.local_values, inputs=full_inputs, location="spec.locals"
+        expression=function.local_values,
+        inputs=full_inputs,
+        location=f"{location}:spec.locals",
     ):
-        case PermFail(message=message, location=locals_location):
-            return Result(
-                outcome=PermFail(
-                    message=message,
-                    location=(
-                        locals_location if locals_location else f"{location}.locals"
-                    ),
-                )
-            )
+        case PermFail() as err:
+            return Result(outcome=err)
         case None:
             full_inputs["locals"] = celtypes.MapType({})
         case celtypes.MapType() as local_values:
@@ -72,7 +67,7 @@ async def reconcile_resource_function(
             return Result(
                 outcome=PermFail(
                     message=f"Invalid `locals` expression type ({type(bad_type)})",
-                    location=f"{location}.locals",
+                    location=f"{location}:spec.locals",
                 )
             )
 
@@ -97,26 +92,20 @@ async def reconcile_resource_function(
     # End Kubernetes Specific
     #########################
 
+    if postcondition_error := evaluate_predicates(
+        predicates=function.postconditions,
+        inputs=full_inputs,
+        location=f"{location}:spec.postconditions",
+    ):
+        return Result(outcome=postcondition_error)
+
     return Result(
-        outcome=_reconcile_outcome(
-            outcome=function.outcome, inputs=full_inputs, name=location
+        outcome=evaluate(
+            expression=function.return_value,
+            inputs=full_inputs,
+            location=f"{location}:spec.return",
         ),
         resource_id=reconcile_result.resource_id,
-    )
-
-
-def _reconcile_outcome(
-    outcome: structure.Outcome, inputs: dict[str, celtypes.Value], name: str
-):
-    if err := evaluate_predicates(
-        predicates=outcome.validators,
-        inputs=inputs,
-        location=f"{name}:spec.outcome.validators",
-    ):
-        return err
-
-    return evaluate(
-        outcome.return_value, inputs=inputs, location=f"{name}:spec.outcome.return"
     )
 
 

@@ -38,15 +38,15 @@ async def prepare_value_function(
 
     used_vars = set[str]()
 
-    match predicate_extractor(cel_env=env, predicate_spec=spec.get("validators")):
+    match predicate_extractor(cel_env=env, predicate_spec=spec.get("preconditions")):
         case PermFail(message=message):
             return PermFail(
-                message=message, location=_location(cache_key, "spec.validators")
+                message=message, location=_location(cache_key, "spec.preconditions")
             )
         case None:
-            validators = None
-        case celpy.Runner() as validators:
-            used_vars.update(extract_argument_structure(validators.ast))
+            preconditions = None
+        case celpy.Runner() as preconditions:
+            used_vars.update(extract_argument_structure(preconditions.ast))
 
     match prepare_map_expression(
         cel_env=env, spec=spec.get("locals"), location="spec.locals"
@@ -76,7 +76,7 @@ async def prepare_value_function(
 
     return (
         structure.ValueFunction(
-            validators=validators,
+            preconditions=preconditions,
             local_values=local_values,
             return_value=return_value,
             dynamic_input_keys=used_vars,

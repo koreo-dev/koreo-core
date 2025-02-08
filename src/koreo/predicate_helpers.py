@@ -18,14 +18,14 @@ def predicate_extractor(
         return None
 
     if not isinstance(predicate_spec, (list, tuple)):
-        return result.PermFail(message="Malformed validators, expected a list")
+        return result.PermFail(message="Malformed conditions, expected a list")
 
     predicates = encode_cel(predicate_spec)
-    validators = f"{predicates}.filter(predicate, predicate.assert)"
+    conditions = f"{predicates}.filter(predicate, !predicate.assert)"
 
     try:
         program = cel_env.program(
-            cel_env.compile(validators), functions=koreo_cel_functions
+            cel_env.compile(conditions), functions=koreo_cel_functions
         )
     except celpy.CELParseError as err:
         return result.PermFail(

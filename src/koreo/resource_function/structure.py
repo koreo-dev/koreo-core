@@ -45,11 +45,6 @@ class DeleteDestroy(NamedTuple):
     force: bool = False
 
 
-class Outcome(NamedTuple):
-    validators: celpy.Runner | None
-    return_value: celpy.Runner | None
-
-
 class CRUDConfig(NamedTuple):
     resource_api: type[APIObject]
     resource_id: celpy.Runner
@@ -62,11 +57,12 @@ class CRUDConfig(NamedTuple):
 
 
 class ResourceFunction(NamedTuple):
-    input_validators: celpy.Runner | None
+    preconditions: celpy.Runner | None
     local_values: celpy.Runner | None
 
     crud_config: CRUDConfig
 
-    outcome: Outcome
+    postconditions: celpy.Runner | None
+    return_value: celpy.Runner | None
 
     dynamic_input_keys: set[str]

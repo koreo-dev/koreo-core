@@ -23,7 +23,7 @@ from koreo.workflow.structure import Workflow
 
 
 GROUP = "koreo.realkinetic.com"
-VERSION = "v1alpha8"
+VERSION = "v1beta1"
 API_VERSION = f"{GROUP}/{VERSION}"
 
 KOREO_NAMESPACE = os.environ.get("KOREO_NAMESPACE", "koreo-testing")

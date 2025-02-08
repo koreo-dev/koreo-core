@@ -10,7 +10,7 @@ spec:
     plural: valuefunctions
     singular: valuefunction
   versions:
-    - name: v1alpha8
+    - name: v1beta1
       served: true
       storage: true
       schema:
@@ -21,7 +21,7 @@ spec:
               type: object
               nullable: false
               properties:
-                validators:
+                preconditions:
                   nullable: false
                   type: array
                   maxItems: 20
@@ -124,7 +124,7 @@ spec:
                     be an object composed of constant values or Koreo
                     Expressions with access to both `inputs` and `locals`.
               anyOf:
-                - required: [validators]
+                - required: [preconditions]
                 - required: [return]
             status:
               type: object

@@ -410,21 +410,49 @@ def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str
             condition=None,
         )
 
+    dynamic_input_keys = set()
+
+    skip_if_spec = step_spec.get("skipIf")
+    match prepare_expression(
+        cel_env=cel_env, spec=skip_if_spec, location=f"{step_label}.skipIf"
+    ):
+        case PermFail() as failure:
+            return structure.ErrorStep(
+                label=step_label,
+                outcome=failure,
+                condition=None,
+            )
+        case None:
+            skip_if = None
+        case celpy.Runner() as skip_if:
+            dynamic_input_keys.update(
+                match.group("name")
+                for match in (
+                    STEPS_NAME_PATTERN.match(key)
+                    for key in extract_argument_structure(skip_if.ast)
+                )
+                if match
+            )
+
     for_each_spec = step_spec.get("forEach")
     match _prepare_for_each(cel_env=cel_env, step_label=step_label, spec=for_each_spec):
-        case None:
-            for_each = None
-            dynamic_input_keys = set()
         case structure.ErrorStep() as error:
             return error
-        case (structure.ForEach() as for_each, dynamic_input_keys):
-            # Need for_each and dynamic_input_keys
-            pass
+        case None:
+            for_each = None
+        case (structure.ForEach() as for_each, for_each_input_keys):
+            dynamic_input_keys.update(for_each_input_keys)
 
     input_mapper_spec = step_spec.get("inputs")
     match prepare_map_expression(
         cel_env=cel_env, spec=input_mapper_spec, location=f"{step_label}.inputs"
     ):
+        case PermFail() as failure:
+            return structure.ErrorStep(
+                label=step_label,
+                outcome=failure,
+                condition=None,
+            )
         case None:
             input_mapper = None
         case celpy.Runner() as input_mapper:
@@ -435,12 +463,6 @@ def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str
                     for key in extract_argument_structure(input_mapper.ast)
                 )
                 if match
-            )
-        case PermFail() as failure:
-            return structure.ErrorStep(
-                label=step_label,
-                outcome=failure,
-                condition=None,
             )
 
     condition_spec = step_spec.get("condition")
@@ -488,6 +510,7 @@ def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str
     return structure.Step(
         label=step_label,
         logic=logic,
+        skip_if=skip_if,
         for_each=for_each,
         inputs=input_mapper,
         dynamic_input_keys=tuple(dynamic_input_keys),

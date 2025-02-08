@@ -10,7 +10,7 @@ spec:
     plural: functiontests
     singular: functiontest
   versions:
-    - name: v1alpha8
+    - name: v1beta1
       served: true
       storage: true
       schema:
@@ -25,6 +25,7 @@ spec:
                 functionRef:
                   type: object
                   nullable: false
+                  description: The Function Under Test
                   properties:
                     kind:
                       type: string
@@ -39,104 +40,181 @@ spec:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
                   nullable: false
+                  description: |
+                    The base inputs to be provided to the Function Under Test.
+                    If the function requires inputs, this must be specified and
+                    it must contain all required inputs. `inputs` must be a
+                    map, but static values, arrays, and objects are allowed as
+                    values. Within tests, Koreo Expressions are not allowed as
+                    inputs.
 
                 currentResource:
                   type: object
                   nullable: false
                   x-kubernetes-embedded-resource: true
                   x-kubernetes-preserve-unknown-fields: true
+                  description: |
+                    If specified, the initial resource state in cluster. If
+                    provided it must be a full object definition.
 
                 testCases:
                   type: array
                   nullable: false
-                  maxItems: 10
+                  maxItems: 20
+                  description: |
+                    Test cases to be run sequentially. Each test case runs the
+                    Function Under Test once, using the resulting state (inputs
+                    and current resource) from prior non-variant test case or
+                    the initial values. Each test case must specify exactly one
+                    assertion.
                   items:
                     type: object
                     properties:
                       label:
                         type: string
                         nullable: false
+                        description: An optional descriptive name.
 
                       variant:
                         type: boolean
                         nullable: false
+                        default: false
+                        description: |
+                          Indicates that state mutations should not be carried
+                          forward. Default is `false`.
 
                       skip:
                         type: boolean
                         nullable: false
                         default: false
+                        description: Skip running this test case.
 
                       inputOverrides:
                         type: object
                         nullable: false
                         x-kubernetes-preserve-unknown-fields: true
+                        description: |
+                          Fully *replace* input values with those provided. If
+                          this is a non-variant test case, these will carry
+                          forward to subsequent test cases. This must be an
+                          object, but the values may be simple values, lists,
+                          or objects. Koreo Expressions are not allowed.
 
                       currentResource:
                         type: object
                         nullable: false
                         x-kubernetes-embedded-resource: true
                         x-kubernetes-preserve-unknown-fields: true
+                        description: |
+                          Fully *replace* the current resource. If this is a
+                          non-variant test case, this will carry forward to
+                          subsequent test cases. This must be the full object.
 
                       overlayResource:
                         type: object
                         nullable: false
                         x-kubernetes-preserve-unknown-fields: true
+                        description: |
+                          *Overlay* the specified properties onto the current
+                          resource. If this is a non-variant test case, this
+                          will carry forward to subsequent test cases. This
+                          must be an object, partial updates are allowed. Koreo
+                          Expressions may be used, and have access to
+                          `template` which is the current resource state.
 
                       expectResource:
                         type: object
                         nullable: false
                         x-kubernetes-embedded-resource: true
                         x-kubernetes-preserve-unknown-fields: true
+                        description: |
+                          Assert that a resource create or patch was attempted
+                          and that the resource exactly matches this
+                          specification.
 
                       expectDelete:
                         type: boolean
                         nullable: false
+                        description: |
+                          Assert that a resource deletion was attempted.
 
                       expectReturn:
                         type: object
                         x-kubernetes-preserve-unknown-fields: true
                         nullable: false
+                        description: |
+                          Assert that no resource modifications were attempted,
+                          and that the function returned this exact object.
 
                       expectOutcome:
                         type: object
+                        description: Assert the function's return type.
                         properties:
                           ok:
                             type: object
                             nullable: true
+                            description: |
+                              Assert that no resource modifications were
+                              attempted, and that the function returned
+                              successfully. Makes no assertions about the
+                              return value, if any.
                           skip:
                             type: object
                             nullable: false
+                            description: Assert that a `Skip` was returned.
                             properties:
                               message:
                                 type: string
                                 nullable: false
+                                description: |
+                                  Assert that the message _contains_ this
+                                  value. Case insensitive. Use '' to match any.
                             required: [message]
                           depSkip:
                             type: object
                             nullable: false
+                            description: Assert that a `DepSkip` was returned.
                             properties:
                               message:
                                 type: string
                                 nullable: false
+                                description: |
+                                  Assert that the message _contains_ this
+                                  value. Case insensitive. Use '' to match any.
                             required: [message]
                           retry:
                             type: object
                             nullable: false
+                            description: |
+                              Assert that a `Retry` was returned, which
+                              indicates either an explictly returned `Retry` or
+                              a resource modification (create, update, or
+                              delete).
                             properties:
                               message:
                                 type: string
                                 nullable: false
+                                description: |
+                                  Assert that the message _contains_ this
+                                  value. Case insensitive. Use '' to match any.
                               delay:
                                 type: integer
                                 nullable: false
+                                description: |
+                                  Assert that the delay is exactly this value.
+                                  Use 0 to match any.
                             required: [message, delay]
                           permFail:
                             type: object
                             nullable: false
+                            description: Assert that a `PermFail` was returned.
                             properties:
                               message:
                                 type: string
                                 nullable: false
+                                description: |
+                                  Assert that the message _contains_ this
+                                  value. Case insensitive. Use '' to match any.
                             required: [message]
                         oneOf:
                           - required: [ok]
@@ -144,66 +222,6 @@ spec:
                           - required: [depSkip]
                           - required: [retry]
                           - required: [permFail]
-
-                expectResource:
-                  type: object
-                  nullable: false
-                  x-kubernetes-embedded-resource: true
-                  x-kubernetes-preserve-unknown-fields: true
-
-                expectReturn:
-                  type: object
-                  x-kubernetes-preserve-unknown-fields: true
-                  nullable: false
-
-                expectOutcome:
-                  type: object
-                  properties:
-                    ok:
-                      type: object
-                      nullable: true
-                    skip:
-                      type: object
-                      nullable: false
-                      properties:
-                        message:
-                          type: string
-                          nullable: false
-                      required: [message]
-                    depSkip:
-                      type: object
-                      nullable: false
-                      properties:
-                        message:
-                          type: string
-                          nullable: false
-                      required: [message]
-                    retry:
-                      type: object
-                      nullable: false
-                      properties:
-                        message:
-                          type: string
-                          nullable: false
-                        delay:
-                          type: integer
-                          nullable: false
-                      required: [message, delay]
-                    permFail:
-                      type: object
-                      nullable: false
-                      properties:
-                        message:
-                          type: string
-                          nullable: false
-                      required: [message]
-                  required: [assert]
-                  oneOf:
-                    - required: [ok]
-                    - required: [skip]
-                    - required: [depSkip]
-                    - required: [retry]
-                    - required: [permFail]
 
             status:
               x-kubernetes-preserve-unknown-fields: true

@@ -17,25 +17,24 @@ async def reconcile_value_function(
         "inputs": inputs,
     }
 
-    if validator_error := evaluate_predicates(
-        predicates=function.validators,
+    if precondition_error := evaluate_predicates(
+        predicates=function.preconditions,
         inputs=full_inputs,
-        location="spec.validators",
+        location=f"{location}:spec.preconditions",
     ):
-        return validator_error
+        return precondition_error
 
     # If there's no return_value, just bail out. No point in extra work.
     if not function.return_value:
         return celpy.json_to_cel(None)
 
     match evaluate(
-        expression=function.local_values, inputs=full_inputs, location="spec.locals"
+        expression=function.local_values,
+        inputs=full_inputs,
+        location=f"{location}:spec.locals",
     ):
-        case PermFail(message=message, location=locals_location):
-            return PermFail(
-                message=message,
-                location=locals_location if locals_location else f"{location}.locals",
-            )
+        case PermFail() as err:
+            return err
         case celtypes.MapType() as local_values:
             full_inputs["locals"] = local_values
         case None:
@@ -44,9 +43,11 @@ async def reconcile_value_function(
             # Due to validation within `prepare`, this should never happen.
             return PermFail(
                 message=f"Invalid `locals` expression type ({type(bad_type)})",
-                location=f"{location}.locals",
+                location=f"{location}:spec.locals",
             )
 
     return evaluate(
-        expression=function.return_value, inputs=full_inputs, location="spec.return"
+        expression=function.return_value,
+        inputs=full_inputs,
+        location=f"{location}:spec.return",
     )

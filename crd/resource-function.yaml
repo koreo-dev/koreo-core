@@ -10,7 +10,7 @@ spec:
     plural: resourcefunctions
     singular: resourcefunction
   versions:
-    - name: v1alpha8
+    - name: v1beta1
       served: true
       storage: true
       schema:
@@ -20,10 +20,14 @@ spec:
             spec:
               type: object
               properties:
-                inputValidators:
+                preconditions:
                   type: array
                   nullable: false
                   maxItems: 20
+                  description: |
+                    Optional set of preconditions which will be evaluated to
+                    determine if the Function can, or should, be run and if not
+                    specifies the outcome.
                   items:
                     type: object
                     properties:
@@ -32,7 +36,12 @@ spec:
                         nullable: false
                         x-kubernetes-validations:
                           - rule: self.startsWith('=')
-                            message: "assertion must be a cel expression (start with '=')."
+                            message: "assertion must be an expression (start with '=')."
+                        description: |
+                          A predicate which must evaluate to `true`, if it does
+                          not the specified outcome is returned. This should be
+                          a Koreo Expression and it may access the function's
+                          `inputs`.
                       ok:
                         type: object
                         nullable: false
@@ -44,6 +53,10 @@ spec:
                             type: string
                             nullable: false
                         required: [message]
+                        description: |
+                          Indicates that the Function did not run due to a
+                          condition, such as a config value. Use message to
+                          indicate why. Note this is not an error.
                       depSkip:
                         type: object
                         nullable: false
@@ -52,6 +65,10 @@ spec:
                             type: string
                             nullable: false
                         required: [message]
+                        description: |
+                          Indicates that the Function did not run due to a
+                          dependency not being ready or being skipped. Use
+                          message to indicate why. Note this is not an error.
                       retry:
                         type: object
                         nullable: false
@@ -63,6 +80,10 @@ spec:
                             type: integer
                             nullable: false
                         required: [message, delay]
+                        description: |
+                          Indicates that a condition is not yet met, so the
+                          function can not (or should not) evaluate yet. Wait
+                          and retry after delay seconds.
                       permFail:
                         type: object
                         nullable: false
@@ -71,6 +92,11 @@ spec:
                             type: string
                             nullable: false
                         required: [message]
+                        description: |
+                          Indicates that an unrecoverable error has occurred,
+                          intervention is required to correct this condition.
+                          This will cause Workflows to stop retrying. Use
+                          message to provide information to correct the issue.
                     required: [assert]
                     oneOf:
                       - required: [ok]
@@ -82,6 +108,10 @@ spec:
                   type: object
                   nullable: false
                   x-kubernetes-preserve-unknown-fields: true
+                  description: |
+                    Constant values or Koreo Expressions which will make
+                    `resource`, `apiConfig`, and `return` more ergonomic to
+                    write.
                 apiConfig:
                   type: object
                   nullable: false
@@ -117,6 +147,7 @@ spec:
                 resourceTemplateRef:
                   type: object
                   nullable: false
+                  description: Dynamically loaded Target Resource Specification.
                   properties:
                     name:
                       type: string
@@ -125,17 +156,29 @@ spec:
                       type: object
                       nullable: false
                       x-kubernetes-preserve-unknown-fields: true
+                      description: |
+                        An optional overlay to be applied to the static
+                        template, allowing for customization of the static
+                        template. The controller will work to keep the managed
+                        resource matching this specification.
                   required: [name]
                 resource:
                   type: object
                   nullable: false
                   x-kubernetes-preserve-unknown-fields: true
+                  description: |
+                    Inline Target Resource Specification. The controller will
+                    work to keep the managed resource matching this
+                    specification.
                 create:
                   type: object
                   nullable: false
                   default:
                     enabled: true
                     delay: 30
+                  description: |
+                    Specify if the resource should be created if missing, and
+                    optionally values to be set only at create time.
                   properties:
                     enabled:
                       type: boolean
@@ -145,16 +188,23 @@ spec:
                       type: integer
                       nullable: false
                       default: 30
+                      description: |
+                        Number of seconds to wait after creating before
+                        checking status.
                     overlay:
                       type: object
                       nullable: true
                       x-kubernetes-preserve-unknown-fields: true
+                      description: |
+                        Values to be set only at create time, but otherwise
+                        ignored from difference validation.
                 update:
                   type: object
                   nullable: false
                   default:
                     patch:
                       delay: 30
+                  description: Specify how differences should be resolved.
                   properties:
                     patch:
                       type: object
@@ -164,6 +214,9 @@ spec:
                           type: integer
                           nullable: false
                           default: 30
+                      description: |
+                        If differences are found, patch the resource to correct
+                        the difference.
                     recreate:
                       type: object
                       nullable: false
@@ -172,12 +225,16 @@ spec:
                           type: integer
                           nullable: false
                           default: 30
+                      description: |
+                        If differences are found, delete the resource so that
+                        it will be recreated.
                     never:
                       type: object
                       nullable: false
                       additionalProperties: false
                       minProperties: 0
                       maxProperties: 0
+                      description: Ignore any differences.
                   oneOf:
                     - required: [patch]
                     - required: [recreate]
@@ -185,6 +242,9 @@ spec:
                 delete:
                   type: object
                   nullable: false
+                  description: |
+                    Specify the deletion behavior for the underlying managed
+                    resource.
                   properties:
                     abandon:
                       type: object
@@ -192,81 +252,115 @@ spec:
                       additionalProperties: false
                       minProperties: 0
                       maxProperties: 0
+                      description: |
+                        If this function is no longer run, leave the resource
+                        in cluster and remove the owner ref.
                     destroy:
                       type: object
                       nullable: false
                       additionalProperties: false
                       minProperties: 0
                       maxProperties: 0
+                      description: |
+                        If this function is no longer run, delete the resource
+                        from the cluster.
                   oneOf:
                     - required: [abandon]
                     - required: [destroy]
-                outcome:
+                postconditions:
                   nullable: false
-                  type: object
-                  properties:
-                    validators:
-                      nullable: false
-                      type: array
-                      maxItems: 20
-                      items:
+                  type: array
+                  maxItems: 20
+                  description: |
+                    Optional set of postconditions which will be evaluated
+                    after CRUD operations to determine if the managed resource
+                    is ready.
+                  items:
+                    type: object
+                    properties:
+                      assert:
+                        type: string
+                        nullable: false
+                        x-kubernetes-validations:
+                          - rule: self.startsWith('=')
+                            message: "assertion must be an expression (start with '=')."
+                        description: |
+                          A predicate which must evaluate to `true`, if it does
+                          not the specified outcome is returned. This should be
+                          a Koreo Expression and it may access the function's
+                          `inputs`, `locals`, and `resource`.
+                      ok:
                         type: object
+                        nullable: false
+                      skip:
+                        type: object
+                        nullable: false
                         properties:
-                          assert:
+                          message:
                             type: string
                             nullable: false
-                            x-kubernetes-validations:
-                              - rule: self.startsWith('=')
-                                message: "assertion must be a cel expression (start with '=')."
-                          ok:
-                            type: object
+                        required: [message]
+                        description: |
+                          Indicates that the Function outcome should be
+                          considered a Skip. Especially useful for readonly.
+                          Use message to indicate why. Note this is not an
+                          error.
+                      depSkip:
+                        type: object
+                        nullable: false
+                        properties:
+                          message:
+                            type: string
                             nullable: false
-                          skip:
-                            type: object
+                        required: [message]
+                        description: |
+                          Indicates that the Function outcome should be
+                          considered a DepSkip. Especially useful for readonly.
+                          Use message to indicate why. Note this is not an
+                          error.
+                      retry:
+                        type: object
+                        nullable: false
+                        properties:
+                          message:
+                            type: string
                             nullable: false
-                            properties:
-                              message:
-                                type: string
-                                nullable: false
-                            required: [message]
-                          depSkip:
-                            type: object
+                          delay:
+                            type: integer
                             nullable: false
-                            properties:
-                              message:
-                                type: string
-                                nullable: false
-                            required: [message]
-                          retry:
-                            type: object
+                        required: [message, delay]
+                        description: |
+                          Indicates that a condition is not yet met, so the
+                          Workflow should wait and retry after delay seconds.
+                      permFail:
+                        type: object
+                        nullable: false
+                        properties:
+                          message:
+                            type: string
                             nullable: false
-                            properties:
-                              message:
-                                type: string
-                                nullable: false
-                              delay:
-                                type: integer
-                                nullable: false
-                            required: [message, delay]
-                          permFail:
-                            type: object
-                            nullable: false
-                            properties:
-                              message:
-                                type: string
-                                nullable: false
-                            required: [message]
-                        required: [assert]
-                        oneOf:
-                          - required: [ok]
-                          - required: [skip]
-                          - required: [depSkip]
-                          - required: [retry]
-                          - required: [permFail]
-                    return:
-                      nullable: false
-                      type: object
-                      x-kubernetes-preserve-unknown-fields: true
+                        required: [message]
+                        description: |
+                          Indicates that an unrecoverable error has occurred,
+                          intervention is required to correct this condition.
+                          This will cause Workflows to stop retrying. Use
+                          message to provide information to correct the issue.
+                    required: [assert]
+                    oneOf:
+                      - required: [ok]
+                      - required: [skip]
+                      - required: [depSkip]
+                      - required: [retry]
+                      - required: [permFail]
+                return:
+                  nullable: false
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                  description: |
+                    The return value expression for this ResourceFunction. It
+                    must be an object composed of constant values or Koreo
+                    Expressions with access to `inputs`, `locals`, and
+                    `resource`.
               required: [apiConfig]
               oneOf:
                 - required: [resource]

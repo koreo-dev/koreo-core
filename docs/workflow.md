@@ -44,7 +44,7 @@ and manages the "external" (to that Logic's body) state interactions.
 |  *`    condition`*:           | _Optional_ The result of the Logic will be set as a `status.condition` on the trigger object.|
 | **`      type`**:             | The condition's "key", must be PascalCase. |
 | **`      name`**:             | A short, descriptive name used within condition messages. |
-|  *`    state:`*: **`{}`**     | _Optional_ If provided, must be an object that specifies values to be set on the trigger object. Subsequent steps _may_ replace the values if the keys match. |
+|  *`    state:`*: **`{}`**     | _Optional_ If provided, must be an object that specifies values to be set on the trigger object. The return value from the Logic is accessible within `value`. Subsequent steps _may_ replace the values if the keys match. |
 | **`  steps`**:                | A collection of Functions or `Workflows` that provide the Logic. |
 | **`  - label`**:              | Name of the step, must be alphanumeric and may contain underscores. Other steps will use this value to reference this step's return value. |
 |  *`    functionRef`*:         | One of `functionRef` or `workflowRef` are required. |
@@ -52,6 +52,7 @@ and manages the "external" (to that Logic's body) state interactions.
 | **`      name`**:             | Name of the Function to use. |
 |  *`    workflowRef`*:         | One of `functionRef` or `workflowRef` are required. |
 | **`      name`**:             | Name of the `Workflow` to use. |
+|  *`    skipIf`*:              | _Optional_ Provide a test to determine if the step should be run. This may be a Koreo Expression which has access to `steps` at evaluation time. |
 |  *`    forEach`*:             | Allows for "mapping" over a list of values. |
 | **`      itemIn`**: **`=[]`** | This must be a Koreo Expression that evaluates to a list. Each item will be mapped to the `inputKey`, and the Logic will be invoked once for each item. |
 | **`      inputKey`**:         | The input name the item should be provided as to the logic. |
@@ -59,7 +60,7 @@ and manages the "external" (to that Logic's body) state interactions.
 |  *`    condition`*:           | _Optional_ The result of the Logic will be set as a `status.condition` on the trigger object.|
 | **`      type`**:             | The condition's "key", must be PascalCase. |
 | **`      name`**:             | A short, descriptive name used within condition messages. |
-|  *`    state:`*: **`{}`**     | _Optional_ If provided, must be an object that specifies values to be set on the trigger object. Subsequent steps _may_ replace the values. |
+|  *`    state:`*: **`{}`**     | _Optional_ If provided, must be an object that specifies values to be set on the trigger object. The return value from the Logic is accessible within `value`. Subsequent steps _may_ replace the values. |
 
 ## Usage
 
@@ -87,10 +88,9 @@ We refer to the _instance_ of the `spec.crdRef` object which _triggers_ a
 
 This is a special step intended to define the entry-point for a `Workflow`.
 `spec.configStep` shares most of the same options as other `spec.steps`.
-However, there are three aspects which are unique about `spec.configStep`.
 
-The most important is that the 'parent' will be provided to this step as
-`inputs.parent`. This enables validation of configuration and provides the
+The most important different is that the 'parent' will be provided to this step
+as `inputs.parent`. This enables validation of configuration and provides the
 ability to construct a well-structured, validated "config" that will be
 available to other steps. It also helps to prevent accidental tight-coupling of
 logic to a specific CRD. In practice we have found this to result in more
@@ -100,7 +100,7 @@ The second difference is that this step is provided a default label: "config".
 That means, unless changed, you may provide its return value as an input to
 other steps by setting a key within their `inputs` to `=steps.config`.
 
-Lastly, `spec.configStep` does not support `forEach`.
+Lastly, `spec.configStep` does not support `forEach` or `skipIf`.
 
 The remaining options share the same behavior as `spec.steps` values.
 
@@ -122,6 +122,10 @@ executed once per item in the `forEach.itemIn` list. Each item will be provided
 within `inputs` with the key name specified in `forEach.inputKey`. This makes
 using any Function within a `forEach` viable.
 
+`skipIf` enables the `Workflow` to dynamically determine which steps to run.
+This allows Logic to define a common interface, then for the `Workflow` to call
+the correct Logic. This enables _if_ or _switch_ statement semantics.
+
 A step may expose a Condition on the parent resource using `condition`. The
 Condition's type will match `condition.type`, and this should be unique within
 your `Workflow`. Note that uniqueness is intentionally not enforced so that you
@@ -135,9 +139,11 @@ messages. It should be a meaningful name or _short_ descriptive phrase.
 > Be careful not to accidentally step on the `condition.type` value as it makes
 > debugging much harder, and reduces visibility into a `Workflow`'s status.
 
-The Logic's results may be exposed via the `state` key. If specified, `state`
-must be a mapping and it will be _merged_ with other `step.sate` values. This
-allows for fine control over what and how state is exposed.
+The Logic's results may be exposed via the `state` key. The Koreo Expressions
+within the `Workflow` step may access the Logic's return value within `value`.
+If specified, `state` must be a mapping and it will be _merged_ with other
+`step.sate` values. This allows for fine control over what and how state is
+exposed.
 
 > 🚧 Warning
 >
@@ -149,7 +155,7 @@ allows for fine control over what and how state is exposed.
 The following `Workflow` demonstrates some of the capabilities.
 
 ```yaml
-apiVersion: koreo.realkinetic.com/v1beta1     
+apiVersion: koreo.realkinetic.com/v1beta1
 kind: Workflow
 metadata:
   name: simple-example.v1

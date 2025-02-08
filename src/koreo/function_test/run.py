@@ -11,6 +11,7 @@ from celpy import celtypes
 
 from koreo import result
 from koreo.cel.encoder import convert_bools
+from koreo.cel.evaluation import evaluate_overlay
 from koreo.cel.functions import _overlay
 
 from koreo.resource_function.reconcile import reconcile_resource_function
@@ -242,9 +243,8 @@ async def _run_test_case(
     else:
         inputs = celtypes.MapType()
 
-    if test_case.overlay_resource:
-        resource = _overlay(current_resource, test_case.overlay_resource)
-        if isinstance(resource, celpy.CELEvalError):
+    if test_case.resource_overlay:
+        if not current_resource:
             return TestCaseOutcome(
                 new_inputs=base_inputs,
                 new_resource=current_resource,
@@ -252,11 +252,33 @@ async def _run_test_case(
                     test_pass=False,
                     expected_outcome=None,
                     outcome=None,
-                    message=f"Could not run test case due to resource overlay error: ({resource})",
+                    message="Can not overlay until the full resource exists. Try setting `currentResource` or reordering test cases.",
                     label=test_case.label,
                 ),
-                fatal_error=not test_case.variant,
+                fatal_error=True,
             )
+
+        match evaluate_overlay(
+            overlay=test_case.resource_overlay,
+            inputs=inputs,
+            base=current_resource,
+            location=f"{test_case.label}:overlayResource",
+        ):
+            case result.PermFail() as err:
+                return TestCaseOutcome(
+                    new_inputs=base_inputs,
+                    new_resource=current_resource,
+                    result=TestCaseResult(
+                        test_pass=False,
+                        expected_outcome=None,
+                        outcome=err,
+                        message=f"Could not run test case due to resource overlay error: ({err})",
+                        label=test_case.label,
+                    ),
+                    fatal_error=not test_case.variant,
+                )
+            case _ as cel_resource:
+                resource = json.loads(json.dumps(convert_bools(cel_resource)))
 
     elif test_case.current_resource:
         resource = test_case.current_resource
@@ -390,7 +412,6 @@ def _validate_outcome_match(
     expected: result.Outcome | None,
     actual: result.UnwrappedOutcome[celtypes.Value] | None,
 ):
-
     test_pass = False
     message = None
 
@@ -400,7 +421,9 @@ def _validate_outcome_match(
         ):
             if not expected_message:
                 test_pass = True
-            elif actual_message and (expected_message in actual_message):
+            elif actual_message and (
+                expected_message.lower() in actual_message.lower()
+            ):
                 test_pass = True
 
             if expected_delay and (expected_delay != actual_delay):
@@ -419,7 +442,9 @@ def _validate_outcome_match(
         ):
             if not expected_message:
                 test_pass = True
-            elif actual_message and (expected_message in actual_message):
+            elif actual_message and (
+                expected_message.lower() in actual_message.lower()
+            ):
                 test_pass = True
             else:
                 message = (
@@ -433,7 +458,9 @@ def _validate_outcome_match(
         ):
             if not expected_message:
                 test_pass = True
-            elif actual_message and (expected_message in actual_message):
+            elif actual_message and (
+                expected_message.lower() in actual_message.lower()
+            ):
                 test_pass = True
             else:
                 message = (
@@ -445,7 +472,9 @@ def _validate_outcome_match(
         case result.Skip(message=expected_message), result.Skip(message=actual_message):
             if not expected_message:
                 test_pass = True
-            elif actual_message and (expected_message in actual_message):
+            elif actual_message and (
+                expected_message.lower() in actual_message.lower()
+            ):
                 test_pass = True
             else:
                 message = (

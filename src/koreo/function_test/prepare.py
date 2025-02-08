@@ -8,7 +8,8 @@ from koreo import registry
 from koreo import schema
 from koreo.cache import get_resource_from_cache
 from koreo.cel.evaluation import evaluate
-from koreo.cel.functions import _overlay
+from koreo.cel.functions import _overlay, koreo_function_annotations
+from koreo.cel.prepare import prepare_overlay_expression
 from koreo.cel.structure_extractor import extract_argument_structure
 from koreo.result import DepSkip, PermFail, UnwrappedOutcome, is_error, is_unwrapped_ok
 
@@ -69,8 +70,11 @@ async def prepare_function_test(
             location=f"{location}.currentResource",
         )
 
+    cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
     test_cases_spec = spec.get("testCases")
     test_cases = _prepare_test_cases(
+        cel_env=cel_env,
         spec=test_cases_spec,
         resource_function=watched_function.resource_type == ResourceFunction,
     )
@@ -112,7 +116,7 @@ async def prepare_function_test(
 
 
 def _prepare_test_cases(
-    spec: list[dict] | None, resource_function: bool
+    cel_env: celpy.Environment, spec: list[dict] | None, resource_function: bool
 ) -> Sequence[structure.TestCase] | PermFail:
     test_cases = []
 
@@ -121,7 +125,7 @@ def _prepare_test_cases(
 
     for idx, test_spec in enumerate(spec):
         test_case = _prepare_test_case(
-            spec=test_spec, idx=idx, resource_function=resource_function
+            cel_env, spec=test_spec, idx=idx, resource_function=resource_function
         )
         if is_error(test_case):
             return test_case
@@ -132,7 +136,7 @@ def _prepare_test_cases(
 
 
 def _prepare_test_case(
-    spec: dict, idx: int, resource_function: bool
+    cel_env: celpy.Environment, spec: dict, idx: int, resource_function: bool
 ) -> structure.TestCase | PermFail:
     variant = spec.get("variant", False)
 
@@ -182,6 +186,18 @@ def _prepare_test_case(
             message=f"`{location}.overlayResource` only valid for `ResourceFunction` tests.",
             location=f"{location}.overlayResource",
         )
+
+    match prepare_overlay_expression(
+        cel_env=cel_env,
+        spec=overlay_resource,
+        location=f"{location}.overlayResource",
+    ):
+        case PermFail() as err:
+            return err
+        case None:
+            overlay = None
+        case _ as overlay:
+            pass
 
     # Just used so that there is only one.
     bad_assertions_failure = PermFail(
@@ -281,7 +297,7 @@ def _prepare_test_case(
         variant=variant,
         input_overrides=overrides,
         current_resource=current_resource,
-        overlay_resource=overlay_resource,
+        resource_overlay=overlay,
         assertion=assertion,
         label=label,
         skip=spec.get("skip", False),
@@ -318,7 +334,6 @@ def _check_for_resource_template_ref(
 
     templates_used = set()
     for test_case in test_cases:
-
         if base_inputs and test_case.input_overrides:
             inputs = _overlay(base_inputs, test_case.input_overrides)
             if isinstance(inputs, celpy.CELEvalError):

@@ -14,7 +14,7 @@ from koreo.result import PermFail
 from koreo.value_function.structure import ValueFunction
 from koreo.workflow.structure import Workflow
 
-DEFAULT_API_VERSION = "v1alpha8"
+DEFAULT_API_VERSION = "v1beta1"
 
 CRD_ROOT = pathlib.Path(__file__).parent.parent.parent.joinpath("crd")
 
