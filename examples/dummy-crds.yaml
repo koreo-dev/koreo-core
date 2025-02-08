@@ -10,7 +10,7 @@ spec:
     plural: testdummies
     singular: testdummy
   versions:
-    - name: v1alpha8
+    - name: v1beta1
       served: true
       storage: true
       schema:
@@ -36,7 +36,7 @@ spec:
     plural: triggerdummies
     singular: triggerdummy
   versions:
-    - name: v1alpha8
+    - name: v1beta1
       served: true
       storage: true
       schema:

@@ -50,15 +50,15 @@ async def prepare_resource_function(
 
     used_vars = set[str]()
 
-    match predicate_extractor(cel_env=env, predicate_spec=spec.get("inputValidators")):
+    match predicate_extractor(cel_env=env, predicate_spec=spec.get("preconditions")):
         case PermFail(message=message):
             return PermFail(
-                message=message, location=_location(cache_key, "spec.inputValidators")
+                message=message, location=_location(cache_key, "spec.preconditions")
             )
         case None:
-            input_validators = None
-        case celpy.Runner() as input_validators:
-            used_vars.update(extract_argument_structure(input_validators.ast))
+            preconditions = None
+        case celpy.Runner() as preconditions:
+            used_vars.update(extract_argument_structure(preconditions.ast))
 
     match prepare_map_expression(
         cel_env=env, spec=spec.get("locals"), location="spec.locals"
@@ -119,24 +119,29 @@ async def prepare_resource_function(
             # We just needed `update` set.
             pass
 
-    match _prepare_outcome(cel_env=env, outcome_spec=spec.get("outcome")):
+    match predicate_extractor(cel_env=env, predicate_spec=spec.get("postconditions")):
         case PermFail(message=message):
             return PermFail(
-                message=message,
-                location=f"prepare:ResourceFunction:{cache_key}.outcome",
+                message=message, location=_location(cache_key, "spec.postconditions")
             )
-        case structure.Outcome(
-            validators=validators, return_value=return_value
-        ) as outcome:
-            if validators:
-                used_vars.update(extract_argument_structure(validators.ast))
+        case None:
+            postconditions = None
+        case celpy.Runner() as postconditions:
+            used_vars.update(extract_argument_structure(postconditions.ast))
 
-            if return_value:
-                used_vars.update(extract_argument_structure(return_value.ast))
+    match prepare_map_expression(
+        cel_env=env, spec=spec.get("return"), location="spec.return"
+    ):
+        case PermFail(message=message) as err:
+            return err
+        case None:
+            return_value = None
+        case celpy.Runner() as return_value:
+            used_vars.update(extract_argument_structure(return_value.ast))
 
     return (
         structure.ResourceFunction(
-            input_validators=input_validators,
+            preconditions=preconditions,
             local_values=local_values,
             crud_config=structure.CRUDConfig(
                 resource_api=resource_api,
@@ -147,7 +152,8 @@ async def prepare_resource_function(
                 create=create,
                 update=update,
             ),
-            outcome=outcome,
+            postconditions=postconditions,
+            return_value=return_value,
             dynamic_input_keys=used_vars,
         ),
         None,
@@ -322,34 +328,3 @@ def _prepare_update(spec: dict | None) -> structure.Update | PermFail:
             return PermFail(
                 message="Malformed `spec.update`, expected a mapping with `patch`, `recreate`, or `never`"
             )
-
-
-def _prepare_outcome(
-    cel_env: celpy.Environment, outcome_spec: dict | None
-) -> structure.Outcome | PermFail:
-    if not outcome_spec:
-        return structure.Outcome(validators=None, return_value=None)
-
-    match predicate_extractor(
-        cel_env=cel_env, predicate_spec=outcome_spec.get("validators")
-    ):
-        case PermFail(message=message):
-            return PermFail(message=message)
-        case None:
-            validators = None
-        case celpy.Runner() as validators:
-            # Just needed to set validators
-            pass
-
-    match prepare_map_expression(
-        cel_env=cel_env, spec=outcome_spec.get("return"), location="spec.outcome.return"
-    ):
-        case PermFail(message=message):
-            return PermFail(message=message)
-        case None:
-            return_value = None
-        case celpy.Runner() as return_value:
-            # Just needed to set return_value
-            pass
-
-    return structure.Outcome(validators=validators, return_value=return_value)

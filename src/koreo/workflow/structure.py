@@ -34,6 +34,7 @@ class Step(NamedTuple):
     label: str
     logic: ResourceFunction | ValueFunction | Workflow
 
+    skip_if: celpy.Runner | None
     for_each: ForEach | None
     inputs: celpy.Runner | None
 

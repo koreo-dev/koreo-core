@@ -48,7 +48,9 @@ def _make_a_string(words: int) -> str:
         (
             "".join(
                 (char if r"\\" != char else r"\\\\")
-                for char in random.choices(string.printable, k=random.randint(3, 15))
+                for char in random.choices(
+                    string.ascii_letters, k=random.randint(3, 15)
+                )
             )
         ).strip()
         for _ in range(words)

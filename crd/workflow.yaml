@@ -10,7 +10,7 @@ spec:
     plural: workflows
     singular: workflow
   versions:
-    - name: v1alpha8
+    - name: v1beta1
       served: true
       storage: true
       schema:
@@ -199,6 +199,15 @@ spec:
                             type: string
                             nullable: false
                         required: [name]
+                      skipIf:
+                        type: string
+                        nullable: false
+                        description: |
+                          Skip running this step if the Koreo Expression
+                          evaluates to `true`.
+                        x-kubernetes-validations:
+                          - rule: self.startsWith('=')
+                            message: must be an expression
                       forEach:
                         type: object
                         nullable: false
@@ -213,7 +222,7 @@ spec:
                               An expression that evaluates to a list of values.
                             x-kubernetes-validations:
                               - rule: self.startsWith('=')
-                                message: must be an expression
+                                message: "must be an expression (start with '=')."
                           inputKey:
                             type: string
                             nullable: false

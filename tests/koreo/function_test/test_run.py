@@ -36,21 +36,21 @@ class TestEndToEndResourceFunction(unittest.IsolatedAsyncioTestCase):
                     "name": "=inputs.metadata.name + '-suffix'",
                     "namespace": "=inputs.metadata.namespace",
                 },
-                "inputValidators": [
+                "preconditions": [
                     {
-                        "assert": "=has(inputs.inputValidators.depSkip)",
+                        "assert": "=!has(inputs.preconditions.depSkip)",
                         "depSkip": {"message": "Input Validator Dep Skip"},
                     },
                     {
-                        "assert": "=has(inputs.inputValidators.skip)",
+                        "assert": "=!has(inputs.preconditions.skip)",
                         "skip": {"message": "Input Validator Skip"},
                     },
                     {
-                        "assert": "=has(inputs.inputValidators.permFail)",
+                        "assert": "=!has(inputs.preconditions.permFail)",
                         "permFail": {"message": "Input Validator Perm Fail"},
                     },
                     {
-                        "assert": "=has(inputs.inputValidators.retry)",
+                        "assert": "=!has(inputs.preconditions.retry)",
                         "retry": {"delay": 18, "message": "Input Validator Retry"},
                     },
                 ],
@@ -76,31 +76,29 @@ class TestEndToEndResourceFunction(unittest.IsolatedAsyncioTestCase):
                         },
                     },
                 },
-                "outcome": {
-                    "validators": [
-                        {
-                            "assert": "=has(resource.status.outcomeValidator.depSkip) ? true : false",
-                            "depSkip": {"message": "Output Validator Dep Skip"},
-                        },
-                        {
-                            "assert": "=has(resource.status.outcomeValidator.skip) ? true : false",
-                            "skip": {"message": "Output Validator Skip"},
-                        },
-                        {
-                            "assert": "=has(resource.status.outcomeValidator.permFail) ? true : false",
-                            "permFail": {"message": "Output Validator Perm Fail"},
-                        },
-                        {
-                            "assert": "=has(resource.status.outcomeValidator.retry) ? true : false",
-                            "retry": {"delay": 18, "message": "Output Validator Retry"},
-                        },
-                        {
-                            "assert": "=!has(resource.status.returnValue)",
-                            "retry": {"delay": 1, "message": "Waiting for ready-state"},
-                        },
-                    ],
-                    "return": {"value": "=resource.status.returnValue"},
-                },
+                "postconditions": [
+                    {
+                        "assert": "=!has(resource.status.postconditions.depSkip)",
+                        "depSkip": {"message": "Output Validator Dep Skip"},
+                    },
+                    {
+                        "assert": "=!has(resource.status.postconditions.skip)",
+                        "skip": {"message": "Output Validator Skip"},
+                    },
+                    {
+                        "assert": "=!has(resource.status.postconditions.permFail)",
+                        "permFail": {"message": "Output Validator Perm Fail"},
+                    },
+                    {
+                        "assert": "=!has(resource.status.postconditions.retry)",
+                        "retry": {"delay": 18, "message": "Output Validator Retry"},
+                    },
+                    {
+                        "assert": "=has(resource.status.returnValue)",
+                        "retry": {"delay": 1, "message": "Waiting for ready-state"},
+                    },
+                ],
+                "return": {"value": "=resource.status.returnValue"},
             },
         )
 
@@ -179,7 +177,7 @@ class TestEndToEndResourceFunction(unittest.IsolatedAsyncioTestCase):
                         "overlayResource": {
                             "status": {
                                 "returnValue": "variant-value",
-                                "outcomeValidator": {"permFail": True},
+                                "postconditions": {"permFail": True},
                             }
                         },
                         "expectOutcome": {"permFail": {"message": "Output Validator"}},
@@ -189,10 +187,10 @@ class TestEndToEndResourceFunction(unittest.IsolatedAsyncioTestCase):
                         "expectReturn": {"value": "controller-set-value"},
                     },
                     {
-                        "label": "[variant] Input overlay triggers inputValidators",
+                        "label": "[variant] Input overlay triggers preconditions",
                         "variant": True,
                         "inputOverrides": {
-                            "inputValidators": {"permFail": True},
+                            "preconditions": {"permFail": True},
                         },
                         "expectOutcome": {"permFail": {"message": "Input Validator"}},
                     },

@@ -31,11 +31,12 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
             steps=[
                 workflow_structure.Step(
                     label="input_source",
+                    skip_if=None,
                     for_each=None,
                     inputs=None,
                     dynamic_input_keys=[],
                     logic=function_structure.ValueFunction(
-                        validators=None,
+                        preconditions=None,
                         local_values=None,
                         return_value=source_return_value,
                         dynamic_input_keys=set(),
@@ -74,11 +75,12 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
             steps=[
                 workflow_structure.Step(
                     label="sub_step",
+                    skip_if=None,
                     for_each=None,
                     inputs=None,
                     dynamic_input_keys=[],
                     logic=function_structure.ValueFunction(
-                        validators=None,
+                        preconditions=None,
                         local_values=None,
                         return_value=cel_env.program(
                             cel_env.compile("{'sub_one': true}")
@@ -90,11 +92,12 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                 ),
                 workflow_structure.Step(
                     label="sub_step_two",
+                    skip_if=None,
                     for_each=None,
                     inputs=None,
                     dynamic_input_keys=[],
                     logic=function_structure.ValueFunction(
-                        validators=None,
+                        preconditions=None,
                         local_values=None,
                         return_value=cel_env.program(cel_env.compile("17171")),
                         dynamic_input_keys=set(),
@@ -114,6 +117,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
             steps=[
                 workflow_structure.Step(
                     label="sub_workflow",
+                    skip_if=None,
                     for_each=None,
                     inputs=None,
                     dynamic_input_keys=[],
@@ -153,11 +157,12 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
             steps=[
                 workflow_structure.Step(
                     label="ok_step_one",
+                    skip_if=None,
                     for_each=None,
                     inputs=None,
                     dynamic_input_keys=[],
                     logic=function_structure.ValueFunction(
-                        validators=None,
+                        preconditions=None,
                         local_values=None,
                         return_value=cel_env.program(
                             cel_env.compile("{'i_am_ok': true}")
@@ -169,11 +174,12 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                 ),
                 workflow_structure.Step(
                     label="fail_step",
+                    skip_if=None,
                     for_each=None,
                     inputs=None,
                     dynamic_input_keys=[],
                     logic=function_structure.ValueFunction(
-                        validators=None,
+                        preconditions=None,
                         local_values=None,
                         return_value=cel_env.program(cel_env.compile("1 / 0")),
                         dynamic_input_keys=set(),
@@ -183,11 +189,12 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                 ),
                 workflow_structure.Step(
                     label="ok_step_two",
+                    skip_if=None,
                     for_each=None,
                     inputs=None,
                     dynamic_input_keys=[],
                     logic=function_structure.ValueFunction(
-                        validators=None,
+                        preconditions=None,
                         local_values=None,
                         return_value=cel_env.program(
                             cel_env.compile("{'sub_one': true}")

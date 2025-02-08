@@ -41,7 +41,7 @@ class TestCase(NamedTuple):
 
     # Mutually exclusive
     current_resource: dict | None = None
-    overlay_resource: dict | None = None
+    resource_overlay: Overlay | None = None
 
     # Human friendly output
     label: str | None = None

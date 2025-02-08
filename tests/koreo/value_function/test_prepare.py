@@ -12,13 +12,16 @@ class TestValueFunctionPrepare(unittest.IsolatedAsyncioTestCase):
         prepared = await prepare.prepare_value_function(
             cache_key="test",
             spec={
-                "validators": [
-                    {"assert": "=inputs.skip", "skip": {"message": "SKip"}},
+                "preconditions": [
+                    {"assert": "=!inputs.skip", "skip": {"message": "Skip"}},
                     {
-                        "assert": "=inputs.permFail",
+                        "assert": "=!inputs.permFail",
                         "permFail": {"message": "Perm Fail"},
                     },
-                    {"assert": "=inputs.depSkip", "depSkip": {"message": "Dep Skip"}},
+                    {
+                        "assert": "=!inputs.depSkip",
+                        "depSkip": {"message": "Dep Skip"},
+                    },
                 ],
                 "locals": {
                     "some_list": [1, 2, 3, 4],
@@ -78,37 +81,38 @@ class TestValueFunctionPrepare(unittest.IsolatedAsyncioTestCase):
                 msg=f'Expected `PermFail` for malformed `spec.locals` "{bad_locals}"',
             )
 
-    async def test_validators_none_and_empty_list(self):
-        outcome = await prepare.prepare_value_function("test", {"validators": None})
+    async def test_preconditions_none_and_empty_list(self):
+        outcome = await prepare.prepare_value_function("test", {"preconditions": None})
 
         self.assertIsInstance(
             outcome,
             result.PermFail,
         )
 
-        function, _ = await prepare.prepare_value_function("test", {"validators": []})
+        prepared = await prepare.prepare_value_function("test", {"preconditions": []})
+        function, _ = prepared
         self.assertIsInstance(
             function,
             ValueFunction,
-            msg="Unexpected error with empty list `spec.validators`",
+            msg="Unexpected error with empty list `spec.preconditions`",
         )
 
-    async def test_bad_validator_input_type(self):
+    async def test_bad_precondition_input_type(self):
         bad_values = [1, "abc", {"value": "one"}, True]
         for value in bad_values:
             self.assertIsInstance(
-                await prepare.prepare_value_function("test", {"validators": value}),
+                await prepare.prepare_value_function("test", {"preconditions": value}),
                 result.PermFail,
                 msg=f"Expected PermFail for bad `predicate_spec` '{value}' (type: {type(value)})",
             )
 
-    async def test_malformed_validator_input(self):
+    async def test_malformed_precondition_input(self):
         bad_values = [
             {"skip": {"message": "=1 + missing"}},
             {"assert": "=1 / 0 '", "permFail": {"message": "Bogus assert"}},
         ]
         self.assertIsInstance(
-            await prepare.prepare_value_function("test", {"validators": bad_values}),
+            await prepare.prepare_value_function("test", {"preconditions": bad_values}),
             result.PermFail,
         )
 

@@ -4,7 +4,7 @@ import celpy
 
 
 class ValueFunction(NamedTuple):
-    validators: celpy.Runner | None
+    preconditions: celpy.Runner | None
     local_values: celpy.Runner | None
     return_value: celpy.Runner | None
 
