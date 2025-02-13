@@ -152,15 +152,6 @@ spec:
                     name:
                       type: string
                       nullable: false
-                    overlay:
-                      type: object
-                      nullable: false
-                      x-kubernetes-preserve-unknown-fields: true
-                      description: |
-                        An optional overlay to be applied to the static
-                        template, allowing for customization of the static
-                        template. The controller will work to keep the managed
-                        resource matching this specification.
                   required: [name]
                 resource:
                   type: object
@@ -170,6 +161,61 @@ spec:
                     Inline Target Resource Specification. The controller will
                     work to keep the managed resource matching this
                     specification.
+                overlays:
+                  type: array
+                  nullable: false
+                  description: |
+                    An optional series of overlays that will be applied to the
+                    resource (from `resource` or `resourceTemplateRef`) to
+                    build the Target Resource Specification. This allows for
+                    optionally updating values and for building the Target
+                    Resource Specification without building a single large,
+                    complex overlay.
+                  items:
+                    type: object
+                    properties:
+                      skipIf:
+                        type: string
+                        description: Skip if the condition evaluates true.
+                        x-kubernetes-validations:
+                          - rule: self.startsWith('=')
+                            message: "must be an expression (start with '=')."
+                      overlay:
+                        type: object
+                        nullable: false
+                        x-kubernetes-preserve-unknown-fields: true
+                        description: Inline overlay specification.
+                      overlayRef:
+                        type: object
+                        nullable: false
+                        description: |
+                          Dynamically loaded Target Resource Specification.
+                          ValueFunctions are supported. The ValueFunction's
+                          return value is treated as the overlay.
+                        properties:
+                          kind:
+                            type: string
+                            nullable: false
+                            enum: [ValueFunction]
+                          name:
+                            type: string
+                            nullable: false
+                        required: [kind, name]
+                      inputs:
+                        type: object
+                        nullable: false
+                        description: |
+                          The inputs to be provided to the ValueFunction.
+                          `inputs` must be a map, but static values, arrays,
+                          and objects are allowed. You may provide the resource
+                          using `resource`, which will contain the current
+                          Target Resource Specification. Koreo Expressions are
+                          allowed and are indicated with a leading `=`. Note
+                          that no default inputs are provided.
+                        x-kubernetes-preserve-unknown-fields: true
+                    oneOf:
+                    - required: [overlay]
+                    - required: [overlayRef]
                 create:
                   type: object
                   nullable: false

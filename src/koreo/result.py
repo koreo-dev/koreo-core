@@ -63,22 +63,20 @@ class Ok[T]:
         return f"Ok(data={self.data})"
 
     def combine(self, other: Outcome):
+        # This is a lower-priority outcome
         if isinstance(other, (DepSkip, Skip)):
-            return self
+            if isinstance(self.data, _OkData):
+                return self
+
+            return Ok(data=_OkData([self.data]), location=self.location)
 
         if not isinstance(other, Ok):
             return other
 
-        data = []
-        if isinstance(self.data, list):
-            data.extend(self.data)
-        elif self.data is not None:
-            data.append(self.data)
-
-        if isinstance(other.data, list):
-            data.extend(other.data)
-        elif other.data is not None:
-            data.append(other.data)
+        if isinstance(self.data, _OkData):
+            combined_data = self.data.append(other.data)
+        else:
+            combined_data = _OkData([self.data, other.data])
 
         location = []
         if self.location:
@@ -87,7 +85,7 @@ class Ok[T]:
         if other.location:
             location.append(other.location)
 
-        return Ok(data=data, location=", ".join(location))
+        return Ok(data=combined_data, location=", ".join(location))
 
 
 class Retry:
@@ -177,21 +175,41 @@ NonOkOutcome = SkipOutcome | ErrorOutcome
 Outcome = NonOkOutcome | Ok[OkT]
 UnwrappedOutcome = NonOkOutcome | OkT
 
-Outcomes = list[Outcome[OkT]]
+
+# This is just for the Ok combine's use so that we know if we've already
+# combined results.
+class _OkData:
+    def __init__(self, values: list):
+        self.values = values
+
+    def append(self, value):
+        new = self.values[:]
+        new.append(value)
+        return _OkData(new)
 
 
 def combine(outcomes: Iterable[Outcome]):
     if not outcomes:
         return Skip()
 
-    return reduce(lambda acc, outcome: acc.combine(outcome), outcomes)
+    combined = reduce(lambda acc, outcome: acc.combine(outcome), outcomes, DepSkip())
+
+    if not isinstance(combined, Ok):
+        return combined
+
+    if isinstance(combined.data, _OkData):
+        return Ok(data=combined.data.values, location=combined.location)
+
+    # Python will not run reduce if there's a single element in the list, it
+    # returns the first element, so the value should be wrapped.
+    return Ok(data=[combined.data], location=combined.location)
 
 
 def unwrapped_combine(outcomes: Iterable[UnwrappedOutcome]) -> UnwrappedOutcome:
     if not outcomes:
         return Skip()
 
-    outcome = reduce(
+    combined = reduce(
         lambda acc, outcome: acc.combine(
             Ok(outcome) if is_unwrapped_ok(outcome) else outcome
         ),
@@ -199,10 +217,15 @@ def unwrapped_combine(outcomes: Iterable[UnwrappedOutcome]) -> UnwrappedOutcome:
         DepSkip(),  # The lowest priority in a combine flow
     )
 
-    if is_ok(outcome):
-        return outcome.data
+    if not is_ok(combined):
+        return combined
 
-    return outcome
+    if isinstance(combined.data, _OkData):
+        return combined.data.values
+
+    # Python will not run reduce if there's a single element in the list, it
+    # returns the first element, so the value should be wrapped.
+    return [combined.data]
 
 
 def is_ok[T](candidate: Outcome[T]) -> TypeIs[Ok[T]]:

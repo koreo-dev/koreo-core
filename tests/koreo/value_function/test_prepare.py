@@ -1,8 +1,10 @@
 import unittest
 
 import celpy
+from celpy import celtypes
 
 from koreo import result
+from koreo.cel.evaluation import evaluate_overlay
 from koreo.value_function import prepare
 from koreo.value_function.structure import ValueFunction
 
@@ -168,15 +170,13 @@ class TestValueFunctionPrepare(unittest.IsolatedAsyncioTestCase):
             ],
         }
 
-        inputs = celpy.json_to_cel(
-            {
-                "skip": False,
-                "permFail": False,
-                "depSkip": False,
-                "retry": False,
-                "ok": False,
-            }
-        )
+        inputs = {
+            "skip": celtypes.BoolType(False),
+            "permFail": celtypes.BoolType(False),
+            "depSkip": celtypes.BoolType(False),
+            "retry": celtypes.BoolType(False),
+            "ok": celtypes.BoolType(False),
+        }
 
         expected_return = {
             "string": "1 + 1",
@@ -197,10 +197,23 @@ class TestValueFunctionPrepare(unittest.IsolatedAsyncioTestCase):
             ],
         }
 
-        function, _ = await prepare.prepare_value_function(
+        prepared = await prepare.prepare_value_function(
             "test", {"return": return_value_cel}
         )
+
+        assert result.is_unwrapped_ok(prepared)
+
+        function, _ = prepared
+
+        assert function.return_value is not None
+
+        return_value = evaluate_overlay(
+            overlay=function.return_value,
+            inputs=inputs,
+            base=celtypes.MapType({}),
+            location="unittest",
+        )
         self.assertDictEqual(
-            function.return_value.evaluate({"inputs": celpy.json_to_cel(inputs)}),
+            return_value,
             expected_return,
         )

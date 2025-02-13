@@ -6,7 +6,11 @@ import celpy
 
 from koreo import schema
 from koreo.cel.functions import koreo_function_annotations
-from koreo.cel.prepare import prepare_map_expression
+from koreo.cel.prepare import (
+    Overlay,
+    prepare_map_expression,
+    prepare_overlay_expression,
+)
 from koreo.cel.structure_extractor import extract_argument_structure
 from koreo.predicate_helpers import predicate_extractor
 from koreo.result import PermFail, UnwrappedOutcome
@@ -61,7 +65,7 @@ async def prepare_value_function(
         case celpy.Runner() as local_values:
             used_vars.update(extract_argument_structure(local_values.ast))
 
-    match prepare_map_expression(
+    match prepare_overlay_expression(
         cel_env=env, spec=spec.get("return"), location="spec.return"
     ):
         case PermFail(message=message):
@@ -71,8 +75,9 @@ async def prepare_value_function(
             )
         case None:
             return_value = None
-        case celpy.Runner() as return_value:
-            used_vars.update(extract_argument_structure(return_value.ast))
+
+        case Overlay(values=values) as return_value:
+            used_vars.update(extract_argument_structure(values.ast))
 
     return (
         structure.ValueFunction(

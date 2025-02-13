@@ -1,19 +1,31 @@
-from typing import NamedTuple
+from typing import NamedTuple, Sequence
 
 from kr8s._objects import APIObject
 
 import celpy
 
 from koreo.cel.prepare import Overlay
+from koreo.result import UnwrappedOutcome
+from koreo.value_function.structure import ValueFunction
 
 
 class ResourceTemplateRef(NamedTuple):
     name: celpy.Runner | None
-    overlay: Overlay | None = None
 
 
 class InlineResourceTemplate(NamedTuple):
     template: celpy.Runner | None = None
+
+
+class ValueFunctionOverlay(NamedTuple):
+    overlay: ValueFunction
+    skip_if: celpy.Runner | None = None
+    inputs: celpy.Runner | None = None
+
+
+class InlineOverlay(NamedTuple):
+    overlay: Overlay
+    skip_if: celpy.Runner | None = None
 
 
 class Create(NamedTuple):
@@ -52,6 +64,8 @@ class CRUDConfig(NamedTuple):
     readonly: bool
 
     resource_template: InlineResourceTemplate | ResourceTemplateRef
+    overlays: UnwrappedOutcome[Sequence[InlineOverlay | ValueFunctionOverlay]]
+
     create: Create
     update: Update
 

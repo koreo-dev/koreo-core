@@ -82,7 +82,7 @@ def evaluate_overlay(
             location=location,
         )
 
-    combined_inputs = inputs | {celtypes.StringType("template"): base}
+    combined_inputs = inputs | {celtypes.StringType("resource"): base}
 
     try:
         overlay_values = overlay.values.evaluate(combined_inputs)

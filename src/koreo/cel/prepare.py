@@ -78,7 +78,7 @@ def _overlay_indexer(spec: dict, base: int = 0) -> tuple[Index, list]:
     values = []
     for key, value in spec.items():
         match value:
-            case dict():
+            case dict() if value:
                 index[key], key_values = _overlay_indexer(
                     value, base=len(values) + base
                 )
