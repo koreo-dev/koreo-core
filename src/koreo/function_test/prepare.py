@@ -61,14 +61,6 @@ async def prepare_function_test(
         )
 
     initial_resource = spec.get("currentResource")
-    if (
-        initial_resource is not None
-        and watched_function.resource_type != ResourceFunction
-    ):
-        return PermFail(
-            message=f"`{location}.currentResource` only valid for `ResourceFunction` tests.",
-            location=f"{location}.currentResource",
-        )
 
     cel_env = celpy.Environment(annotations=koreo_function_annotations)
 
@@ -168,22 +160,10 @@ def _prepare_test_case(
             location=f"{location}.currentResource",
         )
 
-    if current_resource and not resource_function:
-        return PermFail(
-            message=f"`{location}.currentResource` only valid for `ResourceFunction` tests.",
-            location=f"{location}.currentResource",
-        )
-
     overlay_resource = spec.get("overlayResource")
     if overlay_resource is not None and not isinstance(overlay_resource, dict):
         return PermFail(
             message=f"`{location}.overlayResource` must be an object.",
-            location=f"{location}.overlayResource",
-        )
-
-    if overlay_resource and not resource_function:
-        return PermFail(
-            message=f"`{location}.overlayResource` only valid for `ResourceFunction` tests.",
             location=f"{location}.overlayResource",
         )
 

@@ -96,7 +96,6 @@ class MockApi:
         else:
             merged = _merge_overlay(self._current_resource, data)
 
-        # raise Exception(f"called with {data}")
         self._materialized = merged
         yield MockResponse(data=merged)
 
@@ -300,10 +299,17 @@ async def _run_test_case(
                 inputs=inputs,
             )
         case ValueFunction():
+            if not resource:
+                base_resource = celtypes.MapType({})
+            else:
+                base_resource = celpy.json_to_cel(resource)
+                assert isinstance(base_resource, celtypes.MapType)
+
             reconcile_result = await reconcile_value_function(
                 location=location,
                 function=function_under_test,
                 inputs=inputs,
+                value_base=base_resource,
             )
 
     match test_case.assertion:
