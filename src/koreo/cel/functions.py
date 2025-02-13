@@ -230,7 +230,7 @@ def _overlay(
     resource: celtypes.MapType,
     overlay: celtypes.MapType,
 ) -> celtypes.MapType | celpy.CELEvalError:
-    return _deep_overlay(copy.deepcopy(resource), overlay)
+    return _deep_overlay(resource, overlay)
 
 
 def _deep_overlay(

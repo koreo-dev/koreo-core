@@ -1,16 +1,16 @@
 from lark import Tree, Token
 
 
-def extract_argument_structure(compiled: Tree) -> list[str]:
-    var_map: list[str] = []
+def extract_argument_structure(compiled: Tree) -> set[str]:
+    var_map: set[str] = set()
     for thing in compiled.iter_subtrees():
         if thing.data == "member_dot":
             member_dot: str = _process_member_dot(thing)
-            var_map.append(member_dot)
+            var_map.add(member_dot)
 
         if thing.data == "member_index":
             member_index: str = _process_member_index(thing)
-            var_map.append(member_index)
+            var_map.add(member_index)
 
     return var_map
 

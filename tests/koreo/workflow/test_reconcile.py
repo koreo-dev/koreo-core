@@ -3,9 +3,10 @@ import unittest
 import celpy
 from celpy import celtypes
 
-from koreo.result import Ok
+from koreo.result import Ok, is_unwrapped_ok
 
 from koreo.cel.structure_extractor import extract_argument_structure
+from koreo.cel.prepare import prepare_overlay_expression
 
 from koreo.value_function import structure as function_structure
 
@@ -16,8 +17,10 @@ from koreo.workflow import structure as workflow_structure
 class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
     async def test_reconcile(self):
         cel_env = celpy.Environment()
-        source_return_value = cel_env.program(
-            cel_env.compile("{'resources': [{'bool': true}, {'bool': false}]}")
+        source_return_value = prepare_overlay_expression(
+            cel_env=cel_env,
+            spec={"resources": [{"bool": True}, {"bool": False}]},
+            location="unittest",
         )
 
         step_state = cel_env.program(cel_env.compile("{'input_source': value}"))
@@ -66,6 +69,22 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
     async def test_reconcile_nested(self):
         cel_env = celpy.Environment()
 
+        sub_step_return_value = prepare_overlay_expression(
+            cel_env=cel_env, spec={"sub_one": True}, location="unittest:sub_step.return"
+        )
+
+        assert is_unwrapped_ok(sub_step_return_value), f"{sub_step_return_value}"
+
+        sub_step_two_return_value = prepare_overlay_expression(
+            cel_env=cel_env,
+            spec={"value": "17171"},
+            location="unittest:sub_step_two.return",
+        )
+
+        assert is_unwrapped_ok(
+            sub_step_two_return_value
+        ), f"{sub_step_two_return_value}"
+
         sub_workflow = workflow_structure.Workflow(
             crd_ref=workflow_structure.ConfigCRDRef(
                 api_group="tests.koreo.realkinetic.com", version="v1", kind="TestCase"
@@ -82,9 +101,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                     logic=function_structure.ValueFunction(
                         preconditions=None,
                         local_values=None,
-                        return_value=cel_env.program(
-                            cel_env.compile("{'sub_one': true}")
-                        ),
+                        return_value=sub_step_return_value,
                         dynamic_input_keys=set(),
                     ),
                     condition=None,
@@ -99,7 +116,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                     logic=function_structure.ValueFunction(
                         preconditions=None,
                         local_values=None,
-                        return_value=cel_env.program(cel_env.compile("17171")),
+                        return_value=sub_step_two_return_value,
                         dynamic_input_keys=set(),
                     ),
                     condition=None,
@@ -139,7 +156,12 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
 
         self.maxDiff = None
         self.assertDictEqual(
-            {"sub_workflow": {"sub_step": {"sub_one": True}, "sub_step_two": 17171}},
+            {
+                "sub_workflow": {
+                    "sub_step": {"sub_one": True},
+                    "sub_step_two": {"value": 17171},
+                }
+            },
             workflow_result.state,
         )
 
@@ -164,8 +186,8 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                     logic=function_structure.ValueFunction(
                         preconditions=None,
                         local_values=None,
-                        return_value=cel_env.program(
-                            cel_env.compile("{'i_am_ok': true}")
+                        return_value=prepare_overlay_expression(
+                            cel_env=cel_env, spec={"i_am_ok": True}, location="unittest"
                         ),
                         dynamic_input_keys=set(),
                     ),
@@ -196,8 +218,8 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                     logic=function_structure.ValueFunction(
                         preconditions=None,
                         local_values=None,
-                        return_value=cel_env.program(
-                            cel_env.compile("{'sub_one': true}")
+                        return_value=prepare_overlay_expression(
+                            cel_env=cel_env, spec={"sub_one": True}, location="unittest"
                         ),
                         dynamic_input_keys=set(),
                     ),

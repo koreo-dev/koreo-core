@@ -19,11 +19,11 @@ DEFAULT_API_VERSION = "v1beta1"
 CRD_ROOT = pathlib.Path(__file__).parent.parent.parent.joinpath("crd")
 
 CRD_MAP = {
+    FunctionTest: CRD_ROOT.joinpath("function-test.yaml"),
     ResourceFunction: CRD_ROOT.joinpath("resource-function.yaml"),
     ResourceTemplate: CRD_ROOT.joinpath("resource-template.yaml"),
     ValueFunction: CRD_ROOT.joinpath("value-function.yaml"),
     Workflow: CRD_ROOT.joinpath("workflow.yaml"),
-    FunctionTest: CRD_ROOT.joinpath("function-test.yaml"),
 }
 
 _SCHEMA_VALIDATORS = {}

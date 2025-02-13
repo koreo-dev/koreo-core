@@ -21,6 +21,7 @@ from koreo.cel.evaluation import (
 )
 from koreo.resource_template.structure import ResourceTemplate
 from koreo.result import PermFail, Retry, UnwrappedOutcome, is_unwrapped_ok
+from koreo.value_function.reconcile import reconcile_value_function
 
 
 from . import structure
@@ -217,12 +218,32 @@ async def reconcile_krm_resource(
         resource_template=crud_config.resource_template,
         inputs=inputs,
         forced_overlay=forced_overlay,
+        full_resource_name=full_resource_name,
     )
     if not is_unwrapped_ok(expected_resource):
         return ReconcileResult(
             result=expected_resource,
             resource_id=resource_id,
         )
+
+    if crud_config.overlays:
+        if not is_unwrapped_ok(crud_config.overlays):
+            return ReconcileResult(
+                result=crud_config.overlays,
+                resource_id=resource_id,
+            )
+        expected_resource = await _materialize_from_overlays(
+            resource=expected_resource,
+            overlay_steps=crud_config.overlays,
+            inputs=inputs,
+            forced_overlay=forced_overlay,
+            full_resource_name=full_resource_name,
+        )
+        if not is_unwrapped_ok(expected_resource):
+            return ReconcileResult(
+                result=expected_resource,
+                resource_id=resource_id,
+            )
 
     if not api_resource:
         return ReconcileResult(
@@ -356,16 +377,17 @@ async def _construct_resource_template(
         structure.InlineResourceTemplate | structure.ResourceTemplateRef | None
     ),
     forced_overlay: celtypes.MapType,
+    full_resource_name: str,
 ):
     match resource_template:
         case None:
             return forced_overlay
 
-        case structure.ResourceTemplateRef(name=template_name, overlay=overlay):
+        case structure.ResourceTemplateRef(name=template_name):
             match evaluate(
                 expression=template_name,
                 inputs=inputs,
-                location="spec.resourceTemplateRef.name",
+                location=f"{full_resource_name}:spec.resourceTemplateRef.name<eval>",
             ):
                 case PermFail() as err:
                     return err
@@ -374,7 +396,7 @@ async def _construct_resource_template(
                 case _ as bad_type:
                     return PermFail(
                         message=f"Expected string, but received '{bad_type}' ({type(bad_type)}) at `spec.resourceTemplateRef.name`",
-                        location=f"spec.resourceTemplateRef.name",
+                        location=f"{full_resource_name}:spec.resourceTemplateRef.name<eval>",
                     )
 
             dynamic_resource_template = cache.get_resource_from_cache(
@@ -384,68 +406,33 @@ async def _construct_resource_template(
             if not dynamic_resource_template:
                 return Retry(
                     message=f"ResourceTemplate:{template_key} not found.",
-                    location=f"spec.resourceTemplateRef.name:<load>",
+                    location=f"{full_resource_name}:spec.resourceTemplateRef.name<load>",
                     delay=DEFAULT_LOAD_RETRY_DELAY,
                 )
 
             if not is_unwrapped_ok(dynamic_resource_template):
                 return Retry(
                     message=f"ResourceTemplate:{template_key} is not ready ({dynamic_resource_template.message})",
-                    location=f"spec.resourceTemplateRef.name:<load>",
+                    location=f"{full_resource_name}:spec.resourceTemplateRef.name<load>",
                     delay=DEFAULT_LOAD_RETRY_DELAY,
                 )
 
-            if not overlay:
-                materialized = dynamic_resource_template.template
-            else:
-                match evaluate_overlay(
-                    overlay=overlay,
-                    inputs=inputs,
-                    base=dynamic_resource_template.template,
-                    location="spec.resourceTemplateRef.overlay",
-                ):
-                    case PermFail(message=message, location=err_location):
-                        return PermFail(
-                            message=message,
-                            location=(
-                                err_location
-                                if err_location
-                                else "spec.resourceTemplateRef.overlay"
-                            ),
-                        )
-                    case celtypes.MapType() as materialized:
-                        # Just needed materialized
-                        pass
-                    case _ as bad_type:
-                        return PermFail(
-                            message=f"Expected mapping, but received {type(bad_type)} for 'spec.resourceTemplateRef.overlay'",
-                            location="spec.resourceTemplateRef.overlay",
-                        )
-
-                if err := check_for_celevalerror(
-                    materialized, location="spec.resourceTemplateRef.overlay<apply>"
-                ):
-                    return err
-
-                assert not isinstance(materialized, celpy.CELEvalError)
+            materialized = dynamic_resource_template.template
 
         case structure.InlineResourceTemplate(template=template):
             match evaluate(
                 expression=template,
                 inputs=inputs,
-                location="spec.resource",
+                location=f"{full_resource_name}:spec.resource",
             ):
-                case PermFail(message=message, location=err_location):
-                    return PermFail(
-                        message=message,
-                        location=(err_location if err_location else "spec.resource"),
-                    )
+                case PermFail() as err:
+                    return err
                 case celtypes.MapType() as materialized:
                     pass
                 case _ as bad_type:
                     return PermFail(
                         message=f"Expected mapping, but received {type(bad_type)} for `spec.resource`",
-                        location="spec.resource",
+                        location=f"{full_resource_name}:spec.resource",
                     )
 
     materialized = functions._overlay(resource=materialized, overlay=forced_overlay)
@@ -458,6 +445,101 @@ async def _construct_resource_template(
     assert not isinstance(materialized, celpy.CELEvalError)
 
     return materialized
+
+
+async def _materialize_from_overlays(
+    resource: celtypes.MapType,
+    overlay_steps: Sequence[structure.InlineOverlay | structure.ValueFunctionOverlay],
+    inputs: dict[str, celtypes.Value],
+    forced_overlay: celtypes.MapType,
+    full_resource_name: str,
+):
+    location = f"{full_resource_name}:spec.overlays"
+
+    new_resource = resource
+    for idx, overlay_step in enumerate(overlay_steps):
+        if overlay_step.skip_if:
+            match evaluate(
+                overlay_step.skip_if,
+                inputs=inputs,
+                location=f"{location}[{idx}].skipIf",
+            ):
+                case PermFail() as err:
+                    return err
+
+                case celtypes.BoolType() as skip:
+                    if skip:
+                        continue
+
+                case _ as bad_type:
+                    return PermFail(
+                        message=f"Expected boolean, but received {type(bad_type)} for 'spec.overlays[{idx}].skipIf'",
+                        location=f"{location}[{idx}].skipIf",
+                    )
+
+        match overlay_step:
+            case structure.InlineOverlay(overlay=overlay):
+                match evaluate_overlay(
+                    overlay=overlay,
+                    inputs=inputs,
+                    base=new_resource,
+                    location=f"{location}[{idx}].overlay",
+                ):
+                    case PermFail() as err:
+                        return err
+
+                    case celtypes.MapType() as overlaid:
+                        new_resource = overlaid
+
+                    case _ as bad_type:
+                        return PermFail(
+                            message=f"Expected mapping, but received {type(bad_type)} for '{location}[{idx}].overlay'",
+                            location=f"{location}[{idx}].overlay",
+                        )
+
+            case structure.ValueFunctionOverlay(
+                inputs=overlay_inputs, overlay=overlay_function
+            ):
+                evaluated_inputs = evaluate(
+                    expression=overlay_inputs,
+                    inputs=inputs,
+                    location=f"{location}[{idx}].inputs",
+                )
+
+                if not is_unwrapped_ok(evaluated_inputs):
+                    return evaluated_inputs
+
+                overlaid = await reconcile_value_function(
+                    location=f"{location}[{idx}].overlayRef<eval>",
+                    function=overlay_function,
+                    inputs=evaluated_inputs,
+                    value_base=new_resource,
+                )
+                if not is_unwrapped_ok(overlaid):
+                    return overlaid
+
+                if not isinstance(overlaid, celtypes.MapType):
+                    return PermFail(
+                        message=f"Expected mapping, but received {type(overlaid)} for '{location}[{idx}].overlayRef<eval>'",
+                        location=f"{location}[{idx}].overlayRef<eval>",
+                    )
+
+                new_resource = overlaid
+
+        if err := check_for_celevalerror(
+            new_resource, location=f"{location}[{idx}]<apply>"
+        ):
+            return err
+
+        assert not isinstance(new_resource, celpy.CELEvalError)
+
+    new_resource = functions._overlay(resource=new_resource, overlay=forced_overlay)
+    if err := check_for_celevalerror(
+        new_resource, location="spec.overlays<security overlay>"
+    ):
+        return err
+
+    return new_resource
 
 
 async def _create_api_resource(

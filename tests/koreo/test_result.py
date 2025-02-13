@@ -8,14 +8,14 @@ from koreo import result
 
 class TestCombineMessages(unittest.TestCase):
     def test_no_outcomes(self):
-        outcomes: result.Outcomes = []
+        outcomes: list[result.Outcome] = []
 
         combined = result.combine(outcomes)
 
         self.assertIsInstance(combined, result.Skip)
 
     def test_depskips(self):
-        outcomes: result.Outcomes = [
+        outcomes: list[result.Outcome] = [
             result.DepSkip(),
             result.DepSkip(),
             result.DepSkip(),
@@ -29,7 +29,7 @@ class TestCombineMessages(unittest.TestCase):
         self.assertIsInstance(combined, result.DepSkip)
 
     def test_skips(self):
-        outcomes: result.Outcomes = [
+        outcomes: list[result.Outcome] = [
             result.Skip(),
             result.Skip(),
             result.Skip(),
@@ -43,7 +43,7 @@ class TestCombineMessages(unittest.TestCase):
         self.assertIsInstance(combined, result.Skip)
 
     def test_depskips_and_skips(self):
-        outcomes: result.Outcomes = [
+        outcomes: list[result.Outcome] = [
             result.DepSkip(),
             result.Skip(),
             result.DepSkip(),
@@ -56,10 +56,12 @@ class TestCombineMessages(unittest.TestCase):
         self.assertIsInstance(combined, result.Skip)
 
     def test_oks(self):
-        outcomes: result.Outcomes = [
-            result.Ok(None),
+        outcomes: list[result.Outcome] = [
             result.Ok("test"),
             result.Ok(8),
+            result.Ok(88),
+            result.Ok(None),
+            result.Ok(True),
         ]
         shuffle(outcomes)
 
@@ -67,17 +69,21 @@ class TestCombineMessages(unittest.TestCase):
 
         self.assertIsInstance(combined, result.Ok)
 
-        self.assertIn("test", combined.data)
-        self.assertIn(8, combined.data)
-        self.assertNotIn(None, combined.data)
+        # Note, this is done so that we can shuffle the outcomes so that we're
+        # testing different combinations of outcome orderings.
+        for value in [None, "test", 8, 88, True]:
+            self.assertIn(value, combined.data)
 
     def test_skips_and_oks(self):
-        outcomes: result.Outcomes = [
+        outcomes: list[result.Outcome] = [
             result.DepSkip(),
-            result.Skip(),
-            result.Ok(None),
+            result.DepSkip(),
             result.Ok("test"),
             result.Ok(8),
+            result.Ok(False),
+            result.Ok(None),
+            result.Skip(),
+            result.Skip(),
         ]
         shuffle(outcomes)
 
@@ -85,15 +91,38 @@ class TestCombineMessages(unittest.TestCase):
 
         self.assertIsInstance(combined, result.Ok)
 
-        self.assertIn("test", combined.data)
-        self.assertIn(8, combined.data)
-        self.assertNotIn(None, combined.data)
+        # Note, this is done so that we can shuffle the outcomes so that we're
+        # testing different combinations of outcome orderings.
+        for value in [None, "test", 8, False]:
+            self.assertIn(value, combined.data)
+
+    def test_combine_one_value(self):
+        outcomes: list[result.Outcome] = [
+            result.Ok("ok-value"),
+        ]
+
+        combined = result.combine(outcomes)
+
+        self.assertIsInstance(combined, result.Ok)
+
+        print(combined)
+        self.assertListEqual(["ok-value"], combined.data)
+
+    def test_unwrapped_combine_one_value(self):
+        outcomes: list[result.UnwrappedOutcome] = [
+            "one-ok-value",
+        ]
+
+        combined = result.unwrapped_combine(outcomes)
+
+        print(combined)
+        self.assertListEqual(["one-ok-value"], combined)
 
     def test_retries(self):
         delay_5_message = "Waiting"
         default_delay_message = "Will retry"
 
-        outcomes: result.Outcomes = [
+        outcomes: list[result.Outcome] = [
             result.Retry(delay=500),
             result.Retry(delay=5, message="Waiting"),
             result.Retry(delay=59),
@@ -109,7 +138,7 @@ class TestCombineMessages(unittest.TestCase):
         self.assertIn(default_delay_message, combined.message)
 
     def test_skips_oks_and_retries(self):
-        outcomes: result.Outcomes = [
+        outcomes: list[result.Outcome] = [
             result.DepSkip(),
             result.Skip(),
             result.Ok(None),
@@ -130,7 +159,7 @@ class TestCombineMessages(unittest.TestCase):
         first_message = "A bad error"
         second_message = "A really, really bad error"
 
-        outcomes: result.Outcomes = [
+        outcomes: list[result.Outcome] = [
             result.PermFail(),
             result.PermFail(message=first_message),
             result.PermFail(message=second_message),
@@ -145,7 +174,7 @@ class TestCombineMessages(unittest.TestCase):
         self.assertIn(second_message, combined.message)
 
     def test_skips_oks_retries_and_permfail(self):
-        outcomes: result.Outcomes = [
+        outcomes: list[result.Outcome] = [
             result.DepSkip(),
             result.Skip(),
             result.Ok(None),
