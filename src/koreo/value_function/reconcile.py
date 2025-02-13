@@ -18,6 +18,10 @@ async def reconcile_value_function(
         "inputs": inputs,
     }
 
+    # TODO: Need to decide if this is correct to do.
+    if value_base:
+        full_inputs = full_inputs | {celtypes.StringType("resource"): value_base}
+
     if precondition_error := evaluate_predicates(
         predicates=function.preconditions,
         inputs=full_inputs,
