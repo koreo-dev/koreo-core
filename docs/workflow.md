@@ -35,11 +35,9 @@ and manages the "external" (to that Logic's body) state interactions.
 |  *`    kind`*:                | |
 |  *`  configStep`*:            | _Optional_ Acts as the entry-point and will be provided with the trigger values as `inputs.parent`. |
 |  *`    label`*:               | _Optional_ Defaults to `config`, this is the name other steps can use to reference this step's return value. |
-|  *`    functionRef`*:         | One of `functionRef` or `workflowRef` are required. |
-| **`      kind`**:             | `ValueFunction` or `ResourceFunction`, using a `ValueFunction` is strongly recommended. |
+| **`    ref`**:                | A reference to the Logic to be run. |
+| **`      kind`**:             | `ValueFunction`, `ResourceFunction`, or `Workflow`. Using a `ValueFunction` is usually recommended for `configStep`. |
 | **`      name`**:             | Name of the Function to use. |
-|  *`    workflowRef`*:         | One of `functionRef` or `workflowRef` are required. |
-| **`      name`**:             | Name of the `Workflow` to use. |
 |  *`    inputs:`*: **`{}`**    | _Optional_ If provided, must be an object that specifies input values to the Logic. Koreo Expressions may be used. |
 |  *`    condition`*:           | _Optional_ The result of the Logic will be set as a `status.condition` on the trigger object.|
 | **`      type`**:             | The condition's "key", must be PascalCase. |
@@ -47,11 +45,9 @@ and manages the "external" (to that Logic's body) state interactions.
 |  *`    state:`*: **`{}`**     | _Optional_ If provided, must be an object that specifies values to be set on the trigger object. The return value from the Logic is accessible within `value`. Subsequent steps _may_ replace the values if the keys match. |
 | **`  steps`**:                | A collection of Functions or `Workflows` that provide the Logic. |
 | **`  - label`**:              | Name of the step, must be alphanumeric and may contain underscores. Other steps will use this value to reference this step's return value. |
-|  *`    functionRef`*:         | One of `functionRef` or `workflowRef` are required. |
-| **`      kind`**:             | `ValueFunction` or `ResourceFunction` |
+| **`    ref`**:                | A reference to the Logic to be run. |
+| **`      kind`**:             | `ValueFunction`, `ResourceFunction`, or `Workflow` |
 | **`      name`**:             | Name of the Function to use. |
-|  *`    workflowRef`*:         | One of `functionRef` or `workflowRef` are required. |
-| **`      name`**:             | Name of the `Workflow` to use. |
 |  *`    skipIf`*:              | _Optional_ Provide a test to determine if the step should be run. This may be a Koreo Expression which has access to `steps` at evaluation time. |
 |  *`    forEach`*:             | Allows for "mapping" over a list of values. |
 | **`      itemIn`**: **`=[]`** | This must be a Koreo Expression that evaluates to a list. Each item will be mapped to the `inputKey`, and the Logic will be invoked once for each item. |
@@ -110,12 +106,13 @@ Each "step" defines some Logic to be called, specifies the inputs the Logic is
 to be provided with, specifies an optional status condition, and optionally
 specifies any state you wish exposed within the parent object's `status.state`.
 
-Each step must specify either a `functionRef` or `workflowRef`. This defines
-which Logic is to be called. It also specifies `inputs` to be provided to the
-Logic. For Functions, the inputs are directly accessible within `inputs`. For
-`Workflows`, the inputs are exposed under `inputs.parent`. That enables a
-`Workflow` to be directly triggered via a `crdRef` _or_ it may be directly
-called as a sub-workflow. That makes reuse and testing of `Workflows` easier.
+Each step must specify the Logic to be called using `ref`, which may be a
+`ValueFunction`, `ResourceFunction`, or `Workflow`. It also specifies `inputs`
+to be provided to the Logic. For Functions, the inputs are directly accessible
+within `inputs`. For `Workflows`, the inputs are exposed under `inputs.parent`.
+That enables a `Workflow` to be directly triggered via a `crdRef` _or_ it may
+be directly called as a sub-workflow. That makes reuse and testing of
+`Workflows` easier.
 
 A step may also specify a `forEach` block, which will cause the Logic to be
 executed once per item in the `forEach.itemIn` list. Each item will be provided
@@ -174,7 +171,7 @@ spec:
   # ValueFunction as `inputs.parent`, and the return value of this Function
   # will be available to other steps as `steps.config`.
   configStep:
-    functionRef:
+    ref:
       kind: ValueFunction
       name: simple-example-config.v1
 
@@ -184,14 +181,14 @@ spec:
   # complete so you should not depend on the order in which they are listed.
   steps:
     # Each step must have a label, this label is an identifier. The return
-    # value of the Logic (`functionRef` or `workflowRef`) is available to
-    # be passed into other steps' inputs as `steps.simple_return_value`. If a
-    # step does not return successfully, then any step referencing it will
-    # automatically be skipped and marked as `depSkip`.
+    # value of the Logic is available to be passed into other steps' inputs as
+    # `steps.simple_return_value`. If a step does not return successfully, then
+    # any step referencing it will automatically be skipped and marked as
+    # `depSkip`.
     - label: simple_return_value
 
       # The Logic to be run.
-      functionRef:
+      ref:
         kind: ValueFunction
         name: simple-return-value.v1
 
@@ -212,7 +209,7 @@ spec:
           empty_list: =value.empties.emptyList
 
     - label: resource_reader
-      functionRef:
+      ref:
         kind: ResourceFunction
         name: resource-reader.v1
 
@@ -231,7 +228,7 @@ spec:
           int: =steps.config.int
 
     - label: resource_factory
-      functionRef:
+      ref:
         kind: ResourceFunction
         name: resource-factory.v1
 
