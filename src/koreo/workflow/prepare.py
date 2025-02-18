@@ -20,7 +20,6 @@ from koreo.result import (
     PermFail,
     Retry,
     UnwrappedOutcome,
-    is_ok,
     is_unwrapped_ok,
     unwrapped_combine,
 )
@@ -244,13 +243,9 @@ def _load_config_step(
     logic_cache_key = None
     logic = None
 
-    function_ref = step_spec.get("functionRef")
-    if function_ref:
-        logic_cache_key, logic = _load_function(step_label, function_ref)
-
-    workflow_ref = step_spec.get("workflowRef")
-    if workflow_ref:
-        logic_cache_key, logic = _load_workflow(step_label, workflow_ref)
+    logic_ref = step_spec.get("ref")
+    if logic_ref:
+        logic_cache_key, logic = _load_logic(step_label, logic_ref)
 
     if not is_unwrapped_ok(logic):
         return structure.ErrorStep(label=step_label, outcome=logic, condition=None)
@@ -390,13 +385,9 @@ def _load_step(cel_env: celpy.Environment, step_spec: dict, known_steps: set[str
     logic_cache_key = None
     logic = None
 
-    function_ref = step_spec.get("functionRef")
-    if function_ref:
-        logic_cache_key, logic = _load_function(step_label, function_ref)
-
-    workflow_ref = step_spec.get("workflowRef")
-    if workflow_ref:
-        logic_cache_key, logic = _load_workflow(step_label, workflow_ref)
+    logic_ref = step_spec.get("ref")
+    if logic_ref:
+        logic_cache_key, logic = _load_logic(step_label, logic_ref)
 
     if not is_unwrapped_ok(logic):
         return structure.ErrorStep(label=step_label, outcome=logic, condition=None)
@@ -586,88 +577,54 @@ def _prepare_for_each(
     return (for_each, dynamic_input_keys)
 
 
-def _load_function(step_label: str, function_ref: dict):
-    function_kind = function_ref.get("kind")
-    function_cache_key = function_ref.get("name")
+def _load_logic(step_label: str, logic_ref: dict):
+    logic_kind = logic_ref.get("kind")
+    logic_cache_key = logic_ref.get("name")
 
-    if not function_kind:
-        return function_cache_key, PermFail(
-            message=f"Missing `{step_label}.functionRef.kind`, can not prepare Workflow.",
-            location=f"{step_label}:<missing>:{function_cache_key if function_cache_key else '<missing>'}",
+    if not logic_kind:
+        return logic_cache_key, PermFail(
+            message=f"Missing `{step_label}.ref.kind`, can not prepare Workflow.",
+            location=f"{step_label}:ref.<missing>:{logic_cache_key if logic_cache_key else '<missing>'}",
         )
 
-    if not function_cache_key:
-        return function_cache_key, PermFail(
-            message=f"Missing `{step_label}.functionRef.name`, can not prepare Workflow.",
-            location=f"{step_label}:{function_kind}:<missing>",
+    if not logic_cache_key:
+        return logic_cache_key, PermFail(
+            message=f"Missing `{step_label}.ref.name`, can not prepare Workflow.",
+            location=f"{step_label}:ref.{logic_kind}:<missing>",
         )
 
-    function_kind_map: dict[str, type[ValueFunction | ResourceFunction]] = {
+    logic_kind_map: dict[
+        str, type[ValueFunction | ResourceFunction | structure.Workflow]
+    ] = {
         "ValueFunction": ValueFunction,
         "ResourceFunction": ResourceFunction,
+        "Workflow": structure.Workflow,
     }
 
-    function_class = function_kind_map.get(function_kind)
-    if not function_class:
-        return function_cache_key, PermFail(
-            message=f"Invalid `{step_label}.functionRef.kind` ({function_kind}), can not prepare Workflow.",
-            location=f"{step_label}:{function_kind}:{function_cache_key}",
+    logic_class = logic_kind_map.get(logic_kind)
+    if not logic_class:
+        return logic_cache_key, PermFail(
+            message=f"Invalid `{step_label}.ref.kind` ({logic_kind}), can not prepare Workflow.",
+            location=f"{step_label}:ref.{logic_kind}:{logic_cache_key}",
         )
 
-    function = get_resource_from_cache(
-        resource_class=function_class,
-        cache_key=function_cache_key,
+    logic = get_resource_from_cache(
+        resource_class=logic_class,
+        cache_key=logic_cache_key,
     )
 
-    if not function:
-        return function_cache_key, Retry(
-            message=f"Missing {function_kind}:{function_cache_key}, can not prepare Workflow.",
+    if not logic:
+        return logic_cache_key, Retry(
+            message=f"Missing {logic_kind}:{logic_cache_key}. Workflow prepare will retry.",
             delay=15,
-            location=f"{step_label}:{function_kind}:{function_cache_key}",
+            location=f"{step_label}:ref.{logic_kind}:{logic_cache_key}",
         )
 
-    if not is_unwrapped_ok(function):
-        return function_cache_key, Retry(
-            message=f"{function_kind}:{function_cache_key} is not healthy ({function.message}). Workflow prepare will retry.",
+    if not is_unwrapped_ok(logic):
+        return logic_cache_key, Retry(
+            message=f"{logic_kind}:{logic_cache_key} is not healthy ({logic.message}). Workflow prepare will retry.",
             delay=180,
-            location=f"{step_label}:{function_kind}:{function_cache_key}",
+            location=f"{step_label}:{logic_kind}:{logic_cache_key}",
         )
 
-    return function_cache_key, function
-
-
-def _load_workflow(step_label: str, workflow_ref: dict):
-    workflow_cache_key = workflow_ref.get("name")
-    if not workflow_cache_key:
-        return workflow_cache_key, PermFail(
-            message=f"Missing `{step_label}.workflowRef.name`, can not prepare Workflow.",
-            location=f"{step_label}:<missing>",
-        )
-
-    workflow = get_resource_from_cache(
-        resource_class=structure.Workflow,
-        cache_key=workflow_cache_key,
-    )
-
-    if not workflow:
-        return workflow_cache_key, Retry(
-            message=f"Missing Workflow:{workflow_cache_key}, can not prepare Workflow.",
-            delay=15,
-            location=f"{step_label}:Workflow:{workflow_cache_key}",
-        )
-
-    if not is_unwrapped_ok(workflow):
-        return workflow_cache_key, Retry(
-            message=f"Workflow {workflow_cache_key} is not ready ({workflow.message}). Workflow prepare will retry.",
-            delay=180,
-            location=f"{step_label}:Workflow:{workflow_cache_key}",
-        )
-
-    if not is_ok(workflow.steps_ready):
-        return workflow_cache_key, Retry(
-            message=f"Workflow {workflow_cache_key} is not healthy ({workflow.steps_ready.message}). Workflow prepare will retry.",
-            delay=180,
-            location=f"{step_label}:Workflow:{workflow_cache_key}",
-        )
-
-    return workflow_cache_key, workflow
+    return logic_cache_key, logic

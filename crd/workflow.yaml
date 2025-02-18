@@ -62,33 +62,22 @@ spec:
                       x-kubernetes-validations:
                         - rule: self.matches("^[[:word:]]+$")
                           message: labels must be alphanumeric + underscores
-                    functionRef:
+                    ref:
                       type: object
                       nullable: false
                       description: |
-                        The Function to run. This Function will be passed the
-                        triggering-object as `inputs.parent`.
+                        The Function or Workflow to run as the Logic. This
+                        Logic will be passed the triggering-object as
+                        `inputs.parent`.
                       properties:
                         kind:
                           type: string
                           nullable: false
-                          enum: [ResourceFunction, ValueFunction]
+                          enum: [ResourceFunction, ValueFunction, Workflow]
                         name:
                           type: string
                           nullable: false
                       required: [kind, name]
-                    workflowRef:
-                      type: object
-                      nullable: false
-                      description: |
-                        The Workflow to run. The Workflow's trigger-object's
-                        spec will be passed the triggering-object as
-                        `inputs.parent`.
-                      properties:
-                        name:
-                          type: string
-                          nullable: false
-                      required: [name]
                     inputs:
                       type: object
                       nullable: false
@@ -142,9 +131,7 @@ spec:
                         cache. The `state` objects from all steps are merged,
                         so if steps shares keys, the values from last step to
                         run may overwrite earlier values.
-                  oneOf:
-                    - required: [functionRef]
-                    - required: [workflowRef]
+                  required: [ref]
                 steps:
                   nullable: false
                   type: array
@@ -170,35 +157,25 @@ spec:
                           return value (or to express dependence on this step).
                           This is an identifier it must be alphanumeric +
                           underscores.
-                      functionRef:
+                      ref:
                         type: object
                         nullable: false
                         description: |
-                          The Function to run. No default `inputs` are
-                          provided.
+                          The Function or Workflow to run as the Logic. No
+                          default `inputs` are provided to the Logic. For
+                          Workflows, `inputs` are passed to the workflow's
+                          `configStep` as `inputs.parent`, which allows
+                          workflows to be invoked as sub-workflows or by their
+                          `crdRef`.
                         properties:
                           kind:
                             type: string
                             nullable: false
-                            enum: [ResourceFunction, ValueFunction]
+                            enum: [ResourceFunction, ValueFunction, Workflow]
                           name:
                             type: string
                             nullable: false
                         required: [kind, name]
-                      workflowRef:
-                        type: object
-                        nullable: false
-                        description: |
-                          The Workflow to run. No default `inputs` are
-                          provided. Any specified `inputs` are passed to the
-                          workflow's `configStep` as `inputs.parent`, which
-                          allows workflows to be invoked as sub-workflows or by
-                          their `crdRef`.
-                        properties:
-                          name:
-                            type: string
-                            nullable: false
-                        required: [name]
                       skipIf:
                         type: string
                         nullable: false
@@ -289,10 +266,7 @@ spec:
                           cache. The `state` objects from all steps are merged,
                           so if steps shares keys, the values from last step to
                           run may overwrite earlier values.
-                    required: [label]
-                    oneOf:
-                      - required: [functionRef]
-                      - required: [workflowRef]
+                    required: [label, ref]
               required: [steps]
             status:
               x-kubernetes-preserve-unknown-fields: true
