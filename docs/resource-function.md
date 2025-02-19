@@ -55,14 +55,19 @@ configuration options which allow the developer to control how
 |  *`    readonly`*:            | Indicate that the resource should not be managed. This will cause the function to ignore `create`, `update`, and `delete` configuration. Default is `false`. |
 | **`    name`**:               | Specify the `metadata.name` field of the managed resource. This may be a Koreo Expression, when evaluated it has access to `inputs` and `locals`. |
 | **`    namespace`**:          | Specify the `metadata.namespace` field of the managed resource. This may be a Koreo Expression, when evaluated it has access to `inputs` and `locals`. |
-|  *`  resourceTemplateRef`*:   | The Target Resource Specification provided via a dynamically loaded template plus optional overlay. May not be specified if `spec.resource` is provided. |
+|  *`  resourceTemplateRef`*:   | The Target Resource Specification provided via a dynamically loaded template. May not be specified if `spec.resource` is provided. |
 | **`    name`**:               | The name of a `ResourceTemplate` to source a static `template` from. May be a static string or a string-valued Koreo Expression with access to `inputs` and `locals` when evaluated. |
-|  *`    overlay`*:             | An overlay which is applied over the static `template` loaded from the `ResourceTemplate`. This is used to customize the static template with computed values, such as resource names or configuration from the `Workflow`. This may be a Koreo Expression and has access to `inputs`, `locals`, and the base Target Resource Specification as `template`. |
 |  *`  resource`*:              | The Target Resource Specification that defines the resource to manage. This may be a Koreo Expression with access to `inputs` and `locals`. May not be specified if `spec.resourceTemplateRef` is provided. |
+|  *`  overlays`*:              | An optional list of overlays to be sequentially applied over the Target Resource Specification. Each must be either an inline `overlay` or an `overlayRef`. |
+|  *`  - overlay`*: **`{}`**    | An inline overlay specificiation. This may be a Koreo Expression and has access to `inputs`, `locals`, and the base Target Resource Specification as `resource`. |
+|  *`    overlayRef`*:          | Use a `ValueFunction` as the overlay. The `ValueFunction`'s return value acts as the overlay, but all `ValueFunction` capabilities may be used. The current Target Resource Specification is exposed as `inputs.resource` within the `ValueFunction`. |
+| **`      name`**:             | Name of the `ValueFunction` to use as the overlay. |
+|  *`    inputs:`*: **`{}`**    | _Optional_ May only be provided for `overlayRef` overlays and specifies inputs to be provided to the overlay `ValueFunction`. Must be an object that specifies input values to the Logic. Koreo Expressions may be used and have access to `inputs` and `locals` at evaluation time. |
+|  *`    skipIf`*:              | _Optional_ Provide a test to determine if the overlay should be applied. This must be a Koreo Expression which has access to `inputs` and `locals` at evaluation time. |
 |  *`  create`*:                | Specifies if the managed resource should be created if it does not exist. The default is `enabled=true` with a 30 second `delay`. |
 |  *`    enabled`*:             | Create the resource if it does not exist. Default is `true`. |
 |  *`    delay`*:               | The number of second to wait after creating before re-reconciliation is attempted. Default is 30 seconds. |
-|  *`    overlay`*:             | An overlay which is applied over the Target Resource Specification. This is useful for setting create-time-only values, such as immutable properties or external identifiers. This may be a Koreo Expression and has access to `inputs`, `locals`, and the current Target Resource Specification as `template`. |
+|  *`    overlay`*:             | An overlay which is applied over the Target Resource Specification. This is useful for setting create-time-only values, such as immutable properties or external identifiers. This may be a Koreo Expression and has access to `inputs`, `locals`, and the current Target Resource Specification as `resource`. |
 |  *`  update`*:                | The behavior when differences are detected, one of `patch`, `recreate`, or `never` must be specified. The default is `patch` with a 30 second `delay`. |
 |  *`    patch`*:               | If there are differences in any fields defined in Target Resource Specification, patch to correct those differences. |
 |  *`      delay`*:             | The number of seconds to wait to before a re-reconciliation to verify conditions after patching. Defaults to 30 seconds. |
@@ -167,7 +172,7 @@ be omitted.
 When there are multiple "static" configurations of a resource, but there is a
 desire to expose a common interface or configuration options, using _dynamic_
 Target Resource Specification saves repetition by allowing the static component
-to be dynamically loaded, and then an overlay (which may contain Koreo
+to be dynamically loaded, and then overlays (which may contain Koreo
 Expressions) to be applied.
 
 The template `name` is a Koreo Expression, with access to `inputs` and `locals`
@@ -176,15 +181,36 @@ should be used to make the names clear and consistent, for instance: `name:
 ="deployment-service-account-" + locals.templateName` to indicate that the
 template is for a deployment's service account.
 
-`overlay` provides a mechanism to overlay dynamic values onto the static
-template. This allows the Target Resource Specifications to be fully dynamic,
-and flexible, while providing a simple mechanism for swapping out base
-configurations. Using a `ResourceTemplate` in conjunction with
-`ResourceFunction`'s `preconditions` and `locals` makes it possible to ensure
-allowed values are provided via configuration versus statically loaded
-non-configurable values. The Koreo Expressions used within the overlay have
-access to `inputs`, `locals`, and the static Target Resource Specification as
-`template` so that static values are available if needed.
+The `apiVersion`, `kind`, `metadata.name`, and `metadata.namespace` are always
+computed and overlaid onto the Target Resource Specification, so these may be
+omitted.
+
+### `spec.overlays`: Atomic Overlays to Encapsulate Logic
+
+`overlays` provides a mechanism to apply overlays as atomic units onto the
+Target Resource Specification. Each overlay may be either inline (`overlay`) or
+dynamic (`overlayRef`) and may be conditionally skipped (`skipIf`). This allows
+full Target Resource Specifications to be gradually built by composing layers
+that encapsulate intention and logic into testable units.
+
+`overlays` may be used with both inline `resource` definitions or combined with
+static `ResourceTempates` using `resourceTemplateRef`. When combined with
+`ResourceTemplate` it creates a very flexible, but simple, mechanism for
+swapping out static (and often verbose) base configurations and then
+customizing them for a given use case. The `ResourceFunction`'s `preconditions`
+and `locals` make it possible to ensure only allowed values are applied via
+overlays, and only when appropriate.
+
+Inline Overlay Koreo Expressions have access to `inputs`, `locals`, and the
+current Target Resource Specification as `resource` so that static values are
+available if needed.
+
+Dynamic Overlays may be provided using `ValueFunctions`. This allows for the
+use of all `ValueFunction` capabilities, such as `preconditions` and `locals`.
+The `return` value defines the overlays to be applied. Koreo Expressions within
+the `ValueFunction` have access to `inputs`, `locals`, and the current Target
+Resource Specification as `resource` so that static values are available if
+needed.
 
 The `apiVersion`, `kind`, `metadata.name`, and `metadata.namespace` are always
 computed and overlaid onto the Target Resource Specification, so these may be
@@ -208,7 +234,7 @@ property values. Though infrequently needed, these are crucial for certain
 applications such as interfacing with existing external resources or setting
 immutable properties. `create.overlay` behaves similar to the other overlays in
 that it is an object which may contain Koreo Expressions. The expressions have
-access to `inputs`, `locals`, and `template` at evaluation time. `template` is
+access to `inputs`, `locals`, and `resource` at evaluation time. `resource` is
 set to the current Target Resource Specification.
 
 ### `spec.update`: Flexible Update Handling
