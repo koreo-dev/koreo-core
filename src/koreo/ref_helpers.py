@@ -11,96 +11,96 @@ FunctionResource = (
     registry.Resource[ResourceFunction] | registry.Resource[ValueFunction]
 )
 
+LogicResource = (
+    registry.Resource[ResourceFunction]
+    | registry.Resource[ValueFunction]
+    | registry.Resource[Workflow]
+)
 
-def function_or_workflow_to_resource(
+
+def function_ref_spec_to_resource(
     spec: Any, location: str
-) -> FunctionResource | registry.Resource[Workflow] | None | result.PermFail:
+) -> None | FunctionResource | result.PermFail:
     if not spec:
         return None
 
     if not isinstance(spec, dict):
         return result.PermFail(
             message=(
-                "Expected object with a `functionRef` or `workflowRef`. "
+                "Failed to process `functionRef`, expected object with `kind` and `name`. "
                 f"received {type(spec)}"
             ),
             location=location,
         )
 
-    if resource := function_ref_spec_to_resource(
-        spec=spec.get("functionRef"), location=f"{location}:functionRef"
-    ):
-        return resource
+    logic_kind = spec.get("kind")
+    logic_name = spec.get("name")
 
-    if resource := workflow_ref_spec_to_resource(
-        spec=spec.get("workflowRef"), location=f"{location}:workflowRef"
-    ):
-        return resource
+    if not logic_kind:
+        return result.PermFail(message="Missing `functionRef.kind`.", location=location)
 
-    return None
+    if not logic_name:
+        return result.PermFail(
+            message=f"Missing `functionRef.name`.", location=location
+        )
+
+    # This is not using a cleaner "dict lookup" because of Python's deficient
+    # type narrowing.
+    match logic_kind:
+        case "ValueFunction":
+            return registry.Resource(resource_type=ValueFunction, name=logic_name)
+        case "ResourceFunction":
+            return registry.Resource(resource_type=ResourceFunction, name=logic_name)
+        case _:
+            return result.PermFail(
+                message=f"Invalid `functionRef.kind` ({logic_kind}).", location=location
+            )
 
 
-def function_ref_spec_to_resource(
+def logic_ref_spec_to_resource(
     spec: Any, location: str
-) -> None | result.PermFail | FunctionResource:
-    if spec is None:
+) -> None | LogicResource | result.PermFail:
+    if not spec:
         return None
 
     if not isinstance(spec, dict):
         return result.PermFail(
             message=(
-                "Failed to process functionRef, expected object with kind and name. "
-                f"received {type(spec)}"
+                f"Must be an object which contains a `ref`. received {type(spec)}"
             ),
             location=location,
         )
 
-    kind = spec.get("kind")
-    if not kind:
-        return result.PermFail(
-            message="functionRef is missing `kind`, kind and name are required.",
-            location=location,
-        )
+    logic_ref = spec.get("ref")
 
-    name = spec.get("name")
-    if not name:
-        return result.PermFail(
-            message="functionRef is missing `name`, kind and name are required.",
-            location=location,
-        )
-
-    if kind == "ValueFunction":
-        return registry.Resource(resource_type=ValueFunction, name=name)
-    elif kind == "ResourceFunction":
-        return registry.Resource(resource_type=ResourceFunction, name=name)
-
-    return result.PermFail(
-        message=f"Invalid `kind` ({kind}) in functionRef, kind must be one of "
-        "`ResourceFunction` or `ValueFunction`.",
-        location=location,
-    )
-
-
-def workflow_ref_spec_to_resource(
-    spec: Any, location: str
-) -> None | registry.Resource[Workflow] | result.PermFail:
-    if spec is None:
-        return None
-
-    if not isinstance(spec, dict):
+    if not isinstance(logic_ref, dict):
         return result.PermFail(
             message=(
-                "Failed to process workflowRef, expected object with name. "
-                f"received {type(spec)}"
+                "Failed to process `ref`, expected object with `kind` and `name`. "
+                f"received {type(logic_ref)}"
             ),
             location=location,
         )
 
-    name = spec.get("name")
-    if not name:
-        return result.PermFail(
-            message="workflowRef is missing `name`, name is required.",
-            location=location,
-        )
+    logic_kind = logic_ref.get("kind")
+    logic_name = logic_ref.get("name")
 
-    return registry.Resource(resource_type=Workflow, name=name)
+    if not logic_kind:
+        return result.PermFail(message="Missing `ref.kind`.", location=location)
+
+    if not logic_name:
+        return result.PermFail(message=f"Missing `ref.name`.", location=location)
+
+    # This is not using a cleaner "dict lookup" because of Python's deficient
+    # type narrowing.
+    match logic_kind:
+        case "ValueFunction":
+            return registry.Resource(resource_type=ValueFunction, name=logic_name)
+        case "ResourceFunction":
+            return registry.Resource(resource_type=ResourceFunction, name=logic_name)
+        case "Workflow":
+            return registry.Resource(resource_type=Workflow, name=logic_name)
+        case _:
+            return result.PermFail(
+                message=f"Invalid `ref.kind` ({logic_kind}).", location=location
+            )
