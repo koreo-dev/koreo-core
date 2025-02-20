@@ -66,12 +66,12 @@ async def prepare_workflow(
 
     if config_step_spec:
         location_base = _location(cache_key, "spec.configStep")
-        match ref_helpers.function_or_workflow_to_resource(
+        match ref_helpers.logic_ref_spec_to_resource(
             config_step_spec, location=location_base
         ):
             case None:
                 return PermFail(
-                    message="`configStep` must contain `functionRef` or `workflowRef`",
+                    message="`configStep` must contain `ref`",
                     location=location_base,
                 )
             case PermFail() as perm_fail:
@@ -110,12 +110,10 @@ async def prepare_workflow(
         for step in steps_spec:
             step_label = step.get("label")
             location_base = f"Workflow:{cache_key}:{step_label}"
-            match ref_helpers.function_or_workflow_to_resource(
-                step, location=location_base
-            ):
+            match ref_helpers.logic_ref_spec_to_resource(step, location=location_base):
                 case None:
                     return PermFail(
-                        message=f"Step `{step_label}` must contain `functionRef` or `workflowRef`",
+                        message=f"Step `{step_label}` must contain `ref`",
                         location=location_base,
                     )
                 case PermFail() as perm_fail:

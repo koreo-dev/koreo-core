@@ -223,6 +223,7 @@ spec:
                           - required: [retry]
                           - required: [permFail]
 
+              required: [functionRef]
             status:
               x-kubernetes-preserve-unknown-fields: true
               type: object

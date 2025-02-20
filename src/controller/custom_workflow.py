@@ -106,7 +106,7 @@ def start_controller(group: str, kind: str, version: str):
             },
         )
 
-        conditions: list[Condition] = status.get("conditions", [])
+        conditions: list[Condition] = []
 
         # TODO: We're going to allow exactly one workflow / trigger
         if len(workflow_keys) > 1:
