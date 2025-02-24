@@ -30,9 +30,17 @@ class ConfigStep(NamedTuple):
     state: celpy.Runner | None
 
 
+class LogicSwitch(NamedTuple):
+    switch_on: celpy.Runner
+    logic_map: dict[str | int, ResourceFunction | ValueFunction | Workflow]
+    default_logic: ResourceFunction | ValueFunction | Workflow | None
+
+    dynamic_input_keys: set[str]
+
+
 class Step(NamedTuple):
     label: str
-    logic: ResourceFunction | ValueFunction | Workflow
+    logic: ResourceFunction | ValueFunction | Workflow | LogicSwitch
 
     skip_if: celpy.Runner | None
     for_each: ForEach | None

@@ -140,6 +140,7 @@ async def _reconcile_config_step(
         logic=step.logic,
         owner=owner,
         inputs=inputs,
+        steps_input=celtypes.MapType(),
     )
 
 
@@ -341,7 +342,7 @@ async def _reconcile_step(
                 workflow_key=workflow_key,
                 location=location,
                 step=step,
-                steps=celtypes.MapType(),
+                steps_input=celtypes.MapType(),
                 owner=owner,
                 inputs=inputs,
             )
@@ -353,8 +354,10 @@ async def _reconcile_step(
                 logic=step.logic,
                 owner=owner,
                 inputs=inputs,
+                steps_input=celtypes.MapType(),
             )
 
+    # TODO: Error handling review
     [resolved, pending] = await asyncio.wait(dependencies)
     if pending:
         timed_out_tasks = ", ".join(task.get_name() for task in pending)
@@ -411,12 +414,13 @@ async def _reconcile_step(
                 # This should be an UnwrappedOutcome (Ok)
                 ok_outcomes[celtypes.StringType(step_label)] = data
 
+    steps_input: dict[str, celtypes.Value] = {"steps": ok_outcomes}
     if not step.inputs:
         inputs = celtypes.MapType()
     else:
         inputs = evaluate(
             expression=step.inputs,
-            inputs={"steps": ok_outcomes},
+            inputs=steps_input,
             location=f"{location}.inputs",
         )
         if not result.is_unwrapped_ok(inputs):
@@ -425,7 +429,7 @@ async def _reconcile_step(
     if step.skip_if:
         match evaluate(
             expression=step.skip_if,
-            inputs={"steps": ok_outcomes},
+            inputs=steps_input,
             location=f"{location}.skipIf",
         ):
             case result.PermFail() as err:
@@ -447,7 +451,7 @@ async def _reconcile_step(
             workflow_key=workflow_key,
             location=location,
             step=step,
-            steps=ok_outcomes,
+            steps_input=steps_input,
             owner=owner,
             inputs=inputs,
         )
@@ -459,7 +463,70 @@ async def _reconcile_step(
             logic=step.logic,
             owner=owner,
             inputs=inputs,
+            steps_input=steps_input,
         )
+
+
+async def _reconcile_ref_switch(
+    api: kr8s.Api,
+    workflow_key: str,
+    owner: tuple[str, dict],
+    logic_switch: structure.LogicSwitch,
+    steps_input: celtypes.MapType,
+    inputs: celtypes.Value,
+    location: str,
+):
+
+    # This gives the switch-on expression access to direct outcomes through
+    # `steps`, but also to the step's `inputs`. In addition to possible
+    # convenience, this gives the switch access to the iterated values from a
+    # for-each expansion.
+    switch_on_inputs: dict[str, celtypes.Value] = {"inputs": inputs} | steps_input
+
+    match evaluate(
+        expression=logic_switch.switch_on,
+        inputs=switch_on_inputs,
+        location=f"{location}.switchOn",
+    ):
+        case result.PermFail() as err:
+            return StepResult(result=err)
+        case (celtypes.StringType() | celtypes.IntType()) as switch_value:
+            # Just needed to extract the `switch_on` value
+            pass
+        case bad_type:
+            return StepResult(
+                result=result.PermFail(
+                    message=f"`switchOn` must evaluate to a string or int value, received '{bad_type}' a {type(bad_type)}",
+                    location=f"{location}.switchOn",
+                )
+            )
+
+    logic = logic_switch.logic_map.get(switch_value, logic_switch.default_logic)
+
+    if not logic:
+        # TODO: Should this be a PermFail or a Retry? I _think_ PermFail
+        # because it really should be guarded by a `skipIf` if there's a
+        # non-ready condition.
+        return StepResult(
+            result=result.PermFail(
+                message=(
+                    "`refSwitch` must match one case or a default must be provided, "
+                    f"failed to match '{switch_value}' a {type(switch_value)}. "
+                    "Use a `skipIf` guard if this is expected."
+                ),
+                location=f"{location}.<match-case>",
+            )
+        )
+
+    return await _reconcile_step_logic(
+        api=api,
+        workflow_key=workflow_key,
+        owner=owner,
+        inputs=inputs,
+        steps_input=steps_input,
+        location=f"{location}['{switch_value}']",
+        logic=logic,
+    )
 
 
 async def _reconcile_step_logic(
@@ -467,11 +534,13 @@ async def _reconcile_step_logic(
     workflow_key: str,
     owner: tuple[str, dict],
     inputs: celtypes.Value,
+    steps_input: celtypes.MapType,
     location: str,
     logic: (
         structure.ResourceFunction
         | structure.ValueFunction
         | structure.Workflow
+        | structure.LogicSwitch
         | result.NonOkOutcome
     ),
 ) -> StepResult:
@@ -503,6 +572,7 @@ async def _reconcile_step_logic(
                 inputs=inputs,
             )
             return StepResult(result=func_result, resource_ids=resource_id)
+
         case structure.ValueFunction():
             return StepResult(
                 result=await reconcile_value_function(
@@ -510,6 +580,17 @@ async def _reconcile_step_logic(
                     function=logic,
                     inputs=inputs,
                 )
+            )
+
+        case structure.LogicSwitch():
+            return await _reconcile_ref_switch(
+                api=api,
+                workflow_key=workflow_key,
+                owner=owner,
+                logic_switch=logic,
+                steps_input=steps_input,
+                inputs=inputs,
+                location=f"{location}.refSwitch",
             )
 
     return StepResult(result=logic)
@@ -520,7 +601,7 @@ async def _for_each_reconciler(
     step: structure.Step,
     workflow_key: str,
     location: str,
-    steps: celtypes.MapType,
+    steps_input: celtypes.MapType,
     owner: tuple[str, dict],
     inputs: celtypes.Value,
 ) -> StepResult:
@@ -528,13 +609,15 @@ async def _for_each_reconciler(
 
     match evaluate(
         expression=step.for_each.source_iterator,
-        inputs={"steps": steps},
+        inputs=steps_input,
         location=f"{step.label}.forEach.itemIn",
     ):
         case result.PermFail() as failure:
             return StepResult(result=failure)
 
         case celtypes.ListType() as source_iterator:
+            # Without this, if the source_iterator is empty the task-group
+            # raises an exception at context-manager exit.
             if not source_iterator:
                 return StepResult(result=celtypes.ListType())
 
@@ -548,23 +631,28 @@ async def _for_each_reconciler(
 
     tasks: list[asyncio.Task[StepResult]] = []
 
-    async with asyncio.TaskGroup() as task_group:
-        for idx, map_value in enumerate(source_iterator):
-            iterated_inputs = copy.deepcopy(inputs)
-            iterated_inputs[step.for_each.input_key] = map_value
-            tasks.append(
-                task_group.create_task(
-                    _reconcile_step_logic(
-                        api=api,
-                        workflow_key=workflow_key,
-                        location=f"{location}[{idx}]",
-                        logic=step.logic,
-                        owner=owner,
-                        inputs=iterated_inputs,
-                    ),
-                    name=f"{step.label}-{idx}",
+    try:
+        async with asyncio.TaskGroup() as task_group:
+            for idx, map_value in enumerate(source_iterator):
+                iterated_inputs = copy.deepcopy(inputs)
+                iterated_inputs[step.for_each.input_key] = map_value
+                tasks.append(
+                    task_group.create_task(
+                        _reconcile_step_logic(
+                            api=api,
+                            workflow_key=workflow_key,
+                            location=f"{location}[{idx}]",
+                            logic=step.logic,
+                            owner=owner,
+                            inputs=iterated_inputs,
+                            steps_input=steps_input,
+                        ),
+                        name=f"{step.label}-{idx}",
+                    )
                 )
-            )
+    except:
+        # Handled per-task below
+        pass
 
     done, pending = await asyncio.wait(tasks)
     if pending:
@@ -577,7 +665,45 @@ async def _for_each_reconciler(
             )
         )
 
-    outcomes = [task.result() for task in done]
+    outcomes = []
+    for task in done:
+        task_name = task.get_name()
+
+        if task.cancelled():
+            outcomes.append(
+                StepResult(
+                    result=result.Retry(
+                        message=f"Timeout running step ({task_name}), will retry.",
+                        delay=TIMEOUT_RETRY_DELAY,
+                        location=workflow_key,
+                    )
+                )
+            )
+
+        elif task.exception():
+            outcomes.append(
+                StepResult(
+                    result=result.Retry(
+                        message=f"Error ({task.exception()}) running Step ({task_name}), will retry.",
+                        delay=UNKNOWN_ERROR_RETRY_DELAY,
+                        location=workflow_key,
+                    )
+                )
+            )
+
+        elif task.done():
+            outcomes.append(task.result())
+
+        else:
+            outcomes.append(
+                StepResult(
+                    result=result.Retry(
+                        message=f"Unexpected task-state running Step ({task_name}), will retry.",
+                        delay=UNKNOWN_ERROR_RETRY_DELAY,
+                        location=workflow_key,
+                    )
+                )
+            )
 
     error_outcome = result.combine(
         [outcome.result for outcome in outcomes if result.is_error(outcome.result)]
