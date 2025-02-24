@@ -58,10 +58,11 @@ spec:
                         return value or to express dependence on this step.
                         This is an identifier it must be alphanumeric
                         (including underscores). Defaults to `config`.
+                      minLength: 3
                       maxLength: 45
                       x-kubernetes-validations:
-                        - rule: self.matches("^[[:word:]]+$")
-                          message: labels must be alphanumeric + underscores
+                      - rule: self.matches("^[[:word:]]+$")
+                        message: labels must be alphanumeric + underscores
                     ref:
                       type: object
                       nullable: false
@@ -100,9 +101,9 @@ spec:
                           nullable: false
                           maxLength: 40
                           x-kubernetes-validations:
-                            - rule: self.matches("^[A-Z][a-zA-Z0-9]+$")
-                              message: |
-                                must be PascalCase and contain only alphanumeric chars
+                          - rule: self.matches("^[A-Z][a-zA-Z0-9]+$")
+                            message: |
+                              must be PascalCase and contain only alphanumeric chars
                           description: |
                             The type for a condition acts as its key. If steps
                             share type, the condition from last run will be
@@ -112,8 +113,8 @@ spec:
                           nullable: false
                           maxLength: 60
                           x-kubernetes-validations:
-                            - rule: "!self.startsWith('=')"
-                              message: may not be an expression
+                          - rule: "!self.startsWith('=')"
+                            message: may not be an expression
                           description: |
                             A short, human-meaningful description of what the
                             step does or manages. It is used within simple
@@ -148,10 +149,11 @@ spec:
                       label:
                         type: string
                         nullable: false
+                        minLength: 3
                         maxLength: 45
                         x-kubernetes-validations:
-                          - rule: self.matches("^[[:word:]]+$")
-                            message: must be alphanumeric + underscores
+                        - rule: self.matches("^[[:word:]]+$")
+                          message: must be alphanumeric + underscores
                         description: |
                           The name other steps may use to access this step's
                           return value (or to express dependence on this step).
@@ -176,6 +178,51 @@ spec:
                             type: string
                             nullable: false
                         required: [kind, name]
+                      refSwitch:
+                        type: object
+                        nullable: false
+                        description: |
+                          Dyanmically select the Function or Workflow to run as
+                          the step's Logic. No default `inputs` are provided to
+                          the Logic. For Workflows, `inputs` are passed to the
+                          workflow's `configStep` as `inputs.parent`, which
+                          allows workflows to be invoked as sub-workflows or by
+                          their `crdRef`.
+                        properties:
+                          switchOn:
+                            type: string
+                            nullable: false
+                            x-kubernetes-validations:
+                            - rule: self.startsWith('=')
+                              message: must be an expression
+                          cases:
+                            type: array
+                            nullable: false
+                            minItems: 1
+                            maxItems: 10
+                            x-kubernetes-list-type: map
+                            x-kubernetes-list-map-keys: [case]
+                            items:
+                              type: object
+                              properties:
+                                case:
+                                  type: string
+                                  nullable: false
+                                  x-kubernetes-validations:
+                                  - rule: "!self.startsWith('=')"
+                                    message: may not be an expression
+                                default:
+                                  type: boolean
+                                  default: false
+                                  nullable: false
+                                kind:
+                                  type: string
+                                  nullable: false
+                                  enum: [ResourceFunction, ValueFunction, Workflow]
+                                name:
+                                  type: string
+                                  nullable: false
+                              required: [case, kind, name]
                       skipIf:
                         type: string
                         nullable: false
@@ -183,8 +230,8 @@ spec:
                           Skip running this step if the Koreo Expression
                           evaluates to `true`.
                         x-kubernetes-validations:
-                          - rule: self.startsWith('=')
-                            message: must be an expression
+                        - rule: self.startsWith('=')
+                          message: must be an expression
                       forEach:
                         type: object
                         nullable: false
@@ -198,8 +245,8 @@ spec:
                             description: |
                               An expression that evaluates to a list of values.
                             x-kubernetes-validations:
-                              - rule: self.startsWith('=')
-                                message: "must be an expression (start with '=')."
+                            - rule: self.startsWith('=')
+                              message: "must be an expression (start with '=')."
                           inputKey:
                             type: string
                             nullable: false
@@ -234,9 +281,9 @@ spec:
                             nullable: false
                             maxLength: 40
                             x-kubernetes-validations:
-                              - rule: self.matches("^[A-Z][a-zA-Z0-9]+$")
-                                message: |
-                                  must be PascalCase and contain only alphanumeric chars
+                            - rule: self.matches("^[A-Z][a-zA-Z0-9]+$")
+                              message: |
+                                must be PascalCase and contain only alphanumeric chars
                             description: |
                               The type for a condition acts as its key. If
                               steps share type, the condition from last run
@@ -246,8 +293,8 @@ spec:
                             nullable: false
                             maxLength: 60
                             x-kubernetes-validations:
-                              - rule: "!self.startsWith('=')"
-                                message: name may not be an expression
+                            - rule: "!self.startsWith('=')"
+                              message: name may not be an expression
                             description: |
                               A short, human-meaningful description of what the
                               step does or manages. It is used within simple
@@ -266,7 +313,10 @@ spec:
                           cache. The `state` objects from all steps are merged,
                           so if steps shares keys, the values from last step to
                           run may overwrite earlier values.
-                    required: [label, ref]
+                    required: [label]
+                    oneOf:
+                    - required: [ref]
+                    - required: [refSwitch]
               required: [steps]
             status:
               x-kubernetes-preserve-unknown-fields: true

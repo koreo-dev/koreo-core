@@ -35,9 +35,16 @@ and manages the "external" (to that Logic's body) state interactions.
 |  *`    kind`*:                | |
 |  *`  configStep`*:            | _Optional_ Acts as the entry-point and will be provided with the trigger values as `inputs.parent`. |
 |  *`    label`*:               | _Optional_ Defaults to `config`, this is the name other steps can use to reference this step's return value. |
-| **`    ref`**:                | A reference to the Logic to be run. |
+|  *`    ref`*:                 | A reference to the Logic to be run. Either `ref` or `refSwitch` must be provided. |
 | **`      kind`**:             | `ValueFunction`, `ResourceFunction`, or `Workflow`. Using a `ValueFunction` is usually recommended for `configStep`. |
 | **`      name`**:             | Name of the Function to use. |
+|  *`    refSwitch`*:           | Allows selection of the Logic to be run, but requires all to share an interface. Either `ref` or `refSwitch` must be provided. |
+| **`      switchOn`**:         | An expression who's value determines the Logic to run. Has access to `steps` and `inputs` at evaluation time. Must be a string. |
+| **`      cases`**:            | List of cases and Logic to run. At least 1 is required. |
+| **`      - case`**:           | A string that the `switchOn` expression will be exactly matched against. |
+|  *`        default`*:         | One case may be specified as the default if no other cases are an exact match. |
+| **`        kind`**:           | `ValueFunction`, `ResourceFunction`, or `Workflow`. |
+| **`        name`**:           | Name of the Function to use. |
 |  *`    inputs:`*: **`{}`**    | _Optional_ If provided, must be an object that specifies input values to the Logic. Koreo Expressions may be used. |
 |  *`    condition`*:           | _Optional_ The result of the Logic will be set as a `status.condition` on the trigger object.|
 | **`      type`**:             | The condition's "key", must be PascalCase. |
@@ -96,7 +103,7 @@ The second difference is that this step is provided a default label: "config".
 That means, unless changed, you may provide its return value as an input to
 other steps by setting a key within their `inputs` to `=steps.config`.
 
-Lastly, `spec.configStep` does not support `forEach` or `skipIf`.
+Lastly, `spec.configStep` does not support `forEach`, `refSwitch`, or `skipIf`.
 
 The remaining options share the same behavior as `spec.steps` values.
 
@@ -106,22 +113,37 @@ Each "step" defines some Logic to be called, specifies the inputs the Logic is
 to be provided with, specifies an optional status condition, and optionally
 specifies any state you wish exposed within the parent object's `status.state`.
 
-Each step must specify the Logic to be called using `ref`, which may be a
-`ValueFunction`, `ResourceFunction`, or `Workflow`. It also specifies `inputs`
-to be provided to the Logic. For Functions, the inputs are directly accessible
-within `inputs`. For `Workflows`, the inputs are exposed under `inputs.parent`.
-That enables a `Workflow` to be directly triggered via a `crdRef` _or_ it may
-be directly called as a sub-workflow. That makes reuse and testing of
-`Workflows` easier.
+Each step must specify the Logic to be called. Logic is defined by
+`ValueFunction`, `ResourceFunction`, or using a sub-`Workflow` to compose
+Functions. To _reference_ the Logic, you specify the Kind and the name. Logic
+may be statically specified using `ref`, which specifies exact Logic to run.
+Logic may be dynamically selected from a fixed set of references using
+`refSwitch`, which provides the ability to select between multiple Logics which
+implement a compatible interface—this is discussed in more detail below.
+
+Steps also specify `inputs` to be provided to the Logic. For Functions, the
+inputs are directly accessible within `inputs`. For `Workflows`, the inputs are
+exposed under `inputs.parent`. That enables a `Workflow` to be directly
+triggered via a `crdRef` _or_ it may be directly called as a sub-workflow. That
+makes reuse and testing of `Workflows` easier.
 
 A step may also specify a `forEach` block, which will cause the Logic to be
 executed once per item in the `forEach.itemIn` list. Each item will be provided
 within `inputs` with the key name specified in `forEach.inputKey`. This makes
 using any Function within a `forEach` viable.
 
-`skipIf` enables the `Workflow` to dynamically determine which steps to run.
-This allows Logic to define a common interface, then for the `Workflow` to call
-the correct Logic. This enables _if_ or _switch_ statement semantics.
+Steps may be conditionally run using `skipIf`. When the `skipIf` evaluates to
+true, the step and its dependencies are [Skipped](/docs/glossary.md#skip)
+without resulting in an error by stopping further evaluation of the step and
+its dependencies.
+
+Logic may be dynamically selected from a set of choices using `refSwitch`.
+`refSwitch` allows allows Logic to define a common interface, then for the
+`Workflow` to call the appropriate Logic based on input or computed values. The
+`switchOn` expression is has access to the return values from prior
+steps within `steps`. It also has access to the `inputs` that will be provided
+to the Logic. Using `inputs` enables `refSwitch` to work with `forEach` and
+dispatch the correct Logic for each item.
 
 A step may expose a Condition on the parent resource using `condition`. The
 Condition's type will match `condition.type`, and this should be unique within

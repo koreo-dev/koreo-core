@@ -5,7 +5,6 @@ from celpy import celtypes
 
 from koreo.result import Ok, is_unwrapped_ok
 
-from koreo.cel.structure_extractor import extract_argument_structure
 from koreo.cel.prepare import prepare_overlay_expression
 
 from koreo.value_function import structure as function_structure
@@ -246,6 +245,65 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                 "number_two": 2,
                 "two_value": {"sub_one": True},
             },
+            workflow_result.state,
+        )
+
+        # TODO: Check Condition
+
+    async def test_ref_switch(self):
+        cel_env = celpy.Environment()
+        source_return_value = prepare_overlay_expression(
+            cel_env=cel_env,
+            spec={"value": "static-value"},
+            location="unittest",
+        )
+
+        step_state = cel_env.program(cel_env.compile("{'single_switch': value}"))
+
+        workflow = workflow_structure.Workflow(
+            crd_ref=workflow_structure.ConfigCRDRef(
+                api_group="tests.koreo.realkinetic.com", version="v1", kind="TestCase"
+            ),
+            steps_ready=Ok(None),
+            config_step=None,
+            steps=[
+                workflow_structure.Step(
+                    label="single_switch",
+                    skip_if=None,
+                    for_each=None,
+                    inputs=None,
+                    dynamic_input_keys=[],
+                    logic=workflow_structure.LogicSwitch(
+                        switch_on=cel_env.program(cel_env.compile("'alpha'")),
+                        logic_map={
+                            "alpha": function_structure.ValueFunction(
+                                preconditions=None,
+                                local_values=None,
+                                return_value=source_return_value,
+                                dynamic_input_keys=set(),
+                            ),
+                        },
+                        default_logic=None,
+                        dynamic_input_keys=set(),
+                    ),
+                    condition=None,
+                    state=step_state,
+                )
+            ],
+        )
+
+        workflow_result = await reconcile.reconcile_workflow(
+            api=None,
+            workflow_key="test-case",
+            owner=("unit-tests", celtypes.MapType({"uid": "sam-123"})),
+            trigger=celtypes.MapType({}),
+            workflow=workflow,
+        )
+
+        self.maxDiff = None
+        print(workflow_result.result)
+        self.assertDictEqual(
+            {"single_switch": {"value": "static-value"}},
             workflow_result.state,
         )
 

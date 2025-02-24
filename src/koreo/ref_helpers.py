@@ -44,8 +44,8 @@ def function_ref_spec_to_resource(
             message=f"Missing `functionRef.name`.", location=location
         )
 
-    # This is not using a cleaner "dict lookup" because of Python's deficient
-    # type narrowing.
+    # This is not using a "dict lookup" because of Python's deficient type
+    # narrowing.
     match logic_kind:
         case "ValueFunction":
             return registry.Resource(resource_type=ValueFunction, name=logic_name)
@@ -54,53 +54,4 @@ def function_ref_spec_to_resource(
         case _:
             return result.PermFail(
                 message=f"Invalid `functionRef.kind` ({logic_kind}).", location=location
-            )
-
-
-def logic_ref_spec_to_resource(
-    spec: Any, location: str
-) -> None | LogicResource | result.PermFail:
-    if not spec:
-        return None
-
-    if not isinstance(spec, dict):
-        return result.PermFail(
-            message=(
-                f"Must be an object which contains a `ref`. received {type(spec)}"
-            ),
-            location=location,
-        )
-
-    logic_ref = spec.get("ref")
-
-    if not isinstance(logic_ref, dict):
-        return result.PermFail(
-            message=(
-                "Failed to process `ref`, expected object with `kind` and `name`. "
-                f"received {type(logic_ref)}"
-            ),
-            location=location,
-        )
-
-    logic_kind = logic_ref.get("kind")
-    logic_name = logic_ref.get("name")
-
-    if not logic_kind:
-        return result.PermFail(message="Missing `ref.kind`.", location=location)
-
-    if not logic_name:
-        return result.PermFail(message=f"Missing `ref.name`.", location=location)
-
-    # This is not using a cleaner "dict lookup" because of Python's deficient
-    # type narrowing.
-    match logic_kind:
-        case "ValueFunction":
-            return registry.Resource(resource_type=ValueFunction, name=logic_name)
-        case "ResourceFunction":
-            return registry.Resource(resource_type=ResourceFunction, name=logic_name)
-        case "Workflow":
-            return registry.Resource(resource_type=Workflow, name=logic_name)
-        case _:
-            return result.PermFail(
-                message=f"Invalid `ref.kind` ({logic_kind}).", location=location
             )
