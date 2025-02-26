@@ -26,7 +26,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
 
         workflow = workflow_structure.Workflow(
             crd_ref=workflow_structure.ConfigCRDRef(
-                api_group="tests.koreo.realkinetic.com", version="v1", kind="TestCase"
+                api_group="tests.koreo.dev", version="v1", kind="TestCase"
             ),
             steps_ready=Ok(None),
             config_step=None,
@@ -86,7 +86,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
 
         sub_workflow = workflow_structure.Workflow(
             crd_ref=workflow_structure.ConfigCRDRef(
-                api_group="tests.koreo.realkinetic.com", version="v1", kind="TestCase"
+                api_group="tests.koreo.dev", version="v1", kind="TestCase"
             ),
             steps_ready=Ok(None),
             config_step=None,
@@ -126,7 +126,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
 
         workflow = workflow_structure.Workflow(
             crd_ref=workflow_structure.ConfigCRDRef(
-                api_group="tests.koreo.realkinetic.com", version="v1", kind="TestCase"
+                api_group="tests.koreo.dev", version="v1", kind="TestCase"
             ),
             steps_ready=Ok(None),
             config_step=None,
@@ -171,7 +171,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
 
         workflow = workflow_structure.Workflow(
             crd_ref=workflow_structure.ConfigCRDRef(
-                api_group="tests.koreo.realkinetic.com", version="v1", kind="TestCase"
+                api_group="tests.koreo.dev", version="v1", kind="TestCase"
             ),
             steps_ready=Ok(None),
             config_step=None,
@@ -262,7 +262,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
 
         workflow = workflow_structure.Workflow(
             crd_ref=workflow_structure.ConfigCRDRef(
-                api_group="tests.koreo.realkinetic.com", version="v1", kind="TestCase"
+                api_group="tests.koreo.dev", version="v1", kind="TestCase"
             ),
             steps_ready=Ok(None),
             config_step=None,

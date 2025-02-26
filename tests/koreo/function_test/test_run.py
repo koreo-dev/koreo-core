@@ -31,7 +31,7 @@ class TestEndToEndResourceFunction(unittest.IsolatedAsyncioTestCase):
             metadata={"name": "function-under-test", "resourceVersion": "sam123"},
             spec={
                 "apiConfig": {
-                    "apiVersion": "test.koreo.realkinetic.com/v1",
+                    "apiVersion": "test.koreo.dev/v1",
                     "kind": "TestResource",
                     "name": "=inputs.metadata.name + '-suffix'",
                     "namespace": "=inputs.metadata.namespace",
@@ -55,7 +55,7 @@ class TestEndToEndResourceFunction(unittest.IsolatedAsyncioTestCase):
                     },
                 ],
                 "resource": {
-                    "apiVersion": "test.koreo.realkinetic.com/v1",
+                    "apiVersion": "test.koreo.dev/v1",
                     "kind": "TestResource",
                     "metadata": "=inputs.metadata",
                     "spec": {
@@ -120,7 +120,7 @@ class TestEndToEndResourceFunction(unittest.IsolatedAsyncioTestCase):
                     {
                         "label": "Initial create",
                         "expectResource": {
-                            "apiVersion": "test.koreo.realkinetic.com/v1",
+                            "apiVersion": "test.koreo.dev/v1",
                             "kind": "TestResource",
                             "metadata": {
                                 "name": "function-test:end-to-end-suffix",
@@ -144,7 +144,7 @@ class TestEndToEndResourceFunction(unittest.IsolatedAsyncioTestCase):
                             "metadata": {"name": "pumpkins"},
                         },
                         "expectResource": {
-                            "apiVersion": "test.koreo.realkinetic.com/v1",
+                            "apiVersion": "test.koreo.dev/v1",
                             "kind": "TestResource",
                             "metadata": {
                                 "name": "pumpkins-suffix",

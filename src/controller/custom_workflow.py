@@ -177,7 +177,7 @@ def start_controller(group: str, kind: str, version: str):
         object_patch = {
             "metadata": {
                 "annotations": {
-                    "koreo.realkinetic.com/managed-resources": encoded_resource_ids
+                    "koreo.dev/managed-resources": encoded_resource_ids
                 }
             },
             "status": {

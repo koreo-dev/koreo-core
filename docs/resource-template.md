@@ -22,7 +22,7 @@ function only to apply dynamic values.
 
 | Full Specification         | Description           |
 | :--------------------------| :-------------------- |
-| **`apiVersion`**: `koreo.realkinetic.com/v1beta1` | Specification version |
+| **`apiVersion`**: `koreo.dev/v1beta1` | Specification version |
 | **`kind`**: `ResourceTemplate` | Always `ResourceTemplate` |
 | **`metadata`**:            | |
 | **`  name`**:              | Name of the `ResourceTemplate`|
@@ -49,7 +49,7 @@ by the `ResourceFunction`, so you need not specify them.
 The following `ResourceFunction` demonstrates some of the capabilities.
 
 ```yaml
-apiVersion: koreo.realkinetic.com/v1beta1
+apiVersion: koreo.dev/v1beta1
 kind: ResourceTemplate
 metadata:
   # The template will be looked up by its name.
@@ -60,38 +60,38 @@ spec:
   # apiVersion and kind are required. The template is the actual body, or some
   # portion thereof, which you'd like to set static values for.
   template:
-    apiVersion: koreo.realkinetic.com/v1beta1
+    apiVersion: koreo.dev/v1beta1
     kind: TestDummy
     metadata:
       labels:
-        docs.koreo.realkinetic.com/example: template-label
+        docs.koreo.dev/example: template-label
     spec:
       value: one
       nested:
       - 1
       - 2
 ---
-apiVersion: koreo.realkinetic.com/v1beta1
+apiVersion: koreo.dev/v1beta1
 kind: ResourceTemplate
 metadata:
   name: docs-template-two.v1
   namespace: koreo-demo
 spec:
   template:
-    apiVersion: koreo.realkinetic.com/v1beta1
+    apiVersion: koreo.dev/v1beta1
     kind: TestDummy
     metadata:
       labels:
-        docs.koreo.realkinetic.com/example: template-label
+        docs.koreo.dev/example: template-label
       annotations:
-        docs.koreo.realkinetic.com/example: template-two
+        docs.koreo.dev/example: template-two
     spec:
       value: two
       structure:
       - name: doc
       - name: examples
 ---
-apiVersion: koreo.realkinetic.com/v1beta1
+apiVersion: koreo.dev/v1beta1
 kind: ResourceFunction
 metadata:
   name: docs-template-function.v1
@@ -103,7 +103,7 @@ spec:
   # The apiConfig section remains the same. For security purposes, apiVersion,
   # kind, name, and namespace will be overlaid onto the template.
   apiConfig:
-    apiVersion: koreo.realkinetic.com/v1beta1
+    apiVersion: koreo.dev/v1beta1
     kind: TestDummy
     plural: testdummies
 
@@ -119,7 +119,7 @@ spec:
         value: =inputs.value
         addedProperty: =inputs.value * 17
 ---
-apiVersion: koreo.realkinetic.com/v1beta1
+apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
 metadata:
   name: docs-template-function.v1
@@ -137,19 +137,19 @@ spec:
       name: test-demo
       namespace: tests
       labels:
-        docs.koreo.realkinetic.com/from-function: label
+        docs.koreo.dev/from-function: label
 
   testCases:
   - label: Template One
     expectResource:
-      apiVersion: koreo.realkinetic.com/v1beta1
+      apiVersion: koreo.dev/v1beta1
       kind: TestDummy
       metadata:
         name: test-demo-template-docs
         namespace: tests
         labels:
-          docs.koreo.realkinetic.com/example: template-label
-          docs.koreo.realkinetic.com/from-function: label
+          docs.koreo.dev/example: template-label
+          docs.koreo.dev/from-function: label
       spec:
         value: 42
         addedProperty: 714
@@ -161,16 +161,16 @@ spec:
     inputOverrides:
       template: two
     expectResource:
-      apiVersion: koreo.realkinetic.com/v1beta1
+      apiVersion: koreo.dev/v1beta1
       kind: TestDummy
       metadata:
         name: test-demo-template-docs
         namespace: tests
         labels:
-          docs.koreo.realkinetic.com/example: template-label
-          docs.koreo.realkinetic.com/from-function: label
+          docs.koreo.dev/example: template-label
+          docs.koreo.dev/from-function: label
         annotations:
-          docs.koreo.realkinetic.com/example: template-two
+          docs.koreo.dev/example: template-two
       spec:
         value: 42
         addedProperty: 714

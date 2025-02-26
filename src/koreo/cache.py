@@ -9,7 +9,7 @@ from koreo import registry
 
 logger = logging.getLogger(name="koreo.cache")
 
-LABEL_NAMESPACE = "koreo.realkinetic.com"
+LABEL_NAMESPACE = "koreo.dev"
 
 ACTIVE_LABEL = f"{LABEL_NAMESPACE}/active"
 

@@ -3,39 +3,32 @@ kind: Namespace
 metadata:
   name: koreo-testing
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
-kind: ValueFunction
-metadata:
-  name: empty.v1
-  namespace: koreo-testing
-spec:
----
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ValueFunction
 metadata:
   name: config-test.v1
   namespace: koreo-testing
 spec:
-  validators:
-    - assert: =inputs.parent.spec.validators.skip
-      skip:
-        message: skip message
+  preconditions:
+  - assert: =inputs.parent.spec.validators.skip
+    skip:
+      message: skip message
 
-    - assert: =inputs.parent.spec.validators.depSkip
-      depSkip:
-        message: depSkip message
+  - assert: =inputs.parent.spec.validators.depSkip
+    depSkip:
+      message: depSkip message
 
-    - assert: =inputs.parent.spec.validators.permFail
-      permFail:
-        message: permFail message
+  - assert: =inputs.parent.spec.validators.permFail
+    permFail:
+      message: permFail message
 
-    - assert: =inputs.parent.spec.validators.retry
-      retry:
-        message: retry message
-        delay: 13
+  - assert: =inputs.parent.spec.validators.retry
+    retry:
+      message: retry message
+      delay: 13
 
-    - assert: =inputs.parent.spec.validators.ok
-      ok: {}
+  - assert: =inputs.parent.spec.validators.ok
+    ok: {}
 
   locals:
     computed: =inputs.parent.spec.values.string + " local computed"
@@ -47,7 +40,7 @@ spec:
     use_default: =inputs.parent.spec.use_default
     skips: =inputs.parent.spec.optionalSkips
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ValueFunction
 metadata:
   name: return-test.v1
@@ -67,7 +60,7 @@ spec:
       emptyList: []
       none: null
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ValueFunction
 metadata:
   name: resource-user-test.v1
@@ -77,7 +70,7 @@ spec:
     int: =inputs.computedInt
     ref: =inputs.resourceRef
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ValueFunction
 metadata:
   name: maybe-or-default-config-test.v1
@@ -86,33 +79,33 @@ spec:
   return:
     use_default: =inputs.parent.use_default
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ValueFunction
 metadata:
   name: maybe-return-value.v1
   namespace: koreo-testing
 spec:
-  validators:
-    - assert: =inputs.use_default
-      skip:
-        message: Using default, per your request.
+  preconditions:
+  - assert: =inputs.use_default
+    skip:
+      message: Using default, per your request.
   return:
     value: =inputs.value
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ValueFunction
 metadata:
   name: maybe-default-return-value.v1
   namespace: koreo-testing
 spec:
-  validators:
-    - assert: =!inputs.use_default
-      skip:
-        message: Using non-default
+  preconditions:
+  - assert: =!inputs.use_default
+    skip:
+      message: Using non-default
   return:
     value: =inputs.value
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ValueFunction
 metadata:
   name: optional-skip-config.v1
@@ -121,20 +114,20 @@ spec:
   return:
     skips: =inputs.parent.skips
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ValueFunction
 metadata:
   name: maybe-skip.v1
   namespace: koreo-testing
 spec:
-  validators:
-    - assert: =inputs.should_skip
-      skip:
-        message: Skipping per your request
+  preconditions:
+  - assert: =inputs.should_skip
+    skip:
+      message: Skipping per your request
   return:
     value: =inputs.name
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ValueFunction
 metadata:
   name: combine-optional-skips.v1

@@ -26,7 +26,7 @@ configuration options which allow the developer to control how
 
 | Full Specification            | Description           |
 | :-----------------------------| :-------------------- |
-| **`apiVersion`**: `koreo.realkinetic.com/v1beta1` | Specification version |
+| **`apiVersion`**: `koreo.dev/v1beta1` | Specification version |
 | **`kind`**: `ResourceFunction` | Always `ResourceFunction` |
 | **`metadata`**:               | |
 | **`  name`**:                 | Name of the `ResourceFunction`|
@@ -339,7 +339,7 @@ structures, or Koreo Expressions which have access to `inputs`, `locals`, and
 The following `ResourceFunction` demonstrates some of the capabilities.
 
 ```yaml
-apiVersion: koreo.realkinetic.com/v1beta1
+apiVersion: koreo.dev/v1beta1
 kind: ResourceFunction
 metadata:
   name: simple-resource-function.v1
@@ -371,7 +371,7 @@ spec:
     constantList: [NORTH, SOUTH, EAST, WEST]
 
   apiConfig:
-    apiVersion: koreo.realkinetic.com/v1beta1
+    apiVersion: koreo.dev/v1beta1
     kind: TestDummy
     plural: testdummies
 
@@ -413,7 +413,7 @@ spec:
   return:
     ref: =resource.self_ref()
 ---
-apiVersion: koreo.realkinetic.com/v1beta1
+apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
 metadata:
   name: simple-resource-function.v1
@@ -437,7 +437,7 @@ spec:
   # The first test creates the resource, and we verify it matches expections
   - label: Initial Create
     expectResource:
-      apiVersion: koreo.realkinetic.com/v1beta1
+      apiVersion: koreo.dev/v1beta1
       kind: TestDummy
       metadata:
         name: test-demo-docs
@@ -477,7 +477,7 @@ spec:
     # Check a return value, which indicates no changes are made
     expectReturn:
       ref:
-        apiVersion: koreo.realkinetic.com/v1beta1
+        apiVersion: koreo.dev/v1beta1
         kind: TestDummy
         name: test-demo-docs
         namespace: tests
@@ -506,7 +506,7 @@ spec:
       values:
         int: 30
     expectResource:
-      apiVersion: koreo.realkinetic.com/v1beta1
+      apiVersion: koreo.dev/v1beta1
       kind: TestDummy
       metadata:
         name: test-demo-docs

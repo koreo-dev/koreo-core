@@ -1,4 +1,4 @@
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ValueFunction
 metadata:
   name: set-compare-test
@@ -29,7 +29,7 @@ spec:
       - 'dUMB'
       - 'chaRLie'
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
 metadata:
   name: set-compare-test
@@ -66,13 +66,13 @@ spec:
         - 'echo'
       x-koreo-compare-as-set: [anIntSet, aStrSet]
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ResourceFunction
 metadata:
   name: set-compare-resource-test
 spec:
   apiConfig:
-    apiVersion: koreo.realkinetic.com/v1alpha8
+    apiVersion: koreo.dev/v1beta1
     kind: TriggerDummy
     name: test-case
     namespace: test-case
@@ -104,7 +104,7 @@ spec:
       - 'Bravo'
       - 'chaRLie'
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
 metadata:
   name: set-compare-resource-test
@@ -115,7 +115,7 @@ spec:
   
   testCases:
   - expectResource:
-      apiVersion: koreo.realkinetic.com/v1alpha8
+      apiVersion: koreo.dev/v1beta1
       kind: TriggerDummy
       metadata:
         name: test-case
@@ -180,7 +180,7 @@ spec:
     expectOutcome:
       ok: {}
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ValueFunction
 metadata:
   name: list-as-map-compare-test
@@ -211,7 +211,7 @@ spec:
       - { "value": 'dUMB', "secondary": 1  }
       - { "value": 'chaRLie', "secondary": 1  }
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
 metadata:
   name: list-as-map-compare-test
@@ -251,13 +251,13 @@ spec:
         - { "value": 'dUMB', "secondary": 1  }
         - { "value": 'echo', "secondary": 1  }
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ResourceFunction
 metadata:
   name: list-as-map-compare-test-resource
 spec:
   apiConfig:
-    apiVersion: koreo.realkinetic.com/v1alpha8
+    apiVersion: koreo.dev/v1beta1
     kind: TriggerDummy
     name: test-case
     namespace: test-case
@@ -292,7 +292,7 @@ spec:
       - { "value": 'dUMB', "secondary": 1  }
       - { "value": 'chaRLie', "secondary": 1  }
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
 metadata:
   name: list-as-map-compare-test-resource
@@ -303,7 +303,7 @@ spec:
 
   testCases:
   - expectResource:
-      apiVersion: koreo.realkinetic.com/v1alpha8
+      apiVersion: koreo.dev/v1beta1
       kind: TriggerDummy
       metadata:
         name: test-case
@@ -371,14 +371,14 @@ spec:
     expectOutcome:
       ok: {}
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ResourceTemplate
 metadata:
   name: template-list-as-set
   namespace: koreo-testing
 spec:
   template:
-    apiVersion: koreo.realkinetic.com/v1alpha8
+    apiVersion: koreo.dev/v1beta1
     kind: TestDummy
     spec:
       x-koreo-compare-as-set: [list]
@@ -388,14 +388,14 @@ spec:
         - 1
         - 8
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ResourceTemplate
 metadata:
   name: template-list-as-map
   namespace: koreo-testing
 spec:
   template:
-    apiVersion: koreo.realkinetic.com/v1alpha8
+    apiVersion: koreo.dev/v1beta1
     kind: TestDummy
     spec:
       x-koreo-compare-as-map:
@@ -411,14 +411,14 @@ spec:
         - name: two
           value: 2
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ResourceTemplate
 metadata:
   name: template-both-special-compares
   namespace: koreo-testing
 spec:
   template:
-    apiVersion: koreo.realkinetic.com/v1alpha8
+    apiVersion: koreo.dev/v1beta1
     kind: TestDummy
     spec:
       x-koreo-compare-as-set: [list]
@@ -440,14 +440,14 @@ spec:
         - name: three
           value: 3
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ResourceTemplate
 metadata:
   name: template-normal-array-compares
   namespace: koreo-testing
 spec:
   template:
-    apiVersion: koreo.realkinetic.com/v1alpha8
+    apiVersion: koreo.dev/v1beta1
     kind: TestDummy
     spec:
       list:
@@ -465,13 +465,13 @@ spec:
         - name: four
           value: 4
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ResourceFunction
 metadata:
   name: templates-with-special-compares
 spec:
   apiConfig:
-    apiVersion: koreo.realkinetic.com/v1alpha8
+    apiVersion: koreo.dev/v1beta1
     kind: TriggerDummy
     name: test-case
     namespace: test-case
@@ -481,7 +481,7 @@ spec:
 
 
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
 metadata:
   name: templates-with-list-as-set
@@ -496,7 +496,7 @@ spec:
   testCases:
   - label: Use directive so that compare order does not matter
     expectResource:
-      apiVersion: koreo.realkinetic.com/v1alpha8
+      apiVersion: koreo.dev/v1beta1
       kind: TriggerDummy
       metadata:
         name: test-case
@@ -521,7 +521,7 @@ spec:
     expectOutcome:
       ok: {}
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
 metadata:
   name: templates-with-list-as-map
@@ -536,7 +536,7 @@ spec:
   testCases:
   - label: Use directive so that compare order does not matter
     expectResource:
-      apiVersion: koreo.realkinetic.com/v1alpha8
+      apiVersion: koreo.dev/v1beta1
       kind: TriggerDummy
       metadata:
         name: test-case
@@ -571,7 +571,7 @@ spec:
     expectOutcome:
       ok: {}
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
 metadata:
   name: templates-with-both-special-compares
@@ -586,7 +586,7 @@ spec:
   testCases:
   - label: Use directives so that compare order does not matter
     expectResource:
-      apiVersion: koreo.realkinetic.com/v1alpha8
+      apiVersion: koreo.dev/v1beta1
       kind: TriggerDummy
       metadata:
         name: test-case
@@ -632,7 +632,7 @@ spec:
     expectOutcome:
       ok: {}
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
 metadata:
   name: templates-with-normal-array-compares
@@ -647,7 +647,7 @@ spec:
   testCases:
   - label: Can still use directives so that compare order does not matter
     expectResource:
-      apiVersion: koreo.realkinetic.com/v1alpha8
+      apiVersion: koreo.dev/v1beta1
       kind: TriggerDummy
       metadata:
         name: test-case
@@ -696,7 +696,7 @@ spec:
             value: 1
 
     expectResource:
-      apiVersion: koreo.realkinetic.com/v1alpha8
+      apiVersion: koreo.dev/v1beta1
       kind: TriggerDummy
       metadata:
         name: test-case
@@ -737,7 +737,7 @@ spec:
             value: 1
 
     expectResource:
-      apiVersion: koreo.realkinetic.com/v1alpha8
+      apiVersion: koreo.dev/v1beta1
       kind: TriggerDummy
       metadata:
         name: test-case

@@ -3,14 +3,14 @@ kind: Namespace
 metadata:
   name: koreo-testing
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ResourceTemplate
 metadata:
   name: simple-template.v1
   namespace: koreo-testing
 spec:
   template:
-    apiVersion: koreo.realkinetic.com/v1alpha8
+    apiVersion: koreo.dev/v1beta1
     kind: TestDummy
     metadata:
       name: simple-test-resource-simple
@@ -30,14 +30,14 @@ spec:
         name: some
         number: 821
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ResourceTemplate
 metadata:
   name: template-a.v1
   namespace: koreo-testing
 spec:
   template:
-    apiVersion: koreo.realkinetic.com/v1alpha8
+    apiVersion: koreo.dev/v1beta1
     kind: TestDummy
     metadata:
       name: simple-test-resource-template-a
@@ -49,14 +49,14 @@ spec:
       intvalue: 99
       aFalse: false
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ResourceTemplate
 metadata:
   name: template-b.v1
   namespace: koreo-testing
 spec:
   template:
-    apiVersion: koreo.realkinetic.com/v1alpha8
+    apiVersion: koreo.dev/v1beta1
     kind: TestDummy
     metadata:
       name: simple-test-resource-template-b

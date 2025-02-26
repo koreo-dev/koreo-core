@@ -23,7 +23,7 @@ and manages the "external" (to that Logic's body) state interactions.
 
 | Full Specification            | Description           |
 | :-----------------------------| :-------------------- |
-| **`apiVersion`**: `koreo.realkinetic.com/v1beta1` | Specification version |
+| **`apiVersion`**: `koreo.dev/v1beta1` | Specification version |
 | **`kind`**: `Workflow`        | Always `Workflow` |
 | **`metadata`**:               | |
 | **`  name`**:                 | Name of the `Workflow`|
@@ -174,7 +174,7 @@ exposed.
 The following `Workflow` demonstrates some of the capabilities.
 
 ```yaml
-apiVersion: koreo.realkinetic.com/v1beta1
+apiVersion: koreo.dev/v1beta1
 kind: Workflow
 metadata:
   name: simple-example.v1
@@ -185,7 +185,7 @@ spec:
   # this Workflow to run. That is, this workflow will act as a _controller_ of
   # this resource type.
   crdRef:
-    apiGroup: demo.koreo.realkinetic.com
+    apiGroup: demo.koreo.dev
     version: v1beta1
     kind: TriggerDummy
 
