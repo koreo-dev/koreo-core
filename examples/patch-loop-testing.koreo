@@ -3,25 +3,25 @@ kind: Namespace
 metadata:
   name: koreo-update-loop
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: Workflow
 metadata:
   name: update-loop.v1
   namespace: koreo-update-loop
 spec:
   crdRef:
-    apiGroup: koreo.realkinetic.com
+    apiGroup: koreo.dev
     version: v1alpha8
     kind: TriggerDummy
 
   configStep:
-    functionRef:
+    ref:
       kind: ValueFunction
       name: update-loop-config.v1
 
   steps:
     - label: patcher
-      functionRef:
+      ref:
         kind: ResourceFunction
         name: patch-looper.v1
       inputs:
@@ -31,7 +31,7 @@ spec:
         name: Patch Loop Difference Testing
 
     - label: recreater
-      functionRef:
+      ref:
         kind: ResourceFunction
         name: recreate-looper.v1
       inputs:
@@ -40,7 +40,7 @@ spec:
         type: RecreateLooper
         name: Recreate Loop Difference Testing
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ValueFunction
 metadata:
   name: update-loop-config.v1
@@ -51,14 +51,14 @@ spec:
       name: =inputs.parent.metadata.name
       namespace: =inputs.parent.metadata.namespace
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ResourceFunction
 metadata:
   name: patch-looper.v1
   namespace: koreo-update-loop
 spec:
   apiConfig:
-    apiVersion: koreo.realkinetic.com/v1alpha8
+    apiVersion: koreo.dev/v1beta1
     kind: TestDummy
     plural: testdummies
 
@@ -105,11 +105,10 @@ spec:
     patch:
       delay: 15
 
-  outcome:
-    return:
-      ref: =resource.self_ref()
+  return:
+    ref: =resource.self_ref()
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
 metadata:
   name: patch-looper.v1
@@ -127,7 +126,7 @@ spec:
   testCases:
     - label: Creation Values
       expectResource:
-        apiVersion: koreo.realkinetic.com/v1alpha8
+        apiVersion: koreo.dev/v1beta1
         kind: TestDummy
         metadata:
           name: basic-test-case-patch-loop
@@ -159,7 +158,7 @@ spec:
         ok: {}
     - label: Unexpected update Values
       expectResource:
-        apiVersion: koreo.realkinetic.com/v1alpha8
+        apiVersion: koreo.dev/v1beta1
         kind: TestDummy
         metadata:
           name: basic-test-case-patch-loop
@@ -183,19 +182,19 @@ spec:
     - label: Stable return value
       expectReturn:
         ref:
-          apiVersion: koreo.realkinetic.com/v1alpha8
+          apiVersion: koreo.dev/v1beta1
           kind: TestDummy
           name: basic-test-case-patch-loop
           namespace: testing
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ResourceFunction
 metadata:
   name: recreate-looper.v1
   namespace: koreo-update-loop
 spec:
   apiConfig:
-    apiVersion: koreo.realkinetic.com/v1alpha8
+    apiVersion: koreo.dev/v1beta1
     kind: TestDummy
     plural: testdummies
 
@@ -234,11 +233,10 @@ spec:
     recreate:
       delay: 15
 
-  outcome:
-      return:
-        ref: =resource.self_ref()
+  return:
+    ref: =resource.self_ref()
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
 metadata:
   name: recreate-looper.v1
@@ -256,7 +254,7 @@ spec:
   testCases:
     - label: Creation Values
       expectResource:
-        apiVersion: koreo.realkinetic.com/v1alpha8
+        apiVersion: koreo.dev/v1beta1
         kind: TestDummy
         metadata:
           name: basic-test-case-recreate-loop

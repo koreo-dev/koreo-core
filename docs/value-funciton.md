@@ -17,7 +17,7 @@ blocks, or default values for use within other Functions or Workflows.
 
 | Full Specification            | Description           |
 | :-----------------------------| :-------------------- |
-| **`apiVersion`**: `koreo.realkinetic.com/v1beta1` | Specification version |
+| **`apiVersion`**: `koreo.dev/v1beta1` | Specification version |
 | **`kind`**: `ValueFunction`   | Always `ValueFunction` |
 | **`metadata`**:               | |
 | **`  name`**:                 | Name of the `ValueFunction`|
@@ -89,7 +89,7 @@ reference inputs (`inputs.`) or locals (`locals`).
 The following `ValueFunction` demonstrates some of the capabilities.
 
 ```yaml
-apiVersion: koreo.realkinetic.com/v1beta1
+apiVersion: koreo.dev/v1beta1
 kind: ValueFunction
 metadata:
   name: simple-example.v1
@@ -129,7 +129,7 @@ spec:
 # FunctionTests provide a solution for testing your logic and error handling.
 # See the FunctionTest documentation for a full description of their
 # capabilities.
-apiVersion: koreo.realkinetic.com/v1beta1
+apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
 metadata:
   name: simple-example.v1

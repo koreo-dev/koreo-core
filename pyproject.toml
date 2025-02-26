@@ -20,7 +20,7 @@ readme = "README.md"
 license = {text = "Apache-2.0"}
 
 [project.urls]
-Homepage = "https://realkinetic.com/konfig"
+Homepage = "https://koreo.dev"
 
 [project.optional-dependencies]
 dev = [

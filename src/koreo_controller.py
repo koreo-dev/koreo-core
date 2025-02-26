@@ -22,7 +22,7 @@ from koreo.workflow.prepare import prepare_workflow
 from koreo.workflow.structure import Workflow
 
 
-GROUP = "koreo.realkinetic.com"
+GROUP = "koreo.dev"
 VERSION = "v1beta1"
 API_VERSION = f"{GROUP}/{VERSION}"
 

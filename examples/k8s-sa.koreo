@@ -3,7 +3,7 @@ kind: Namespace
 metadata:
   name: koreo-demo
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: Workflow
 metadata:
   name: deployment-service-account.v1
@@ -11,18 +11,18 @@ metadata:
 spec:
   # This is used for testing. This workflow is meant to be a sub-workflow.
   crdRef:
-    apiGroup: koreo.realkinetic.com
+    apiGroup: koreo.dev
     version: v1alpha8
     kind: TriggerDummy
 
   configStep:
-    functionRef:
+    ref:
       kind: ValueFunction
       name: service-account-config.v1
 
   steps:
     - label: service_account
-      functionRef:
+      ref:
         kind: ResourceFunction
         name: deployment-service-account.v1
       inputs:
@@ -31,7 +31,7 @@ spec:
         ref: =resource.self_ref()
 
     - label: role
-      functionRef:
+      ref:
         kind: ResourceFunction
         name: deployment-service-account-role.v1
       inputs:
@@ -39,7 +39,7 @@ spec:
         resources: =steps.config.resources
 
     - label: binding
-      functionRef:
+      ref:
         kind: ResourceFunction
         name: deployment-service-account-binding.v1
       inputs:
@@ -47,7 +47,7 @@ spec:
         service_account: =steps.service_account
         role: =steps.role
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ValueFunction
 metadata:
   name: service-account-config.v1
@@ -62,7 +62,7 @@ spec:
       namespace: =inputs.parent.metadata.namespace
     resources: =inputs.parent.spec.resources
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
 metadata:
   name: service-account-config.v1
@@ -95,7 +95,7 @@ spec:
        - kind: configmap
          name: test-configmap
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ResourceTemplate
 metadata:
   name: deployment-service-account.v1
@@ -108,7 +108,7 @@ spec:
       labels:
         workloads.realkinetic.com/auto-sa: "true"
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ResourceFunction
 metadata:
   name: deployment-service-account.v1
@@ -131,12 +131,10 @@ spec:
     recreate:
       delay: 10
 
-
-  outcome:
-      return:
-        ref: =resource.self_ref()
+  return:
+    ref: =resource.self_ref()
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
 metadata:
   name: deployment-service-account.v1
@@ -167,7 +165,7 @@ spec:
         name: test-account
         namespace: test-namespace
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ResourceFunction
 metadata:
   name: deployment-service-account-role.v1
@@ -196,11 +194,10 @@ spec:
     kind: Role
     rules: = locals.rules
 
-  outcome:
-      return:
-        ref: =resource.self_ref()
+  return:
+    ref: =resource.self_ref()
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
 metadata:
   name: deployment-service-account-role.v1
@@ -232,7 +229,7 @@ spec:
         resources: [secrets]
         verbs: [get]
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: ResourceFunction
 metadata:
   name: deployment-service-account-binding.v1
@@ -260,11 +257,10 @@ spec:
       kind: =locals.role_group_ref.kind
       name: =locals.role_group_ref.name
 
-  outcome:
-      return:
-        ref: =resource.self_ref()
+  return:
+    ref: =resource.self_ref()
 ---
-apiVersion: koreo.realkinetic.com/v1alpha8
+apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
 metadata:
   name: deployment-service-account-binding.v1

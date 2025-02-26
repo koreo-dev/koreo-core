@@ -19,7 +19,7 @@ errors, or easily testing other variant behaviors.
 
 | Full Specification         | Description           |
 | :--------------------------| :-------------------- |
-| **`apiVersion`**: `koreo.realkinetic.com/v1beta1` | Specification version |
+| **`apiVersion`**: `koreo.dev/v1beta1` | Specification version |
 | **`kind`**: `FunctionTest` | Always `FunctionTest` |
 | **`metadata`**:            | |
 | **`  name`**:              | Name of the `FunctionTest`|
@@ -232,7 +232,7 @@ will match any value.
 In order to demonstrate `FunctionTest`, we will test a simple but
 representative `ResourceFunction`.
 ```yaml
-apiVersion: koreo.realkinetic.com/v1beta1
+apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
 metadata:
   name: function-test-demo.v1
@@ -256,7 +256,7 @@ spec:
   # matches our expections
   - label: Initial Create
     expectResource:
-      apiVersion: koreo.realkinetic.com/v1beta1
+      apiVersion: koreo.dev/v1beta1
       kind: TestDummy
       metadata:
         name: test-demo
@@ -305,7 +305,7 @@ spec:
       bigInt: 6400
       ready: true
       ref:
-        apiVersion: koreo.realkinetic.com/v1beta1
+        apiVersion: koreo.dev/v1beta1
         kind: TestDummy
         name: test-demo
         namespace: tests
@@ -315,7 +315,7 @@ spec:
     inputOverrides:
       int: 22
     expectResource:
-      apiVersion: koreo.realkinetic.com/v1beta1
+      apiVersion: koreo.dev/v1beta1
       kind: TestDummy
       metadata:
         name: test-demo
@@ -334,7 +334,7 @@ spec:
   # We can simulate a full replacement of the resource and ensure it is patched.
   - label: Resource Replacement
     currentResource:
-      apiVersion: koreo.realkinetic.com/v1beta1
+      apiVersion: koreo.dev/v1beta1
       kind: TestDummy
       metadata:
         name: test-demo
@@ -346,7 +346,7 @@ spec:
         - 3
         - 4
     expectResource:
-      apiVersion: koreo.realkinetic.com/v1beta1
+      apiVersion: koreo.dev/v1beta1
       kind: TestDummy
       metadata:
         name: test-demo
@@ -366,7 +366,7 @@ spec:
     expectOutcome:
       ok: {}
 ---
-apiVersion: koreo.realkinetic.com/v1beta1
+apiVersion: koreo.dev/v1beta1
 kind: ResourceFunction
 metadata:
   name: function-test-demo.v1
@@ -382,7 +382,7 @@ spec:
       message: User disabled the ResourceFunction
 
   apiConfig:
-    apiVersion: koreo.realkinetic.com/v1beta1
+    apiVersion: koreo.dev/v1beta1
     kind: TestDummy
     plural: testdummies
 
