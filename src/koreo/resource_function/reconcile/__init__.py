@@ -338,11 +338,14 @@ async def load_api_resource(
     namespace: str | None,
 ):
     try:
-        matches = await api.async_get(
-            resource_api,
-            name,
-            namespace=namespace,
-        )
+        matches = [
+            match
+            async for match in api.async_get(
+                resource_api,
+                name,
+                namespace=namespace,
+            )
+        ]
     except kr8s.NotFoundError:
         matches = None
     except kr8s.ServerError as err:

@@ -29,7 +29,7 @@ async def load_cache(
     )
     resources = resource_class.list(namespace=namespace)
 
-    for resource in await resources:
+    async for resource in resources:
         logging.debug(f"Caching {resource.name}.")
         await prepare_and_cache(
             resource_class=resource_class,

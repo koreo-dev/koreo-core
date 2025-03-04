@@ -7,10 +7,10 @@ authors = [
 ]
 
 dependencies = [
-    "cel-python==0.1.5",
+    "cel-python==0.2.0",
     "kopf==1.37.4",
     "PyYAML==6.0.2",
-    "kr8s==0.18.1",
+    "kr8s==0.20.6",
     "uvloop==0.21.0",
     "fastjsonschema==2.21.1",
 ]
@@ -24,8 +24,8 @@ Homepage = "https://koreo.dev"
 
 [project.optional-dependencies]
 dev = [
-    "black==24.10.0",
-    "pytest==8.3.4",
+    "black==25.1.0",
+    "pytest==8.3.5",
     "pytest-cov==6.0.0",
 ]
 
