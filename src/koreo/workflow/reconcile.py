@@ -358,7 +358,7 @@ async def _reconcile_step(
             )
 
     # TODO: Error handling review
-    [resolved, pending] = await asyncio.wait(dependencies)
+    _, pending = await asyncio.wait(dependencies)
     if pending:
         timed_out_tasks = ", ".join(task.get_name() for task in pending)
         return StepResult(
@@ -371,7 +371,7 @@ async def _reconcile_step(
 
     ok_outcomes = celtypes.MapType()
 
-    for task in resolved:
+    for task in dependencies:
         step_label = task.get_name()
         step_result = task.result()
         match step_result.result:
@@ -632,7 +632,7 @@ async def _for_each_reconciler(
     tasks: list[asyncio.Task[StepResult]] = []
 
     try:
-        async with asyncio.TaskGroup() as task_group:
+        async with asyncio.timeout(STEP_TIMEOUT), asyncio.TaskGroup() as task_group:
             for idx, map_value in enumerate(source_iterator):
                 iterated_inputs = copy.deepcopy(inputs)
                 iterated_inputs[step.for_each.input_key] = map_value
@@ -654,7 +654,8 @@ async def _for_each_reconciler(
         # Handled per-task below
         pass
 
-    done, pending = await asyncio.wait(tasks)
+    # TODO: This shouldn't even be needed. The context manager does this already?
+    _, pending = await asyncio.wait(tasks)
     if pending:
         timed_out_tasks = ", ".join(task.get_name() for task in pending)
         return StepResult(
@@ -666,7 +667,7 @@ async def _for_each_reconciler(
         )
 
     outcomes = []
-    for task in done:
+    for task in tasks:
         task_name = task.get_name()
 
         if task.cancelled():
