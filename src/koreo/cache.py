@@ -7,12 +7,9 @@ import time
 from koreo.result import UnwrappedOutcome, is_unwrapped_ok
 from koreo import registry
 
+from constants import ACTIVE_LABEL
+
 logger = logging.getLogger(name="koreo.cache")
-
-LABEL_NAMESPACE = "koreo.dev"
-
-ACTIVE_LABEL = f"{LABEL_NAMESPACE}/active"
-
 
 T = TypeVar("T")
 type PreparerFn[T] = Callable[
