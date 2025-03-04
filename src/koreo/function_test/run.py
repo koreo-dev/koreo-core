@@ -69,17 +69,11 @@ class MockApi:
                 ),
                 asyncio=True,
             )
-            return [
-                resource_class(
-                    api=self,
-                    resource=self._current_resource,
-                    namespace=self._current_resource.get("metadata", {}).get(
-                        "namespace"
-                    ),
-                )
-            ]
-        else:
-            return []
+            yield resource_class(
+                api=self,
+                resource=self._current_resource,
+                namespace=self._current_resource.get("metadata", {}).get("namespace"),
+            )
 
     @asynccontextmanager
     async def call_api(self, *args, **kwargs):
