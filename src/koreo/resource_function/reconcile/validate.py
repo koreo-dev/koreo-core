@@ -75,6 +75,18 @@ def validate_match(
                 differences=[f"<target:{type(target)}, resource:bool>"],
             )
 
+        case _, None if target:
+            return ResourceMatch(
+                match=False,
+                differences=[f"<target:{type(target)}, resource:null or missing>"],
+            )
+
+        case None, _ if actual:
+            return ResourceMatch(
+                match=False,
+                differences=[f"<target:null, resource:{type(actual)}"],
+            )
+
     # Hopefully anything else is a simple type.
     if target == actual:
         return ResourceMatch(match=True, differences=())

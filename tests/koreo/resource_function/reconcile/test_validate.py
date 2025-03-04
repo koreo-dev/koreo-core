@@ -3,6 +3,8 @@ import random
 import string
 import unittest
 
+from celpy import celtypes
+
 from koreo.resource_function.reconcile import validate
 
 CHARS = string.ascii_letters + " "
@@ -564,3 +566,21 @@ class TestDifferenceValidator(unittest.TestCase):
         )
         self.assertFalse(match.differences)
         self.assertTrue(match.match)
+
+    def test_compare_celstring_to_none(self):
+        target_value = {
+            "x-koreo-compare-last-applied": ["to-last-applied"],
+            "to-last-applied": celtypes.StringType(string_generator(50)),
+        }
+        actual_value = copy.deepcopy(target_value)
+        actual_value["to-last-applied"] = string_generator(20)
+
+        last_applied_value = None
+
+        match = validate.validate_match(
+            target=target_value,
+            actual=actual_value,
+            last_applied_value=last_applied_value,
+        )
+        self.assertTrue(match.differences)
+        self.assertFalse(match.match)
