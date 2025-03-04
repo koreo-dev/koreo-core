@@ -9,6 +9,8 @@ import kr8s
 import celpy
 from celpy import celtypes
 
+from constants import LAST_APPLIED_ANNOTATION
+
 from koreo import result
 from koreo.cel.encoder import convert_bools
 from koreo.cel.evaluation import evaluate_overlay
@@ -405,7 +407,9 @@ def _validate_resource_match(
             message=f"Unexpected result-type ({actual_outcome}), but expected Retry",
         )
 
-    match = _validate_match(target=expected, actual=materialized)
+    materialized_without_last_applied = _strip_last_applied_annotation(materialized)
+
+    match = _validate_match(target=expected, actual=materialized_without_last_applied)
     return TestCaseResult(
         test_pass=match.match,
         expected_outcome=result.Ok(expected),
@@ -523,6 +527,29 @@ Difference = dict[str, "str | Difference"] | Sequence["Difference | None"] | str
 class ResourceMatch(NamedTuple):
     match: bool
     differences: Difference
+
+
+def _strip_last_applied_annotation[T](actual: T) -> T:
+    if not actual or not isinstance(actual, dict):
+        return actual
+
+    if "metadata" not in actual:
+        return actual
+
+    if "annotations" not in actual["metadata"]:
+        return actual
+
+    annotation_count = len(actual["metadata"]["annotations"])
+    if annotation_count == 0:
+        return actual
+
+    stripped = copy.deepcopy(actual)
+    if annotation_count == 1:
+        del stripped["metadata"]["annotations"]
+    else:
+        del stripped["metadata"]["annotations"][LAST_APPLIED_ANNOTATION]
+
+    return stripped
 
 
 def _validate_match(target, actual, compare_list_as_set: bool = False) -> ResourceMatch:

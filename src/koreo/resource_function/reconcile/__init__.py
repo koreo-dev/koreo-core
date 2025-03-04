@@ -1,5 +1,6 @@
 from typing import NamedTuple, Sequence
 import copy
+import json
 import logging
 
 logger = logging.getLogger("koreo.function")
@@ -9,6 +10,12 @@ import kr8s
 
 import celpy
 from celpy import celtypes
+
+from constants import (
+    DEFAULT_LOAD_RETRY_DELAY,
+    KOREO_DIRECTIVE_KEYS,
+    LAST_APPLIED_ANNOTATION,
+)
 
 from koreo import cache
 from koreo.cel import functions
@@ -23,10 +30,8 @@ from koreo.resource_template.structure import ResourceTemplate
 from koreo.result import PermFail, Retry, UnwrappedOutcome, is_unwrapped_ok
 from koreo.value_function.reconcile import reconcile_value_function
 
-
-from . import structure
-
-DEFAULT_LOAD_RETRY_DELAY = 30
+from koreo.resource_function import structure
+from .validate import validate_match
 
 
 class Result(NamedTuple):
@@ -271,7 +276,13 @@ async def reconcile_krm_resource(
 
     converted_resource = convert_bools(expected_resource)
 
-    resource_match = _validate_match(converted_resource, api_resource.raw)
+    last_applied = _extract_last_applied(api_resource.raw)
+
+    resource_match = validate_match(
+        target=converted_resource,
+        actual=api_resource.raw,
+        last_applied_value=last_applied,
+    )
     if resource_match.match and owner_reffed:
         logger.debug(f"{full_resource_name} matched spec, no update required.")
 
@@ -306,7 +317,7 @@ async def reconcile_krm_resource(
 
                 converted_resource["metadata"]["ownerReferences"] = owner_refs
 
-            await api_resource.patch(_strip_koreo_directives(converted_resource))
+            await api_resource.patch(_prepare_for_api(converted_resource))
             return ReconcileResult(
                 result=Retry(
                     message=(
@@ -617,7 +628,7 @@ async def _create_api_resource(
 
     new_resource = resource_api(
         api=api,
-        resource=_strip_koreo_directives(converted_resource),
+        resource=_prepare_for_api(converted_resource),
         namespace=namespace,
     )
 
@@ -737,10 +748,39 @@ def _validate_owner_reffed(resource_view: dict, owner_ref: dict):
     return False
 
 
-KOREO_DIRECTIVE_KEYS: set[str] = {
-    "x-koreo-compare-as-set",
-    "x-koreo-compare-as-map",
-}
+def _extract_last_applied(resource: dict) -> dict | None:
+    if not resource:
+        return None
+
+    metadata = resource.get("metadata")
+    if not metadata:
+        return None
+
+    annotations = metadata.get("annotations")
+    if not annotations:
+        return None
+
+    last_applied = annotations.get(LAST_APPLIED_ANNOTATION)
+    if not last_applied:
+        return None
+
+    return json.loads(last_applied)
+
+
+def _prepare_for_api(obj: dict) -> dict:
+    prepared = _strip_koreo_directives(obj)
+
+    dumped = json.dumps(prepared)
+
+    if "metadata" not in prepared:
+        prepared["metadata"] = {}
+
+    if "annotations" not in prepared["metadata"]:
+        prepared["metadata"]["annotations"] = {}
+
+    prepared["metadata"]["annotations"][LAST_APPLIED_ANNOTATION] = dumped
+
+    return prepared
 
 
 def _strip_koreo_directives[T](obj: T) -> T:
@@ -757,185 +797,3 @@ def _strip_koreo_directives[T](obj: T) -> T:
 
         case _:
             return obj
-
-
-class ResourceMatch(NamedTuple):
-    match: bool
-    differences: Sequence[str]
-
-
-def _validate_match(target, actual, compare_list_as_set: bool = False) -> ResourceMatch:
-    """Compare the specified (`target`) state against the actual (`actual`)
-    reosurce state. We compare all target fields and ignore anything extra.
-    """
-
-    match (target, actual):
-        # Objects need a special comparator
-        case dict(), dict():
-            return _validate_dict_match(target, actual)
-        case dict(), _:
-            return ResourceMatch(
-                match=False,
-                differences=[f"<target:object, resource:{type(actual)}>"],
-            )
-        case _, dict():
-            return ResourceMatch(
-                match=False,
-                differences=[f"<target:{type(target)}, resource:object>"],
-            )
-
-        # Arrays need a special comparator
-        case (list() | tuple(), list() | tuple()):
-            if compare_list_as_set:
-                return _validate_set_match(target, actual)
-
-            return _validate_list_match(target, actual)
-
-        case (list() | tuple(), _):
-            return ResourceMatch(
-                match=False,
-                differences=[f"<target:array, resource:{type(actual)}>"],
-            )
-        case (_, list() | tuple()):
-            return ResourceMatch(
-                match=False,
-                differences=[f"<target:{type(target)}, resource:array>"],
-            )
-
-        # Bool needs a special comparator, due to Python's int truthiness rules
-        case bool(), bool():
-            if target == actual:
-                return ResourceMatch(match=True, differences=())
-            else:
-                return ResourceMatch(
-                    match=False,
-                    differences=[f"<target:[{target}], resource:[{actual}]>"],
-                )
-        case bool(), _:
-            return ResourceMatch(
-                match=False,
-                differences=[f"<target:bool, resource:{type(actual)}>"],
-            )
-        case _, bool():
-            return ResourceMatch(
-                match=False,
-                differences=[f"<target:{type(target)}, resource:bool>"],
-            )
-
-    # Hopefully anything else is a simple type.
-    if target == actual:
-        return ResourceMatch(match=True, differences=())
-    else:
-        return ResourceMatch(
-            match=False,
-            differences=[f"<target:[{target}], resource:[{actual}]>"],
-        )
-
-
-def _obj_to_key(obj: dict, fields: Sequence[int | str]) -> str:
-    return "$".join(f"{obj.get(field)}".strip() for field in fields)
-
-
-def _list_to_object(
-    obj_list: Sequence[dict], key_fields: Sequence[int | str]
-) -> dict[str, dict]:
-    return {_obj_to_key(obj, key_fields): obj for obj in obj_list}
-
-
-def _validate_dict_match(target: dict, actual: dict) -> ResourceMatch:
-    target_keys = set(target.keys()) - KOREO_DIRECTIVE_KEYS
-
-    compare_list_as_set_keys = {
-        key for key in target.get("x-koreo-compare-as-set", ()) if key
-    }
-
-    compare_as_map = {
-        key: [field_name for field_name in fields if field_name]
-        for key, fields in target.get("x-koreo-compare-as-map", {}).items()
-        if key
-    }
-
-    for target_key in target_keys:
-        if target_key == "ownerReferences":
-            continue
-
-        if target_key not in actual:
-            return ResourceMatch(
-                match=False, differences=[f"<missing '{target_key}' in resource>"]
-            )
-
-        if target_key in compare_as_map:
-            key_match = _validate_match(
-                _list_to_object(target[target_key], compare_as_map[target_key]),
-                _list_to_object(actual[target_key], compare_as_map[target_key]),
-            )
-        else:
-            key_match = _validate_match(
-                target[target_key],
-                actual[target_key],
-                compare_list_as_set=(target_key in compare_list_as_set_keys),
-            )
-        if not key_match.match:
-            differences = [f"'{target_key}'"]
-            differences.extend(key_match.differences)
-            return ResourceMatch(match=False, differences=differences)
-
-    return ResourceMatch(match=True, differences=())
-
-
-def _validate_list_match(target: list | tuple, actual: list | tuple) -> ResourceMatch:
-    if len(target) != len(actual):
-        return ResourceMatch(
-            match=False,
-            differences=[
-                f"<length mismatch target:{len(target)}, actual:{len(actual)}"
-            ],
-        )
-
-    for idx, (target_value, actual_value) in enumerate(zip(target, actual)):
-        item_match = _validate_match(target_value, actual_value)
-        if not item_match.match:
-            differences = [f"at index '{idx}'"]
-            differences.extend(item_match.differences)
-            return ResourceMatch(match=False, differences=differences)
-
-    return ResourceMatch(match=True, differences=())
-
-
-def _validate_set_match(target: list | tuple, actual: list | tuple) -> ResourceMatch:
-    try:
-        target_set = set(target)
-        actual_set = set(actual)
-    except TypeError as err:
-        if "dict" in f"{err}":
-            return ResourceMatch(
-                match=False,
-                differences=(
-                    f"Could not compare array-as-set, try: `x-koreo-compare-as-map`",
-                ),
-            )
-
-        return ResourceMatch(
-            match=False, differences=(f"Could not compare array-as-set ({err})",)
-        )
-    except Exception as err:
-        return ResourceMatch(
-            match=False, differences=(f"Could not compare array-as-set ({err})",)
-        )
-
-    missing_values = target_set - actual_set
-    unexpected_values = actual_set - target_set
-
-    if not (missing_values or unexpected_values):
-        return ResourceMatch(match=True, differences=())
-
-    for missing_value in missing_values:
-        return ResourceMatch(match=False, differences=(f"<missing '{missing_value}'>",))
-
-    for unexpected_value in unexpected_values:
-        return ResourceMatch(
-            match=False, differences=(f"<unexpectedly found '{unexpected_value}'>",)
-        )
-
-    # This is impossible
-    return ResourceMatch(match=True, differences=())
