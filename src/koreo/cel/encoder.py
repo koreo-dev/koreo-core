@@ -1,24 +1,43 @@
 from typing import Any
+import base64
 
 from celpy import celtypes
 
 CEL_PREFIX = "="
 
+ConvertedType = (
+    list["ConvertedType"]
+    | dict["ConvertedType", "ConvertedType"]
+    | str
+    | int
+    | float
+    | bool
+    | None
+)
+
 
 def convert_bools(
     cel_object: celtypes.Value,
-) -> celtypes.Value | list[Any] | dict[Any, Any] | bool:
-    """Recursive walk through the CEL object, replacing BoolType with native bool instances.
-    This lets the :py:mod:`json` module correctly represent the obects
-    with JSON ``true`` and ``false``.
-
-    This will also replace ListType and MapType with native ``list`` and ``dict``.
-    All other CEL objects will be left intact. This creates an intermediate hybrid
-    beast that's not quite a :py:class:`celtypes.Value` because a few things have been replaced.
+) -> ConvertedType:
+    """Recursive walk through the CEL object, replacing celtypes with native
+    types. This lets the :py:mod:`json` module correctly represent the obects
+    and allows Python code to treat these as normal objects.
     """
     match cel_object:
         case celtypes.BoolType():
             return True if cel_object else False
+
+        case celtypes.StringType() | celtypes.TimestampType() | celtypes.DurationType():
+            return str(cel_object)
+
+        case celtypes.IntType() | celtypes.UintType():
+            return int(cel_object)
+
+        case celtypes.DoubleType():
+            return float(cel_object)
+
+        case celtypes.BytesType():
+            return base64.b64encode(cel_object).decode("ASCII")
 
         case celtypes.ListType() | list() | tuple():
             return [convert_bools(item) for item in cel_object]
@@ -28,6 +47,9 @@ def convert_bools(
                 convert_bools(key): convert_bools(value)
                 for key, value in cel_object.items()
             }
+
+        case celtypes.NullType():
+            return None
 
         case _:
             return cel_object

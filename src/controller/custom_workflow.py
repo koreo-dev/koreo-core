@@ -176,9 +176,7 @@ def start_controller(group: str, kind: str, version: str):
 
         object_patch = {
             "metadata": {
-                "annotations": {
-                    "koreo.dev/managed-resources": encoded_resource_ids
-                }
+                "annotations": {"koreo.dev/managed-resources": encoded_resource_ids}
             },
             "status": {
                 "conditions": conditions,
