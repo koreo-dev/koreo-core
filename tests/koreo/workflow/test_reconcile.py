@@ -308,3 +308,40 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
         )
 
         # TODO: Check Condition
+
+
+class TestConditionHelper(unittest.TestCase):
+    def test_none_outcome(self):
+        condition = reconcile._condition_helper(
+            condition_type="UnitTest",
+            thing_name="unit test",
+            outcome=None,
+            workflow_key="unit-test-flow",
+        )
+
+        self.assertEqual("Pending", condition.get("reason"))
+
+    def test_ok_outcome_that_is_none(self):
+        condition = reconcile._condition_helper(
+            condition_type="UnitTest",
+            thing_name="unit test",
+            outcome=Ok(None),
+            workflow_key="unit-test-flow",
+        )
+
+        self.assertEqual("Ready", condition.get("reason"))
+
+    def test_falsy_outcomes(self):
+        falsy_stuff = [[], (), {}, 0, False, ""]
+
+        for falsy_thing in falsy_stuff:
+            condition = reconcile._condition_helper(
+                condition_type="UnitTest",
+                thing_name="unit test",
+                outcome=falsy_thing,
+                workflow_key="unit-test-flow",
+            )
+
+            self.assertEqual(
+                "Ready", condition.get("reason"), f"Falsy thing '{falsy_thing}'"
+            )
