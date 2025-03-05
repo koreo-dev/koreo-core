@@ -733,7 +733,7 @@ def _condition_helper(
     status = "True"
     location = workflow_key
 
-    if not outcome:
+    if outcome is None:
         return Condition(
             type=condition_type,
             reason=reason,
