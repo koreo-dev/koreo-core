@@ -86,6 +86,8 @@ def evaluate_overlay(
 
     try:
         overlay_values = overlay.values.evaluate(combined_inputs)
+        if eval_error := check_for_celevalerror(overlay_values, location):
+            return eval_error
 
         if not isinstance(overlay_values, celtypes.ListType):
             return PermFail(

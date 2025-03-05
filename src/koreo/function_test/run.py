@@ -273,7 +273,7 @@ async def _run_test_case(
                     fatal_error=not test_case.variant,
                 )
             case _ as cel_resource:
-                resource = json.loads(json.dumps(convert_bools(cel_resource)))
+                resource = convert_bools(cel_resource)
 
     elif test_case.current_resource:
         resource = test_case.current_resource
@@ -364,13 +364,13 @@ def _validate_return_match(
             message=f"Non-Ok return value ({actual})",
         )
 
-    actual = json.loads(json.dumps(convert_bools(actual)))
+    converted_actual = convert_bools(actual)
 
-    match = _validate_match(target=expected, actual=actual)
+    match = _validate_match(target=expected, actual=converted_actual)
     return TestCaseResult(
         test_pass=match.match,
         expected_outcome=result.Ok(expected),
-        outcome=actual,
+        outcome=converted_actual,
         differences=match.differences,
     )
 
@@ -489,7 +489,7 @@ def _validate_outcome_match(
 
         case _, _:
             if actual and result.is_unwrapped_ok(actual):
-                actual = json.loads(json.dumps(convert_bools(actual)))
+                actual = convert_bools(actual)
                 actual_str = f"Ok({actual})"
             else:
                 actual_str = f"{actual}"
@@ -511,7 +511,10 @@ def _validate_outcome_match(
                 message = f"Expected({expected}) Actual({actual_str})"
 
     return TestCaseResult(
-        test_pass=test_pass, expected_outcome=expected, outcome=actual, message=message
+        test_pass=test_pass,
+        expected_outcome=expected,
+        outcome=actual,
+        message=message,
     )
 
 

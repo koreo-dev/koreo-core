@@ -86,7 +86,7 @@ def _perform_overlay(overlay_spec, failureException):
         case PermFail(message=message):
             raise failureException(f"PermFail overlaying {message}")
         case overlaid:
-            return json.loads(json.dumps(convert_bools(overlaid)))
+            return convert_bools(overlaid)
 
 
 class TestEvaluation(unittest.TestCase):
