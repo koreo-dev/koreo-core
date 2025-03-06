@@ -67,6 +67,7 @@ class ErrorStep(NamedTuple):
 
 
 class Workflow(NamedTuple):
+    name: str
     crd_ref: ConfigCRDRef | None
 
     steps_ready: Outcome

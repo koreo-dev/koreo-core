@@ -71,6 +71,7 @@ class CRUDConfig(NamedTuple):
 
 
 class ResourceFunction(NamedTuple):
+    name: str
     preconditions: celpy.Runner | None
     local_values: celpy.Runner | None
 

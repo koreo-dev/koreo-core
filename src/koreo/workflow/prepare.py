@@ -121,6 +121,7 @@ async def prepare_workflow(
 
     return (
         structure.Workflow(
+            name=cache_key,
             crd_ref=crd_ref,
             config_step=config_step,
             steps_ready=all_steps_ready,
@@ -168,9 +169,9 @@ async def _deindex_crd_on_delete(cache_key: str):
             match event:
                 case registry.Kill():
                     break
-                case registry.ResourceEvent(
-                    event_time=event_time
-                ) if event_time >= last_event:
+                case registry.ResourceEvent(event_time=event_time) if (
+                    event_time >= last_event
+                ):
                     cached = get_resource_from_cache(
                         resource_class=structure.Workflow, cache_key=cache_key
                     )

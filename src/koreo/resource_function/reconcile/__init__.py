@@ -87,10 +87,12 @@ async def reconcile_resource_function(
         owner=owner,
         inputs=full_inputs,
     )
+    resource_id = reconcile_result.resource_id
+    if resource_id:
+        resource_id["resourceFunction"] = function.name
+
     if not is_unwrapped_ok(reconcile_result.result):
-        return Result(
-            outcome=reconcile_result.result, resource_id=reconcile_result.resource_id
-        )
+        return Result(outcome=reconcile_result.result, resource_id=resource_id)
 
     full_inputs["resource"] = celpy.json_to_cel(reconcile_result.result)
 
@@ -111,7 +113,7 @@ async def reconcile_resource_function(
             inputs=full_inputs,
             location=f"{location}:spec.return",
         ),
-        resource_id=reconcile_result.resource_id,
+        resource_id=resource_id,
     )
 
 
