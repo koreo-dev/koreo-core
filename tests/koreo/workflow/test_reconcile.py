@@ -25,6 +25,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
         step_state = cel_env.program(cel_env.compile("{'input_source': value}"))
 
         workflow = workflow_structure.Workflow(
+            name="unit-test",
             crd_ref=workflow_structure.ConfigCRDRef(
                 api_group="tests.koreo.dev", version="v1", kind="TestCase"
             ),
@@ -85,6 +86,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
         ), f"{sub_step_two_return_value}"
 
         sub_workflow = workflow_structure.Workflow(
+            name="unit-test",
             crd_ref=workflow_structure.ConfigCRDRef(
                 api_group="tests.koreo.dev", version="v1", kind="TestCase"
             ),
@@ -125,6 +127,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
         )
 
         workflow = workflow_structure.Workflow(
+            name="unit-test",
             crd_ref=workflow_structure.ConfigCRDRef(
                 api_group="tests.koreo.dev", version="v1", kind="TestCase"
             ),
@@ -170,6 +173,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
         cel_env = celpy.Environment()
 
         workflow = workflow_structure.Workflow(
+            name="unit-test",
             crd_ref=workflow_structure.ConfigCRDRef(
                 api_group="tests.koreo.dev", version="v1", kind="TestCase"
             ),
@@ -261,6 +265,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
         step_state = cel_env.program(cel_env.compile("{'single_switch': value}"))
 
         workflow = workflow_structure.Workflow(
+            name="unit-test",
             crd_ref=workflow_structure.ConfigCRDRef(
                 api_group="tests.koreo.dev", version="v1", kind="TestCase"
             ),

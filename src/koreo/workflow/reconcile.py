@@ -70,7 +70,10 @@ async def reconcile_workflow(
 
     outcome_results = {key: result.result for key, result in outcomes.items()}
 
-    outcome_resources = {key: result.resource_ids for key, result in outcomes.items()}
+    outcome_resources = {
+        "workflow": workflow.name,
+        "resources": {key: result.resource_ids for key, result in outcomes.items()},
+    }
 
     overall_outcome = result.unwrapped_combine(outcomes=outcome_results.values())
     conditions.append(

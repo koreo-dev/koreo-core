@@ -153,6 +153,7 @@ async def prepare_resource_function(
 
     return (
         structure.ResourceFunction(
+            name=cache_key,
             preconditions=preconditions,
             local_values=local_values,
             crud_config=structure.CRUDConfig(
