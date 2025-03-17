@@ -55,41 +55,21 @@ async def prepare_workflow(
     # Used to  update our cross-reference registries
     watched_resources = set[registry.Resource]()
 
-    # Handle configStep, which is just slightly special.
-    config_step_spec = spec.get("configStep", {})
-    loaded_config_step = _load_config_step(cel_env, config_step_spec)
-
-    if not loaded_config_step:
-        config_step_label = None
-        config_step = None
-    else:
-        config_resources, config_step = loaded_config_step
-        config_step_label = config_step.label
-        if config_resources:
-            watched_resources.update(config_resources)
-
-    # Handle normal Steps
     steps_spec = spec.get("steps", [])
-    step_resources, steps, steps_ready = _load_steps(
-        cel_env, steps_spec, config_step_label=config_step_label
+    step_resources, steps, steps_ready, parent_properties = _load_steps(
+        cel_env, steps_spec
     )
     if step_resources:
         watched_resources.update(step_resources)
 
-    # Ensure configStep is checked as well.
-    if isinstance(config_step, structure.ErrorStep):
-        all_steps_ready = unwrapped_combine((config_step.outcome, steps_ready))
-    else:
-        all_steps_ready = steps_ready
-
-    if not (steps_spec or config_step_spec):
-        all_steps_ready = unwrapped_combine(
+    if not steps_spec:
+        steps_ready = unwrapped_combine(
             (
-                all_steps_ready,
+                steps_ready,
                 PermFail(
                     message=(
-                        "No steps specified Workflow, either 'spec.configStep' or "
-                        "at least one step in 'spec.steps' is required."
+                        "No steps specified Workflow at least one step in "
+                        "'spec.steps' is required."
                     )
                 ),
             )
@@ -123,9 +103,9 @@ async def prepare_workflow(
         structure.Workflow(
             name=cache_key,
             crd_ref=crd_ref,
-            config_step=config_step,
-            steps_ready=all_steps_ready,
+            steps_ready=steps_ready,
             steps=steps,
+            dynamic_input_keys=parent_properties,
         ),
         tuple(watched_resources),
     )
@@ -202,6 +182,7 @@ def _build_crd_ref(crd_ref_spec: dict) -> structure.ConfigCRDRef | None:
     return structure.ConfigCRDRef(api_group=api_group, version=version, kind=kind)
 
 
+PARENT_NAME_PATTERN = re.compile(r"parent.(?P<name>.*)")
 STEPS_NAME_PATTERN = re.compile(r"steps.(?P<name>[^.[]+)?\[?.*")
 
 
@@ -211,119 +192,20 @@ LogicRegistryResource = registry.Resource[
 Logic = ValueFunction | ResourceFunction | structure.Workflow
 
 
-def _load_config_step(
-    cel_env: celpy.Environment, step_spec: dict
-) -> (
-    None
-    | tuple[
-        set[LogicRegistryResource] | None, structure.ConfigStep | structure.ErrorStep
-    ]
-):
-    if not step_spec:
-        return None
-
-    dynamic_input_keys: set[str] = set()
-
-    step_label = step_spec.get("label", "config")
-
-    logic = None
-    resources = None
-
-    logic_ref = step_spec.get("ref")
-    if logic_ref:
-        resources, logic = _load_logic(logic_ref=logic_ref, location="spec.configStep")
-
-    if not is_unwrapped_ok(logic):
-        return resources, structure.ErrorStep(
-            label=step_label, outcome=logic, condition=None
-        )
-
-    if not logic:
-        return resources, structure.ErrorStep(
-            label=step_label,
-            outcome=PermFail(
-                message=f"Unable to load '{step_label}', can not prepare Workflow."
-            ),
-            condition=None,
-        )
-
-    input_mapper_spec = step_spec.get("inputs")
-    match prepare_map_expression(
-        cel_env=cel_env, spec=input_mapper_spec, location="spec.configStep.inputs"
-    ):
-        case None:
-            input_mapper = None
-        case celpy.Runner() as input_mapper:
-            used_vars = extract_argument_structure(input_mapper.ast)
-            dynamic_input_keys.update(
-                match.group("name")
-                for match in (STEPS_NAME_PATTERN.match(key) for key in used_vars)
-                if match
-            )
-        case PermFail() as err:
-            return resources, structure.ErrorStep(
-                label=step_label, outcome=err, condition=None
-            )
-
-    condition_spec = step_spec.get("condition")
-    if not condition_spec:
-        condition = None
-    else:
-        condition = structure.StepConditionSpec(
-            type_=condition_spec.get("type"),
-            name=condition_spec.get("name"),
-        )
-
-    state_spec = step_spec.get("state")
-    match prepare_map_expression(
-        cel_env=cel_env, spec=state_spec, location="spec.configStep.state"
-    ):
-        case None:
-            state = None
-        case celpy.Runner() as state:
-            used_vars = extract_argument_structure(state.ast)
-            dynamic_input_keys.update(
-                match.group("name")
-                for match in (STEPS_NAME_PATTERN.match(key) for key in used_vars)
-                if match
-            )
-        case PermFail() as err:
-            return resources, structure.ErrorStep(
-                label=step_label, outcome=err, condition=None
-            )
-
-    if dynamic_input_keys:
-        return resources, structure.ErrorStep(
-            label=step_label,
-            outcome=PermFail(
-                message=f"Config step ('{step_label}'), may not reference "
-                f"steps ({dynamic_input_keys}). Can not prepare Workflow."
-            ),
-            condition=None,
-        )
-
-    return resources, structure.ConfigStep(
-        label=step_label,
-        logic=logic,
-        inputs=input_mapper,
-        condition=condition,
-        state=state,
-    )
-
-
 def _load_steps(
     cel_env: celpy.Environment,
     steps_spec: list[dict],
-    config_step_label: str | None = None,
 ) -> tuple[
-    set[LogicRegistryResource], Sequence[structure.Step | structure.ErrorStep], Outcome
+    set[LogicRegistryResource],
+    Sequence[structure.Step | structure.ErrorStep],
+    Outcome,
+    set[str],
 ]:
     if not steps_spec:
-        return set(), [], Ok(None)
+        return set(), [], Ok(None), set()
 
     known_steps: set[str] = set()
-    if config_step_label:
-        known_steps.add(config_step_label)
+    parent_properties: set[str] = set()
 
     resources: set[LogicRegistryResource] = set()
     step_outcomes: list[structure.Step | structure.ErrorStep] = []
@@ -340,8 +222,11 @@ def _load_steps(
                 )
             )
             continue
-        step_resources, step_logic = _load_step(cel_env, step_spec, known_steps)
+        step_resources, step_logic, needed_parent_properties = _load_step(
+            cel_env, step_spec, known_steps
+        )
         known_steps.add(step_label)
+        parent_properties.update(needed_parent_properties)
         step_outcomes.append(step_logic)
         if step_resources:
             resources.update(step_resources)
@@ -351,19 +236,28 @@ def _load_steps(
     ]
 
     if not error_outcomes:
-        return resources, step_outcomes, Ok(None)
+        return resources, step_outcomes, Ok(None), parent_properties
 
-    return resources, step_outcomes, unwrapped_combine(error_outcomes)
+    return (
+        resources,
+        step_outcomes,
+        unwrapped_combine(error_outcomes),
+        parent_properties,
+    )
 
 
 def _load_step(
     cel_env: celpy.Environment, step_spec: dict, known_steps: set[str]
-) -> tuple[set[LogicRegistryResource] | None, structure.Step | structure.ErrorStep]:
+) -> tuple[
+    set[LogicRegistryResource] | None, structure.Step | structure.ErrorStep, set[str]
+]:
     step_label = step_spec.get("label", "<missing label>")
 
     step_location = f"spec.steps['{step_label}']"
 
-    dynamic_input_keys = set()
+    needed_steps = set()
+    needed_parent_properties = set()
+
     resources = None
     logic = None
 
@@ -371,13 +265,17 @@ def _load_step(
     logic_ref_switch = step_spec.get("refSwitch")
     if logic_ref and logic_ref_switch:
         # This should never happen due to schema validation
-        return None, structure.ErrorStep(
-            label=step_label,
-            outcome=PermFail(
-                message=f"spec.steps['{step_label}'] may not specify both `ref` and `refSwitch`, can not prepare Workflow.",
-                location=step_location,
+        return (
+            None,
+            structure.ErrorStep(
+                label=step_label,
+                outcome=PermFail(
+                    message=f"spec.steps['{step_label}'] may not specify both `ref` and `refSwitch`, can not prepare Workflow.",
+                    location=step_location,
+                ),
+                condition=None,
             ),
-            condition=None,
+            needed_parent_properties,
         )
 
     if logic_ref:
@@ -387,39 +285,54 @@ def _load_step(
             cel_env=cel_env, logic_switch=logic_ref_switch, location=step_location
         )
         if is_unwrapped_ok(logic):
-            dynamic_input_keys.update(
+            arg_structure = extract_argument_structure(logic.switch_on.ast)
+
+            needed_parent_properties.update(
                 match.group("name")
-                for match in (
-                    STEPS_NAME_PATTERN.match(key)
-                    for key in extract_argument_structure(logic.switch_on.ast)
-                )
+                for match in (PARENT_NAME_PATTERN.match(key) for key in arg_structure)
+                if match
+            )
+
+            needed_steps.update(
+                match.group("name")
+                for match in (STEPS_NAME_PATTERN.match(key) for key in arg_structure)
                 if match
             )
 
     if step_label == "<missing label>":
         # Note, this should be impossible due to schema validation.
-        return resources, structure.ErrorStep(
-            label="missing",
-            outcome=PermFail(
-                message="Missing step-label, can not prepare Workflow.",
-                location=step_location,
+        return (
+            resources,
+            structure.ErrorStep(
+                label="missing",
+                outcome=PermFail(
+                    message="Missing step-label, can not prepare Workflow.",
+                    location=step_location,
+                ),
+                condition=None,
             ),
-            condition=None,
+            needed_parent_properties,
         )
 
     if not is_unwrapped_ok(logic):
-        return resources, structure.ErrorStep(
-            label=step_label, outcome=logic, condition=None
+        return (
+            resources,
+            structure.ErrorStep(label=step_label, outcome=logic, condition=None),
+            needed_parent_properties,
         )
 
     if not logic:
-        return resources, structure.ErrorStep(
-            label=step_label,
-            outcome=PermFail(
-                message=f"Unable to load Logic for step ({step_label}), can not prepare Workflow.",
-                location=step_location,
+        return (
+            resources,
+            structure.ErrorStep(
+                label=step_label,
+                outcome=PermFail(
+                    message=f"Unable to load Logic for step ({step_label}), can not prepare Workflow.",
+                    location=step_location,
+                ),
+                condition=None,
             ),
-            condition=None,
+            needed_parent_properties,
         )
 
     skip_if_spec = step_spec.get("skipIf")
@@ -427,51 +340,83 @@ def _load_step(
         cel_env=cel_env, spec=skip_if_spec, location=f"{step_location}.skipIf"
     ):
         case PermFail() as failure:
-            return resources, structure.ErrorStep(
-                label=step_label,
-                outcome=failure,
-                condition=None,
+            return (
+                resources,
+                structure.ErrorStep(
+                    label=step_label,
+                    outcome=failure,
+                    condition=None,
+                ),
+                needed_parent_properties,
             )
         case None:
             skip_if = None
         case celpy.Runner() as skip_if:
-            dynamic_input_keys.update(
+            arg_structure = extract_argument_structure(skip_if.ast)
+
+            needed_parent_properties.update(
                 match.group("name")
-                for match in (
-                    STEPS_NAME_PATTERN.match(key)
-                    for key in extract_argument_structure(skip_if.ast)
-                )
+                for match in (PARENT_NAME_PATTERN.match(key) for key in arg_structure)
+                if match
+            )
+
+            needed_steps.update(
+                match.group("name")
+                for match in (STEPS_NAME_PATTERN.match(key) for key in arg_structure)
                 if match
             )
 
     for_each_spec = step_spec.get("forEach")
     match _prepare_for_each(cel_env=cel_env, step_label=step_label, spec=for_each_spec):
         case structure.ErrorStep() as error:
-            return resources, error
+            return resources, error, needed_parent_properties
         case None:
             for_each = None
         case (structure.ForEach() as for_each, for_each_input_keys):
-            dynamic_input_keys.update(for_each_input_keys)
+            needed_parent_properties.update(
+                match.group("name")
+                for match in (
+                    PARENT_NAME_PATTERN.match(key) for key in for_each_input_keys
+                )
+                if match
+            )
+
+            needed_steps.update(
+                match.group("name")
+                for match in (
+                    STEPS_NAME_PATTERN.match(key) for key in for_each_input_keys
+                )
+                if match
+            )
 
     input_mapper_spec = step_spec.get("inputs")
     match prepare_map_expression(
         cel_env=cel_env, spec=input_mapper_spec, location=f"{step_location}.inputs"
     ):
         case PermFail() as failure:
-            return resources, structure.ErrorStep(
-                label=step_label,
-                outcome=failure,
-                condition=None,
+            return (
+                resources,
+                structure.ErrorStep(
+                    label=step_label,
+                    outcome=failure,
+                    condition=None,
+                ),
+                needed_parent_properties,
             )
         case None:
             input_mapper = None
         case celpy.Runner() as input_mapper:
-            dynamic_input_keys.update(
+            arg_structure = extract_argument_structure(input_mapper.ast)
+
+            needed_parent_properties.update(
                 match.group("name")
-                for match in (
-                    STEPS_NAME_PATTERN.match(key)
-                    for key in extract_argument_structure(input_mapper.ast)
-                )
+                for match in (PARENT_NAME_PATTERN.match(key) for key in arg_structure)
+                if match
+            )
+
+            needed_steps.update(
+                match.group("name")
+                for match in (STEPS_NAME_PATTERN.match(key) for key in arg_structure)
                 if match
             )
 
@@ -491,41 +436,58 @@ def _load_step(
         case None:
             state = None
         case celpy.Runner() as state:
-            dynamic_input_keys.update(
+            arg_structure = extract_argument_structure(state.ast)
+
+            needed_parent_properties.update(
                 match.group("name")
-                for match in (
-                    STEPS_NAME_PATTERN.match(key)
-                    for key in extract_argument_structure(state.ast)
-                )
+                for match in (PARENT_NAME_PATTERN.match(key) for key in arg_structure)
+                if match
+            )
+
+            needed_steps.update(
+                match.group("name")
+                for match in (STEPS_NAME_PATTERN.match(key) for key in arg_structure)
                 if match
             )
         case PermFail() as failure:
-            return resources, structure.ErrorStep(
-                label=step_label,
-                outcome=failure,
-                condition=None,
+            return (
+                resources,
+                structure.ErrorStep(
+                    label=step_label,
+                    outcome=failure,
+                    condition=None,
+                ),
+                needed_parent_properties,
             )
 
-    out_of_order_steps = dynamic_input_keys.difference(known_steps)
+    out_of_order_steps = needed_steps.difference(known_steps)
     if out_of_order_steps:
-        return resources, structure.ErrorStep(
-            label=step_label,
-            outcome=PermFail(
-                message=f"Step '{step_label}', must come after {', '.join(out_of_order_steps)}.",
-                location=step_location,
+        return (
+            resources,
+            structure.ErrorStep(
+                label=step_label,
+                outcome=PermFail(
+                    message=f"Step '{step_label}', must come after {', '.join(out_of_order_steps)}.",
+                    location=step_location,
+                ),
+                condition=None,
             ),
-            condition=None,
+            needed_parent_properties,
         )
 
-    return resources, structure.Step(
-        label=step_label,
-        logic=logic,
-        skip_if=skip_if,
-        for_each=for_each,
-        inputs=input_mapper,
-        dynamic_input_keys=tuple(dynamic_input_keys),
-        condition=condition,
-        state=state,
+    return (
+        resources,
+        structure.Step(
+            label=step_label,
+            logic=logic,
+            skip_if=skip_if,
+            for_each=for_each,
+            inputs=input_mapper,
+            dynamic_input_keys=needed_steps,
+            condition=condition,
+            state=state,
+        ),
+        needed_parent_properties,
     )
 
 
@@ -560,7 +522,7 @@ def _prepare_for_each(
                 condition=None,
             )
         case celpy.Runner() as source_iterator:
-            used_vars = extract_argument_structure(source_iterator.ast)
+            dynamic_input_keys = extract_argument_structure(source_iterator.ast)
 
     input_key = spec.get("inputKey")
     if not input_key:
@@ -580,12 +542,6 @@ def _prepare_for_each(
             type_=condition_spec.get("type"),
             name=condition_spec.get("name"),
         )
-
-    dynamic_input_keys: set[str] = {
-        match.group("name")
-        for match in (STEPS_NAME_PATTERN.match(key) for key in used_vars)
-        if match
-    }
 
     for_each = structure.ForEach(
         source_iterator=source_iterator,
@@ -716,11 +672,13 @@ def _load_logic_switch(
 
         logic_map[case] = logic
 
-        if (
-            isinstance(logic, (ResourceFunction, ValueFunction))
-            and logic.dynamic_input_keys
-        ):
-            dynamic_input_keys.update(logic.dynamic_input_keys)
+        if is_unwrapped_ok(logic):
+            if isinstance(logic, structure.Workflow):
+                dynamic_input_keys.update(
+                    f"inputs.{input}" for input in logic.dynamic_input_keys
+                )
+            else:
+                dynamic_input_keys.update(logic.dynamic_input_keys)
 
         if is_default:
             default_logic = logic

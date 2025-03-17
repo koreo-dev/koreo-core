@@ -62,7 +62,6 @@ async def reconcile_workflow(
     outcomes, conditions, step_state, state_errors = await _reconcile_steps(
         api=api,
         workflow_key=workflow_key,
-        config_step=workflow.config_step,
         steps=workflow.steps,
         owner=owner,
         trigger=trigger,
@@ -99,63 +98,14 @@ class StepResult(NamedTuple):
     resource_ids: ResourceIds = None
 
 
-async def _reconcile_config_step(
-    api: kr8s.Api,
-    workflow_key: str,
-    step: structure.ConfigStep | structure.ErrorStep,
-    owner: tuple[str, dict],
-    trigger: celtypes.Value,
-) -> StepResult:
-    location = f"{workflow_key}.spec.configStep"
-
-    if isinstance(step, structure.ErrorStep):
-        return StepResult(result=step.outcome)
-
-    if not result.is_unwrapped_ok(step.logic):
-        return StepResult(result=step.logic)
-
-    if not step.inputs:
-        inputs = celtypes.MapType()
-
-    else:
-        inputs = evaluate(
-            expression=step.inputs,
-            inputs={"parent": trigger},
-            location=f"{location}.inputs",
-        )
-        if not result.is_unwrapped_ok(inputs):
-            return StepResult(result=inputs)
-
-    if not isinstance(inputs, celtypes.MapType):
-        return StepResult(
-            result=result.PermFail(
-                message=f"Bad inputs type {type(inputs)}, expected map-type",
-                location=f"{location}.inputs",
-            )
-        )
-
-    inputs[celtypes.StringType("parent")] = trigger
-
-    return await _reconcile_step_logic(
-        api=api,
-        workflow_key=workflow_key,
-        location=location,
-        logic=step.logic,
-        owner=owner,
-        inputs=inputs,
-        steps_input=celtypes.MapType(),
-    )
-
-
 async def _reconcile_steps(
     api: kr8s.Api,
     workflow_key: str,
     owner: tuple[str, dict],
     trigger: celtypes.Value,
-    config_step: structure.ConfigStep | structure.ErrorStep | None,
     steps: Sequence[structure.Step | structure.ErrorStep],
 ) -> tuple[dict[str, StepResult], list[Condition], celtypes.MapType, dict[str, str]]:
-    if not (config_step or steps):
+    if not steps:
         return {}, [], celtypes.MapType({}), {}
 
     outcome_map: dict[
@@ -165,22 +115,6 @@ async def _reconcile_steps(
 
     try:
         async with asyncio.timeout(STEP_TIMEOUT), asyncio.TaskGroup() as task_group:
-            if config_step:
-                task_map[config_step.label] = task_group.create_task(
-                    _reconcile_config_step(
-                        api=api,
-                        workflow_key=workflow_key,
-                        step=config_step,
-                        owner=owner,
-                        trigger=trigger,
-                    ),
-                    name=config_step.label,
-                )
-                outcome_map[config_step.label] = (
-                    config_step.condition,
-                    config_step.state,
-                )
-
             if steps:
                 for step in steps:
                     match step:
@@ -200,6 +134,7 @@ async def _reconcile_steps(
                             workflow_key=workflow_key,
                             step=step,
                             owner=owner,
+                            trigger=trigger,
                             dependencies=step_dependencies,
                         ),
                         name=step.label,
@@ -301,6 +236,7 @@ async def _reconcile_step(
     api: kr8s.Api,
     workflow_key: str,
     step: structure.Step | structure.ErrorStep,
+    trigger: celtypes.Value,
     dependencies: list[asyncio.Task[StepResult]],
     owner: tuple[str, dict],
 ) -> StepResult:
@@ -310,19 +246,24 @@ async def _reconcile_step(
         return StepResult(result=step.outcome)
 
     if not dependencies:
+        workflow_inputs = celtypes.MapType({"parent": trigger})
+
         if not step.inputs:
             inputs = celtypes.MapType()
         else:
             inputs = evaluate(
                 expression=step.inputs,
-                inputs={},
+                inputs=workflow_inputs,
                 location=f"{location}.inputs",
             )
             if not result.is_unwrapped_ok(inputs):
                 return StepResult(result=inputs)
+
         if step.skip_if:
             match evaluate(
-                expression=step.skip_if, inputs=inputs, location=f"{location}.skipIf"
+                expression=step.skip_if,
+                inputs=workflow_inputs,
+                location=f"{location}.skipIf",
             ):
                 case result.PermFail() as err:
                     return StepResult(result=err)
@@ -345,8 +286,8 @@ async def _reconcile_step(
                 workflow_key=workflow_key,
                 location=location,
                 step=step,
-                steps_input=celtypes.MapType(),
                 owner=owner,
+                workflow_inputs=workflow_inputs,
                 inputs=inputs,
             )
         else:
@@ -356,8 +297,8 @@ async def _reconcile_step(
                 location=location,
                 logic=step.logic,
                 owner=owner,
+                workflow_inputs=workflow_inputs,
                 inputs=inputs,
-                steps_input=celtypes.MapType(),
             )
 
     # TODO: Error handling review
@@ -417,13 +358,18 @@ async def _reconcile_step(
                 # This should be an UnwrappedOutcome (Ok)
                 ok_outcomes[celtypes.StringType(step_label)] = data
 
-    steps_input: dict[str, celtypes.Value] = {"steps": ok_outcomes}
+    workflow_inputs: dict[str, celtypes.Value] = celtypes.MapType(
+        {
+            "steps": ok_outcomes,
+            "parent": trigger,
+        }
+    )
     if not step.inputs:
         inputs = celtypes.MapType()
     else:
         inputs = evaluate(
             expression=step.inputs,
-            inputs=steps_input,
+            inputs=workflow_inputs,
             location=f"{location}.inputs",
         )
         if not result.is_unwrapped_ok(inputs):
@@ -432,7 +378,7 @@ async def _reconcile_step(
     if step.skip_if:
         match evaluate(
             expression=step.skip_if,
-            inputs=steps_input,
+            inputs=workflow_inputs,
             location=f"{location}.skipIf",
         ):
             case result.PermFail() as err:
@@ -454,7 +400,7 @@ async def _reconcile_step(
             workflow_key=workflow_key,
             location=location,
             step=step,
-            steps_input=steps_input,
+            workflow_inputs=workflow_inputs,
             owner=owner,
             inputs=inputs,
         )
@@ -466,7 +412,7 @@ async def _reconcile_step(
             logic=step.logic,
             owner=owner,
             inputs=inputs,
-            steps_input=steps_input,
+            workflow_inputs=workflow_inputs,
         )
 
 
@@ -475,7 +421,7 @@ async def _reconcile_ref_switch(
     workflow_key: str,
     owner: tuple[str, dict],
     logic_switch: structure.LogicSwitch,
-    steps_input: celtypes.MapType,
+    workflow_inputs: celtypes.MapType,
     inputs: celtypes.Value,
     location: str,
 ):
@@ -484,7 +430,7 @@ async def _reconcile_ref_switch(
     # `steps`, but also to the step's `inputs`. In addition to possible
     # convenience, this gives the switch access to the iterated values from a
     # for-each expansion.
-    switch_on_inputs: dict[str, celtypes.Value] = {"inputs": inputs} | steps_input
+    switch_on_inputs: dict[str, celtypes.Value] = {"inputs": inputs} | workflow_inputs
 
     match evaluate(
         expression=logic_switch.switch_on,
@@ -526,7 +472,7 @@ async def _reconcile_ref_switch(
         workflow_key=workflow_key,
         owner=owner,
         inputs=inputs,
-        steps_input=steps_input,
+        workflow_inputs=workflow_inputs,
         location=f"{location}['{switch_value}']",
         logic=logic,
     )
@@ -537,7 +483,7 @@ async def _reconcile_step_logic(
     workflow_key: str,
     owner: tuple[str, dict],
     inputs: celtypes.Value,
-    steps_input: celtypes.MapType,
+    workflow_inputs: celtypes.MapType,
     location: str,
     logic: (
         structure.ResourceFunction
@@ -591,7 +537,7 @@ async def _reconcile_step_logic(
                 workflow_key=workflow_key,
                 owner=owner,
                 logic_switch=logic,
-                steps_input=steps_input,
+                workflow_inputs=workflow_inputs,
                 inputs=inputs,
                 location=f"{location}.refSwitch",
             )
@@ -604,15 +550,15 @@ async def _for_each_reconciler(
     step: structure.Step,
     workflow_key: str,
     location: str,
-    steps_input: celtypes.MapType,
     owner: tuple[str, dict],
+    workflow_inputs: celtypes.MapType,
     inputs: celtypes.Value,
 ) -> StepResult:
     assert step.for_each
 
     match evaluate(
         expression=step.for_each.source_iterator,
-        inputs=steps_input,
+        inputs=workflow_inputs,
         location=f"{step.label}.forEach.itemIn",
     ):
         case result.PermFail() as failure:
@@ -648,7 +594,7 @@ async def _for_each_reconciler(
                             logic=step.logic,
                             owner=owner,
                             inputs=iterated_inputs,
-                            steps_input=steps_input,
+                            workflow_inputs=workflow_inputs,
                         ),
                         name=f"{step.label}-{idx}",
                     )

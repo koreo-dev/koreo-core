@@ -20,16 +20,6 @@ class StepConditionSpec(NamedTuple):
     name: str
 
 
-class ConfigStep(NamedTuple):
-    label: str
-    logic: ResourceFunction | ValueFunction | Workflow
-
-    inputs: celpy.Runner | None
-
-    condition: StepConditionSpec | None
-    state: celpy.Runner | None
-
-
 class LogicSwitch(NamedTuple):
     switch_on: celpy.Runner
     logic_map: dict[str | int, ResourceFunction | ValueFunction | Workflow]
@@ -49,7 +39,7 @@ class Step(NamedTuple):
     condition: StepConditionSpec | None
     state: celpy.Runner | None
 
-    dynamic_input_keys: Sequence[str]
+    dynamic_input_keys: set[str]
 
 
 class ForEach(NamedTuple):
@@ -71,5 +61,6 @@ class Workflow(NamedTuple):
     crd_ref: ConfigCRDRef | None
 
     steps_ready: Outcome
-    config_step: ConfigStep | ErrorStep | None
     steps: Sequence[Step | ErrorStep]
+
+    dynamic_input_keys: set[str]

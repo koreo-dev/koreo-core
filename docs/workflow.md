@@ -33,10 +33,10 @@ and manages the "external" (to that Logic's body) state interactions.
 |  *`    apiGroup`*:            | |
 |  *`    version`*:             | |
 |  *`    kind`*:                | |
-|  *`  configStep`*:            | _Optional_ Acts as the entry-point and will be provided with the trigger values as `inputs.parent`. |
-|  *`    label`*:               | _Optional_ Defaults to `config`, this is the name other steps can use to reference this step's return value. |
-|  *`    ref`*:                 | A reference to the Logic to be run. Either `ref` or `refSwitch` must be provided. |
-| **`      kind`**:             | `ValueFunction`, `ResourceFunction`, or `Workflow`. Using a `ValueFunction` is usually recommended for `configStep`. |
+| **`  steps`**:                | A collection of Functions or `Workflows` that provide the Logic. |
+| **`  - label`**:              | Name of the step, must be alphanumeric and may contain underscores. Other steps will use this value to reference this step's return value. |
+|  *`    ref`*:                 | A reference to the Logic to be run. May not be specified with `refSwitch`. |
+| **`      kind`**:             | `ValueFunction`, `ResourceFunction`, or `Workflow` |
 | **`      name`**:             | Name of the Function to use. |
 |  *`    refSwitch`*:           | Allows selection of the Logic to be run, but requires all to share an interface. Either `ref` or `refSwitch` must be provided. |
 | **`      switchOn`**:         | An expression who's value determines the Logic to run. Has access to `steps` and `inputs` at evaluation time. Must be a string. |
@@ -45,16 +45,6 @@ and manages the "external" (to that Logic's body) state interactions.
 |  *`        default`*:         | One case may be specified as the default if no other cases are an exact match. |
 | **`        kind`**:           | `ValueFunction`, `ResourceFunction`, or `Workflow`. |
 | **`        name`**:           | Name of the Function to use. |
-|  *`    inputs:`*: **`{}`**    | _Optional_ If provided, must be an object that specifies input values to the Logic. Koreo Expressions may be used. |
-|  *`    condition`*:           | _Optional_ The result of the Logic will be set as a `status.condition` on the trigger object.|
-| **`      type`**:             | The condition's "key", must be PascalCase. |
-| **`      name`**:             | A short, descriptive name used within condition messages. |
-|  *`    state:`*: **`{}`**     | _Optional_ If provided, must be an object that specifies values to be set on the trigger object. The return value from the Logic is accessible within `value`. Subsequent steps _may_ replace the values if the keys match. |
-| **`  steps`**:                | A collection of Functions or `Workflows` that provide the Logic. |
-| **`  - label`**:              | Name of the step, must be alphanumeric and may contain underscores. Other steps will use this value to reference this step's return value. |
-| **`    ref`**:                | A reference to the Logic to be run. |
-| **`      kind`**:             | `ValueFunction`, `ResourceFunction`, or `Workflow` |
-| **`      name`**:             | Name of the Function to use. |
 |  *`    skipIf`*:              | _Optional_ Provide a test to determine if the step should be run. This may be a Koreo Expression which has access to `steps` at evaluation time. |
 |  *`    forEach`*:             | Allows for "mapping" over a list of values. |
 | **`      itemIn`**: **`=[]`** | This must be a Koreo Expression that evaluates to a list. Each item will be mapped to the `inputKey`, and the Logic will be invoked once for each item. |
@@ -87,26 +77,6 @@ We refer to the _instance_ of the `spec.crdRef` object which _triggers_ a
 > controlled by another controller. Instead create your own CRDs. Koreo
 > Developer Tooling provides a tool to generate a CRD from a `Workflow`.
 
-### `spec.configStep`: Defining the entry-point
-
-This is a special step intended to define the entry-point for a `Workflow`.
-`spec.configStep` shares most of the same options as other `spec.steps`.
-
-The most important different is that the 'parent' will be provided to this step
-as `inputs.parent`. This enables validation of configuration and provides the
-ability to construct a well-structured, validated "config" that will be
-available to other steps. It also helps to prevent accidental tight-coupling of
-logic to a specific CRD. In practice we have found this to result in more
-maintainable and reusable Functions.
-
-The second difference is that this step is provided a default label: "config".
-That means, unless changed, you may provide its return value as an input to
-other steps by setting a key within their `inputs` to `=steps.config`.
-
-Lastly, `spec.configStep` does not support `forEach`, `refSwitch`, or `skipIf`.
-
-The remaining options share the same behavior as `spec.steps` values.
-
 ### `spec.steps`: Defining the Logic
 
 Each "step" defines some Logic to be called, specifies the inputs the Logic is
@@ -123,9 +93,12 @@ implement a compatible interface—this is discussed in more detail below.
 
 Steps also specify `inputs` to be provided to the Logic. For Functions, the
 inputs are directly accessible within `inputs`. For `Workflows`, the inputs are
-exposed under `inputs.parent`. That enables a `Workflow` to be directly
-triggered via a `crdRef` _or_ it may be directly called as a sub-workflow. That
-makes reuse and testing of `Workflows` easier.
+exposed under `parent`. That enables a `Workflow` to be directly triggered via
+a `crdRef` _or_ it may be directly called as a sub-workflow. That makes reuse
+and testing of `Workflows` easier.
+
+The `Workflow` may pass input values from prior steps using `steps`. Values
+from the parent object may be passed using `parent`.
 
 A step may also specify a `forEach` block, which will cause the Logic to be
 executed once per item in the `forEach.itemIn` list. Each item will be provided
@@ -189,14 +162,6 @@ spec:
     version: v1beta1
     kind: TriggerDummy
 
-  # The 'parent' object's `metadata` and `spec`, will be passed to this
-  # ValueFunction as `inputs.parent`, and the return value of this Function
-  # will be available to other steps as `steps.config`.
-  configStep:
-    ref:
-      kind: ValueFunction
-      name: simple-example-config.v1
-
   # Steps may be run once all steps they reference have been run. To help make
   # the sequencing clearer, you are required to list steps after any step(s)
   # they reference. Note that steps may run concurrently as their dependencies
@@ -207,6 +172,17 @@ spec:
     # `steps.simple_return_value`. If a step does not return successfully, then
     # any step referencing it will automatically be skipped and marked as
     # `depSkip`.
+    # The 'parent' object's `metadata` and `spec`, will be passed to this
+    # ValueFunction as `inputs.parent`, and the return value of this Function
+    # will be available to other steps as `steps.config`.
+    - label: config
+      ref:
+        kind: ValueFunction
+        name: simple-example-config.v1
+      inputs:
+        string: =parent.spec.string
+        int: =parent.spec.int
+
     - label: simple_return_value
 
       # The Logic to be run.

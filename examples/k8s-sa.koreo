@@ -15,37 +15,41 @@ spec:
     version: v1alpha8
     kind: TriggerDummy
 
-  configStep:
+  steps:
+  - label: config
     ref:
       kind: ValueFunction
       name: service-account-config.v1
+    inputs:
+      metadata: =parent.metadata
+      name: =parent.spec.name
+      resources: =parent.spec.resources
 
-  steps:
-    - label: service_account
-      ref:
-        kind: ResourceFunction
-        name: deployment-service-account.v1
-      inputs:
-        metadata: =steps.config.metadata
-      state:
-        ref: =resource.self_ref()
+  - label: service_account
+    ref:
+      kind: ResourceFunction
+      name: deployment-service-account.v1
+    inputs:
+      metadata: =steps.config.metadata
+    state:
+      ref: =resource.self_ref()
 
-    - label: role
-      ref:
-        kind: ResourceFunction
-        name: deployment-service-account-role.v1
-      inputs:
-        metadata: =steps.config.metadata
-        resources: =steps.config.resources
+  - label: role
+    ref:
+      kind: ResourceFunction
+      name: deployment-service-account-role.v1
+    inputs:
+      metadata: =steps.config.metadata
+      resources: =steps.config.resources
 
-    - label: binding
-      ref:
-        kind: ResourceFunction
-        name: deployment-service-account-binding.v1
-      inputs:
-        metadata: =steps.config.metadata
-        service_account: =steps.service_account
-        role: =steps.role
+  - label: binding
+    ref:
+      kind: ResourceFunction
+      name: deployment-service-account-binding.v1
+    inputs:
+      metadata: =steps.config.metadata
+      service_account: =steps.service_account
+      role: =steps.role
 ---
 apiVersion: koreo.dev/v1beta1
 kind: ValueFunction
@@ -54,13 +58,13 @@ metadata:
   namespace: koreo-demo
 spec:
   locals:
-    service_account: =inputs.parent.spec.name + "-workload"
+    service_account: =inputs.name + "-workload"
 
   return:
     metadata:
       name: =locals.service_account
-      namespace: =inputs.parent.metadata.namespace
-    resources: =inputs.parent.spec.resources
+      namespace: =inputs.metadata.namespace
+    resources: =inputs.resources
 ---
 apiVersion: koreo.dev/v1beta1
 kind: FunctionTest
@@ -73,16 +77,14 @@ spec:
     name: service-account-config.v1
 
   inputs:
-    parent:
-      metadata:
-        namespace: test-namespace
-      spec:
-        name: test-account
-        resources:
-          - kind: secret
-            name: test-secret
-          - kind: configmap
-            name: test-configmap
+    metadata:
+      namespace: test-namespace
+    name: test-account
+    resources:
+      - kind: secret
+        name: test-secret
+      - kind: configmap
+        name: test-configmap
 
   testCases:
    - expectReturn:

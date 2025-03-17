@@ -14,84 +14,95 @@ spec:
     version: v1alpha8
     kind: TriggerDummy
 
-  configStep:
+  steps:
+  - label: config
     ref:
       kind: ValueFunction
       name: config-test.v1
+    inputs:
+      validators: =parent.spec.validators
+      values: =parent.spec.values
+      use_default: =parent.spec.use_default
+      optional_skips: =parent.spec.optionalSkips
 
-  steps:
-    - label: return_value
-      ref:
-        kind: ValueFunction
-        name: return-test.v1
-      inputs:
+  - label: return_value
+    ref:
+      kind: ValueFunction
+      name: return-test.v1
+    inputs:
+      string: =steps.config.string
+      int: =steps.config.int
+    state:
+      config:
+        nested_string: =value.nested.a_string
+        empty_list: =value.empties.emptyList
+
+  - label: resource_reader
+    ref:
+      kind: ResourceFunction
+      name: resource-reader.v1
+    inputs:
+      name: resource-function-test
+      validators:
+        skip: false
+        depSkip: false
+        permFail: false
+        retry: false
+        ok: false
+      values:
         string: =steps.config.string
         int: =steps.config.int
-      state:
-        config:
-          nested_string: =value.nested.a_string
-          empty_list: =value.empties.emptyList
-    - label: resource_reader
-      ref:
-        kind: ResourceFunction
-        name: resource-reader.v1
-      inputs:
-        name: resource-function-test
-        validators:
-          skip: false
-          depSkip: false
-          permFail: false
-          retry: false
-          ok: false
-        values:
-          string: =steps.config.string
-          int: =steps.config.int
-      state: {}
-    - label: resource_factory
-      ref:
-        kind: ResourceFunction
-        name: resource-factory.v1
-      forEach:
-        itemIn: =["a", "b", "c"]
-        inputKey: suffix
-      inputs:
-        name: resource-function-test
-        validators:
-          skip: false
-          depSkip: false
-          permFail: false
-          retry: false
-          ok: false
-        values:
-          string: =steps.config.string
-          int: =steps.config.int
-      state:
-        resources: =value.map(resource, resource.computedInt)
-    - label: resource_value_user
-      ref:
-        kind: ValueFunction
-        name: resource-user-test.v1
-      inputs:
-        computedInt: =steps.resource_reader.computedInt
-        resourceRef: =steps.resource_reader.ref
-    - label: maybe_or_default_example
-      ref:
-        kind: Workflow
-        name: run-or-default.v1
-      inputs:
-        use_default: =steps.config.use_default
-    - label: optional_skips
-      ref:
-        kind: Workflow
-        name: optional-skips.v1
-      inputs:
-        skips: =steps.config.skips
-    - label: combine_optional_skips
-      ref:
-        kind: ValueFunction
-        name: combine-optional-skips.v1
-      inputs:
-        optionals: =steps.optional_skips
+    state: {}
+
+  - label: resource_factory
+    ref:
+      kind: ResourceFunction
+      name: resource-factory.v1
+    forEach:
+      itemIn: =["a", "b", "c"]
+      inputKey: suffix
+    inputs:
+      name: resource-function-test
+      validators:
+        skip: false
+        depSkip: false
+        permFail: false
+        retry: false
+        ok: false
+      values:
+        string: =steps.config.string
+        int: =steps.config.int
+    state:
+      resources: =value.map(resource, resource.computedInt)
+
+  - label: resource_value_user
+    ref:
+      kind: ValueFunction
+      name: resource-user-test.v1
+    inputs:
+      computedInt: =steps.resource_reader.computedInt
+      resourceRef: =steps.resource_reader.ref
+
+  - label: maybe_or_default_example
+    ref:
+      kind: Workflow
+      name: run-or-default.v1
+    inputs:
+      use_default: =steps.config.use_default
+
+  - label: optional_skips
+    ref:
+      kind: Workflow
+      name: optional-skips.v1
+    inputs:
+      skips: =steps.config.skips
+
+  - label: combine_optional_skips
+    ref:
+      kind: ValueFunction
+      name: combine-optional-skips.v1
+    inputs:
+      optionals: =steps.optional_skips
 ---
 apiVersion: koreo.dev/v1beta1
 kind: Workflow
@@ -99,30 +110,34 @@ metadata:
   name: run-or-default.v1
   namespace: koreo-testing
 spec:
-  configStep:
+
+  steps:
+  - label: config
     ref:
       kind: ValueFunction
       name: maybe-or-default-config-test.v1
+    inputs:
+      parent: =parent
 
-  steps:
-    - label: maybe_return_value
-      ref:
-        kind: ValueFunction
-        name: maybe-return-value.v1
-      inputs:
-        use_default: =steps.config.use_default
-        value: Non-default Return Value
-      state:
-        value: =value.value
-    - label: default_return_value
-      ref:
-        kind: ValueFunction
-        name: maybe-default-return-value.v1
-      inputs:
-        use_default: =steps.config.use_default
-        value: Default Return Value
-      state:
-        value: =value.value
+  - label: maybe_return_value
+    ref:
+      kind: ValueFunction
+      name: maybe-return-value.v1
+    inputs:
+      use_default: =steps.config.use_default
+      value: Non-default Return Value
+    state:
+      value: =value.value
+
+  - label: default_return_value
+    ref:
+      kind: ValueFunction
+      name: maybe-default-return-value.v1
+    inputs:
+      use_default: =steps.config.use_default
+      value: Default Return Value
+    state:
+      value: =value.value
 ---
 apiVersion: koreo.dev/v1beta1
 kind: Workflow
@@ -130,13 +145,15 @@ metadata:
   name: optional-skips.v1
   namespace: koreo-testing
 spec:
-  configStep:
-    ref:
-      kind: ValueFunction
-      name: optional-skip-config.v1
-    state: {}
-
   steps:
+    - label: config
+      ref:
+        kind: ValueFunction
+        name: optional-skip-config.v1
+      inputs:
+       parent: =parent
+      state: {}
+
     - label: option_one
       ref:
         kind: ValueFunction
@@ -146,6 +163,7 @@ spec:
         should_skip: =steps.config.skips.one
       state:
         one: =value.value
+
     - label: option_two
       ref:
         kind: ValueFunction
@@ -155,6 +173,7 @@ spec:
         should_skip: =steps.config.skips.two
       state:
         two: =value.value
+
     - label: option_three
       ref:
         kind: ValueFunction

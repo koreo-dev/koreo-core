@@ -26,8 +26,8 @@ spec:
                   type: object
                   description: |
                     Optionally specify a Resource that will cause this Workflow
-                    to run. The triggering-object will be passed to the
-                    `configStep` as `inputs.parent`.
+                    to run. The triggering-object is available to pass as an
+                    input as `parent`.
                   properties:
                     apiGroup:
                       type: string
@@ -39,100 +39,6 @@ spec:
                       type: string
                       nullable: false
                   required: [apiGroup, version, kind]
-                configStep:
-                  nullable: false
-                  type: object
-                  description: |
-                    The entry-point for this Workflow. The triggering-object
-                    will be passed as `inputs.parent`. Though not required, it
-                    is _almost_ always required in order to process a
-                    configuration that provides context to the remaining steps
-                    such as a unique name.
-                  properties:
-                    label:
-                      type: string
-                      nullable: false
-                      default: config
-                      description: |
-                        The name other steps may use to access this step's
-                        return value or to express dependence on this step.
-                        This is an identifier it must be alphanumeric
-                        (including underscores). Defaults to `config`.
-                      minLength: 3
-                      maxLength: 45
-                      x-kubernetes-validations:
-                      - rule: self.matches("^[[:word:]]+$")
-                        message: labels must be alphanumeric + underscores
-                    ref:
-                      type: object
-                      nullable: false
-                      description: |
-                        The Function or Workflow to run as the Logic. This
-                        Logic will be passed the triggering-object as
-                        `inputs.parent`.
-                      properties:
-                        kind:
-                          type: string
-                          nullable: false
-                          enum: [ResourceFunction, ValueFunction, Workflow]
-                        name:
-                          type: string
-                          nullable: false
-                      required: [kind, name]
-                    inputs:
-                      type: object
-                      nullable: false
-                      description: |
-                        The inputs to be provided to the Logic. `inputs` must
-                        be a map, but static values, arrays, and objects are
-                        allowed. Koreo Expressions are allowed and are
-                        indicated with a leading `=`. Note that no default
-                        inputs are provided aside from `parent`.
-                      x-kubernetes-preserve-unknown-fields: true
-                    condition:
-                      nullable: false
-                      type: object
-                      description: |
-                        Optional configuration for a Condition that will be set
-                        in the triggering-object's `status.conditions` list.
-                      properties:
-                        type:
-                          type: string
-                          nullable: false
-                          maxLength: 40
-                          x-kubernetes-validations:
-                          - rule: self.matches("^[A-Z][a-zA-Z0-9]+$")
-                            message: |
-                              must be PascalCase and contain only alphanumeric chars
-                          description: |
-                            The type for a condition acts as its key. If steps
-                            share type, the condition from last run will be
-                            reported on the parent.
-                        name:
-                          type: string
-                          nullable: false
-                          maxLength: 60
-                          x-kubernetes-validations:
-                          - rule: "!self.startsWith('=')"
-                            message: may not be an expression
-                          description: |
-                            A short, human-meaningful description of what the
-                            step does or manages. It is used within simple
-                            template descriptions to describe the step's
-                            outcome.
-                    state:
-                      type: object
-                      nullable: false
-                      maxProperties: 10
-                      x-kubernetes-preserve-unknown-fields: true
-                      description: |
-                        Defines an object that will be set on the parent's
-                        `status.state`. Useful for surfacing values for
-                        informational or debugging purposes, or to act as a
-                        cache. The `state` objects from all steps are merged,
-                        so if steps shares keys, the values from last step to
-                        run may overwrite earlier values.
-                  required: [ref]
                 steps:
                   nullable: false
                   type: array
@@ -165,10 +71,9 @@ spec:
                         description: |
                           The Function or Workflow to run as the Logic. No
                           default `inputs` are provided to the Logic. For
-                          Workflows, `inputs` are passed to the workflow's
-                          `configStep` as `inputs.parent`, which allows
-                          workflows to be invoked as sub-workflows or by their
-                          `crdRef`.
+                          Workflows, `inputs` are passed as the `parent`, which
+                          allows workflows to be invoked as sub-workflows or by
+                          their `crdRef`.
                         properties:
                           kind:
                             type: string
@@ -184,10 +89,9 @@ spec:
                         description: |
                           Dyanmically select the Function or Workflow to run as
                           the step's Logic. No default `inputs` are provided to
-                          the Logic. For Workflows, `inputs` are passed to the
-                          workflow's `configStep` as `inputs.parent`, which
-                          allows workflows to be invoked as sub-workflows or by
-                          their `crdRef`.
+                          the Logic. For Workflows, `inputs` are passed as the
+                          workflow's `parent`, which allows workflows to be
+                          invoked as sub-workflows or by their `crdRef`.
                         properties:
                           switchOn:
                             type: string

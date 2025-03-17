@@ -10,35 +10,35 @@ metadata:
   namespace: koreo-testing
 spec:
   preconditions:
-  - assert: =inputs.parent.spec.validators.skip
+  - assert: =inputs.validators.skip
     skip:
       message: skip message
 
-  - assert: =inputs.parent.spec.validators.depSkip
+  - assert: =inputs.validators.depSkip
     depSkip:
       message: depSkip message
 
-  - assert: =inputs.parent.spec.validators.permFail
+  - assert: =inputs.validators.permFail
     permFail:
       message: permFail message
 
-  - assert: =inputs.parent.spec.validators.retry
+  - assert: =inputs.validators.retry
     retry:
       message: retry message
       delay: 13
 
-  - assert: =inputs.parent.spec.validators.ok
+  - assert: =inputs.validators.ok
     ok: {}
 
   locals:
-    computed: =inputs.parent.spec.values.string + " local computed"
+    computed: =inputs.values.string + " local computed"
 
   return:
-    string: =inputs.parent.spec.values.string
-    int: =inputs.parent.spec.values.int
+    string: =inputs.values.string
+    int: =inputs.values.int
     local_computed: =locals.computed
-    use_default: =inputs.parent.spec.use_default
-    skips: =inputs.parent.spec.optionalSkips
+    use_default: =inputs.use_default
+    skips: =inputs.optional_skips
 ---
 apiVersion: koreo.dev/v1beta1
 kind: ValueFunction
