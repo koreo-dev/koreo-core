@@ -30,7 +30,6 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                 api_group="tests.koreo.dev", version="v1", kind="TestCase"
             ),
             steps_ready=Ok(None),
-            config_step=None,
             steps=[
                 workflow_structure.Step(
                     label="input_source",
@@ -48,6 +47,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                     state=step_state,
                 )
             ],
+            dynamic_input_keys=set(),
         )
 
         workflow_result = await reconcile.reconcile_workflow(
@@ -91,7 +91,6 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                 api_group="tests.koreo.dev", version="v1", kind="TestCase"
             ),
             steps_ready=Ok(None),
-            config_step=None,
             steps=[
                 workflow_structure.Step(
                     label="sub_step",
@@ -124,6 +123,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                     state=cel_env.program(cel_env.compile("{'sub_step_two': value}")),
                 ),
             ],
+            dynamic_input_keys=set(),
         )
 
         workflow = workflow_structure.Workflow(
@@ -132,7 +132,6 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                 api_group="tests.koreo.dev", version="v1", kind="TestCase"
             ),
             steps_ready=Ok(None),
-            config_step=None,
             steps=[
                 workflow_structure.Step(
                     label="sub_workflow",
@@ -145,6 +144,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                     state=cel_env.program(cel_env.compile("{'sub_workflow': value}")),
                 )
             ],
+            dynamic_input_keys=set(),
         )
 
         workflow_result = await reconcile.reconcile_workflow(
@@ -178,7 +178,6 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                 api_group="tests.koreo.dev", version="v1", kind="TestCase"
             ),
             steps_ready=Ok(None),
-            config_step=None,
             steps=[
                 workflow_structure.Step(
                     label="ok_step_one",
@@ -232,6 +231,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                     ),
                 ),
             ],
+            dynamic_input_keys=set(),
         )
 
         workflow_result = await reconcile.reconcile_workflow(
@@ -270,7 +270,6 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                 api_group="tests.koreo.dev", version="v1", kind="TestCase"
             ),
             steps_ready=Ok(None),
-            config_step=None,
             steps=[
                 workflow_structure.Step(
                     label="single_switch",
@@ -295,6 +294,7 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
                     state=step_state,
                 )
             ],
+            dynamic_input_keys=set(),
         )
 
         workflow_result = await reconcile.reconcile_workflow(

@@ -14,31 +14,33 @@ spec:
     version: v1alpha8
     kind: TriggerDummy
 
-  configStep:
+  steps:
+  - label: config
     ref:
       kind: ValueFunction
       name: update-loop-config.v1
+    inputs:
+      metadata: =parent.metadata
 
-  steps:
-    - label: patcher
-      ref:
-        kind: ResourceFunction
-        name: patch-looper.v1
-      inputs:
-        metadata: =steps.config.metadata
-      condition:
-        type: PatchLooper
-        name: Patch Loop Difference Testing
+  - label: patcher
+    ref:
+      kind: ResourceFunction
+      name: patch-looper.v1
+    inputs:
+      metadata: =steps.config.metadata
+    condition:
+      type: PatchLooper
+      name: Patch Loop Difference Testing
 
-    - label: recreater
-      ref:
-        kind: ResourceFunction
-        name: recreate-looper.v1
-      inputs:
-        metadata: =steps.config.metadata
-      condition:
-        type: RecreateLooper
-        name: Recreate Loop Difference Testing
+  - label: recreater
+    ref:
+      kind: ResourceFunction
+      name: recreate-looper.v1
+    inputs:
+      metadata: =steps.config.metadata
+    condition:
+      type: RecreateLooper
+      name: Recreate Loop Difference Testing
 ---
 apiVersion: koreo.dev/v1beta1
 kind: ValueFunction
@@ -48,8 +50,8 @@ metadata:
 spec:
   return:
     metadata:
-      name: =inputs.parent.metadata.name
-      namespace: =inputs.parent.metadata.namespace
+      name: =inputs.metadata.name
+      namespace: =inputs.metadata.namespace
 ---
 apiVersion: koreo.dev/v1beta1
 kind: ResourceFunction
