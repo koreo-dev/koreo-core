@@ -1,5 +1,5 @@
 [project]
-name = "koreo/koreo-core"
+name = "koreo-core"
 version = "0.1.0"
 description = "Type-safe and testable KRM Templates and Workflows."
 authors = [
