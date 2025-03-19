@@ -26,7 +26,7 @@ jobs:
         run: pipx install pdm
 
       - name: Install dependencies
-        run: pdm install --dev
+        run: pdm sync && pdm install --dev
 
       - name: Run tests
         run: pdm run pytest
