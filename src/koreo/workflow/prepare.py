@@ -1,8 +1,6 @@
 from typing import Sequence
-import asyncio
 import logging
 import re
-import time
 
 import celpy
 
@@ -25,14 +23,7 @@ from koreo.result import (
 )
 from koreo.value_function.structure import ValueFunction
 
-from controller.custom_workflow import start_controller
-
 from . import structure
-from .registry import (
-    index_workflow_custom_crd,
-    unindex_workflow_custom_crd,
-)
-
 
 logger = logging.getLogger("koreo.workflow")
 
@@ -75,29 +66,7 @@ async def prepare_workflow(
             )
         )
 
-    # Update CRD registry and ensure controller is running for the CRD.
     crd_ref = _build_crd_ref(spec.get("crdRef", {}))
-    if not crd_ref:
-        unindex_workflow_custom_crd(workflow=cache_key)
-    else:
-        deletor_name = f"DeleteWorkflow:{cache_key}"
-        if deletor_name not in _DEREGISTERERS:
-            delete_task = asyncio.create_task(
-                _deindex_crd_on_delete(cache_key=cache_key), name=deletor_name
-            )
-            _DEREGISTERERS[deletor_name] = delete_task
-            delete_task.add_done_callback(
-                lambda task: _DEREGISTERERS.__delitem__(task.get_name())
-            )
-
-        index_workflow_custom_crd(
-            workflow=cache_key,
-            custom_crd=f"{crd_ref.api_group}:{crd_ref.kind}:{crd_ref.version}",
-        )
-
-        start_controller(
-            group=crd_ref.api_group, kind=crd_ref.kind, version=crd_ref.version
-        )
 
     return (
         structure.Workflow(
@@ -117,58 +86,6 @@ def _location(cache_key: str, extra: str | None = None) -> str:
         return base
 
     return f"{base}:{extra}"
-
-
-class WorkflowDeleteor: ...
-
-
-_DEREGISTERERS: dict[str, asyncio.Task] = {}
-
-
-async def _deindex_crd_on_delete(cache_key: str):
-    deletor_resource = registry.Resource(
-        resource_type=WorkflowDeleteor, name=cache_key, namespace=None
-    )
-    queue = registry.register(deletor_resource)
-
-    registry.subscribe(
-        subscriber=deletor_resource,
-        resource=registry.Resource(
-            resource_type=structure.Workflow, name=cache_key, namespace=None
-        ),
-    )
-
-    last_event = 0
-    while True:
-        try:
-            event = await queue.get()
-        except (asyncio.CancelledError, asyncio.QueueShutDown):
-            break
-
-        try:
-            match event:
-                case registry.Kill():
-                    break
-                case registry.ResourceEvent(event_time=event_time) if (
-                    event_time >= last_event
-                ):
-                    cached = get_resource_from_cache(
-                        resource_class=structure.Workflow, cache_key=cache_key
-                    )
-
-                    if cached:
-                        continue
-
-                    logger.debug(f"Deregistering CRD watches for Workflow {cache_key}")
-
-                    unindex_workflow_custom_crd(workflow=cache_key)
-
-                    break
-
-        finally:
-            queue.task_done()
-
-    registry.deregister(deletor_resource, deregistered_at=time.monotonic())
 
 
 def _build_crd_ref(crd_ref_spec: dict) -> structure.ConfigCRDRef | None:
