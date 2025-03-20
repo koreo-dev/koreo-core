@@ -7,10 +7,9 @@ import kr8s
 import celpy
 from celpy import celtypes
 
-from resources.k8s.conditions import Condition
-
 from koreo import result
 from koreo.cel.evaluation import evaluate
+from koreo.conditions import Condition
 from koreo.resource_function.reconcile import reconcile_resource_function
 from koreo.value_function.reconcile import reconcile_value_function
 
