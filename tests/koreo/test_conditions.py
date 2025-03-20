@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from unittest.mock import patch
 import unittest
 
-from resources.k8s.conditions import Condition, Conditions, update_condition
+from koreo.conditions import Condition, Conditions, update_condition
 
 
 class TestConditions(unittest.TestCase):
@@ -17,7 +17,7 @@ class TestConditions(unittest.TestCase):
         )
 
         frozen_now = datetime.now(UTC)
-        with patch("resources.k8s.conditions.datetime") as frozen_now_datetime:
+        with patch("koreo.conditions.datetime") as frozen_now_datetime:
             frozen_now_datetime.now.return_value = frozen_now
             updated_conditions = update_condition(
                 conditions=conditions, condition=update
@@ -51,7 +51,7 @@ class TestConditions(unittest.TestCase):
         )
 
         insert_frozen_now = datetime.now(UTC)
-        with patch("resources.k8s.conditions.datetime") as frozen_now_datetime:
+        with patch("koreo.conditions.datetime") as frozen_now_datetime:
             frozen_now_datetime.now.return_value = insert_frozen_now
 
             updated_conditions = update_condition(
@@ -59,7 +59,7 @@ class TestConditions(unittest.TestCase):
             )
 
         update_frozen_now = datetime.now(UTC)
-        with patch("resources.k8s.conditions.datetime") as frozen_now_datetime:
+        with patch("koreo.conditions.datetime") as frozen_now_datetime:
             frozen_now_datetime.now.return_value = update_frozen_now
 
             updated_conditions = update_condition(
@@ -105,7 +105,7 @@ class TestConditions(unittest.TestCase):
         )
 
         new_frozen_now = datetime.now(UTC)
-        with patch("resources.k8s.conditions.datetime") as frozen_now_datetime:
+        with patch("koreo.conditions.datetime") as frozen_now_datetime:
             frozen_now_datetime.now.return_value = new_frozen_now
 
             updated_conditions = update_condition(
@@ -121,7 +121,7 @@ class TestConditions(unittest.TestCase):
         )
 
         update_frozen_now = datetime.now(UTC)
-        with patch("resources.k8s.conditions.datetime") as frozen_now_datetime:
+        with patch("koreo.conditions.datetime") as frozen_now_datetime:
             frozen_now_datetime.now.return_value = update_frozen_now
 
             updated_conditions = update_condition(

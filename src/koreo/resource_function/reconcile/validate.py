@@ -1,6 +1,6 @@
 from typing import NamedTuple, Sequence
 
-from constants import KOREO_DIRECTIVE_KEYS
+from koreo.constants import KOREO_DIRECTIVE_KEYS
 
 
 class ResourceMatch(NamedTuple):
