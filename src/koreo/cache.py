@@ -4,10 +4,10 @@ import copy
 import logging
 import time
 
+from koreo.constants import ACTIVE_LABEL
 from koreo.result import UnwrappedOutcome, is_unwrapped_ok
 from koreo import registry
 
-from constants import ACTIVE_LABEL
 
 logger = logging.getLogger(name="koreo.cache")
 

@@ -11,12 +11,6 @@ import kr8s
 import celpy
 from celpy import celtypes
 
-from constants import (
-    DEFAULT_LOAD_RETRY_DELAY,
-    KOREO_DIRECTIVE_KEYS,
-    LAST_APPLIED_ANNOTATION,
-)
-
 from koreo import cache
 from koreo.cel import functions
 from koreo.cel.encoder import convert_bools
@@ -25,6 +19,11 @@ from koreo.cel.evaluation import (
     evaluate_overlay,
     evaluate_predicates,
     check_for_celevalerror,
+)
+from koreo.constants import (
+    DEFAULT_LOAD_RETRY_DELAY,
+    KOREO_DIRECTIVE_KEYS,
+    LAST_APPLIED_ANNOTATION,
 )
 from koreo.resource_template.structure import ResourceTemplate
 from koreo.result import PermFail, Retry, UnwrappedOutcome, is_unwrapped_ok

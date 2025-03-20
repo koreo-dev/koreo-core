@@ -9,13 +9,11 @@ import kr8s
 import celpy
 from celpy import celtypes
 
-from constants import LAST_APPLIED_ANNOTATION
-
 from koreo import result
 from koreo.cel.encoder import convert_bools
 from koreo.cel.evaluation import evaluate_overlay
 from koreo.cel.functions import _overlay
-
+from koreo.constants import KOREO_DIRECTIVE_KEYS, LAST_APPLIED_ANNOTATION
 from koreo.resource_function.reconcile import reconcile_resource_function
 from koreo.resource_function.structure import ResourceFunction
 from koreo.value_function.reconcile import reconcile_value_function
@@ -614,12 +612,6 @@ def _validate_match(target, actual, compare_list_as_set: bool = False) -> Resour
         match=False,
         differences=f"expected '`{target}`' but found '`{actual}`'",
     )
-
-
-KOREO_DIRECTIVE_KEYS: set[str] = {
-    "x-koreo-compare-as-set",
-    "x-koreo-compare-as-map",
-}
 
 
 def _obj_to_key(obj: dict, fields: Sequence[int | str]) -> str:
