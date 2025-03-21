@@ -23,11 +23,8 @@ jobs:
           python-version: "3.13"
           cache: true
 
-      - name: Install PDM
-        run: pipx install pdm
-
       - name: Install dependencies
-        run: pdm sync && pdm install --dev
+        run: pdm install --dev
 
       - name: Run tests
         run: pdm run pytest
