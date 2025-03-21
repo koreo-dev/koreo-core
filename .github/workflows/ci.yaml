@@ -24,7 +24,7 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: pdm install --dev
+        run: pdm install
 
       - name: Run tests
         run: pdm run pytest
