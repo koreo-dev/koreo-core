@@ -1,6 +1,6 @@
 [project]
 name = "koreo-core"
-version = "0.1.3"
+version = "0.1.4"
 description = "Type-safe and testable KRM Templates and Workflows."
 authors = [
     {name = "Robert Kluin", email = "robert.kluin@realkinetic.com"},
@@ -10,10 +10,8 @@ authors = [
 
 dependencies = [
     "cel-python==0.2.0",
-    "kopf==1.37.4",
     "PyYAML==6.0.2",
     "kr8s==0.20.6",
-    "uvloop==0.21.0",
     "fastjsonschema==2.21.1",
 ]
 

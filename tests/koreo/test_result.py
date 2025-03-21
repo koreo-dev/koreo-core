@@ -1,8 +1,6 @@
 from random import shuffle
 import unittest
 
-import kopf
-
 from koreo import result
 
 
@@ -233,13 +231,3 @@ class TestIsError(unittest.TestCase):
 
     def test_permfail(self):
         self.assertTrue(result.is_error(result.PermFail()))
-
-
-class TestRaiseForError(unittest.TestCase):
-    def test_retry(self):
-        with self.assertRaisesRegex(kopf.TemporaryError, "Try again"):
-            result.raise_for_error(result.Retry(message="Try again"))
-
-    def test_permfail(self):
-        with self.assertRaisesRegex(kopf.PermanentError, "Failure"):
-            result.raise_for_error(result.PermFail(message="Failure"))

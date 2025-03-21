@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from functools import reduce
-from typing import Any, NoReturn, TypeIs, TypeVar, Iterable
-
-import kopf
+from typing import Any, TypeIs, TypeVar, Iterable
 
 
 class DepSkip:
@@ -265,10 +263,3 @@ def is_skip(candidate: Any) -> TypeIs[SkipOutcome]:
 
 def is_not_error(candidate: Outcome) -> TypeIs[Ok | Skip | DepSkip]:
     return not is_error(candidate=candidate)
-
-
-def raise_for_error(error: Retry | PermFail) -> NoReturn:
-    if isinstance(error, Retry):
-        raise kopf.TemporaryError(error.message, delay=error.delay)
-
-    raise kopf.PermanentError(error.message)
