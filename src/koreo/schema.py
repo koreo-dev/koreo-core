@@ -7,14 +7,13 @@ logger = logging.getLogger("koreo.schema")
 import fastjsonschema
 import yaml
 
+from koreo.constants import DEFAULT_API_VERSION
 from koreo.function_test.structure import FunctionTest
 from koreo.resource_function.structure import ResourceFunction
 from koreo.resource_template.structure import ResourceTemplate
 from koreo.result import PermFail
 from koreo.value_function.structure import ValueFunction
 from koreo.workflow.structure import Workflow
-
-DEFAULT_API_VERSION = "v1beta1"
 
 CRD_ROOT = pathlib.Path(__file__).parent.parent.parent.joinpath("crd")
 
@@ -59,6 +58,9 @@ def validate(
 
 
 def _get_validator(resource_type: type, version: str | None = None):
+    if not _SCHEMA_VALIDATORS:
+        _load_validators_from_files()
+
     if not version:
         version = DEFAULT_API_VERSION
 
@@ -67,73 +69,74 @@ def _get_validator(resource_type: type, version: str | None = None):
     return _SCHEMA_VALIDATORS.get(resource_version_key)
 
 
-def _load_validators():
-    _SCHEMA_VALIDATORS.clear()
-
-    for resource_type, schema_file in CRD_MAP.items():
-        resource_validators = _load_validator(schema_file)
-        if not resource_validators:
-            continue
-
-        for version, validator in resource_validators:
-            resource_version_key = f"{resource_type.__qualname__}:{version}"
-            _SCHEMA_VALIDATORS[resource_version_key] = validator
-
-
-def _load_validator(schema_file: pathlib.Path):
-
-    if not schema_file.exists():
+def load_validator(resource_type_name: str, resource_schema: dict):
+    spec = resource_schema.get("spec")
+    if not spec:
         return None
 
-    with schema_file.open() as crd_content:
-        parsed = yaml.load(crd_content, Loader=yaml.Loader)
-        spec = parsed.get("spec")
-        if not spec:
-            return None
+    spec_names = spec.get("names")
+    if spec_names:
+        spec_kind = spec_names.get("kind", "<missing kind>")
+    else:
+        spec_kind = "<missing kind>"
 
-        spec_names = spec.get("names")
-        if spec_names:
-            spec_kind = spec_names.get("kind", "<missing kind>")
-        else:
-            spec_kind = "<missing kind>"
+    schema_specs = spec.get("versions")
+    if not schema_specs:
+        return None
 
-        schema_specs = spec.get("versions")
-        if not schema_specs:
-            return None
+    for schema_spec in schema_specs:
+        version = schema_spec.get("name")
+        if not version:
+            continue
 
-        validators = []
+        schema_block = schema_spec.get("schema")
+        if not schema_block:
+            continue
 
-        for schema_spec in schema_specs:
-            version = schema_spec.get("name")
-            if not version:
-                continue
+        openapi_schema = schema_block.get("openAPIV3Schema")
+        if not openapi_schema:
+            continue
 
-            schema_block = schema_spec.get("schema")
-            if not schema_block:
-                continue
+        openapi_properties = openapi_schema.get("properties")
+        if not openapi_properties:
+            continue
 
-            openapi_schema = schema_block.get("openAPIV3Schema")
-            if not openapi_schema:
-                continue
+        openapi_spec = openapi_properties.get("spec")
 
-            openapi_properties = openapi_schema.get("properties")
-            if not openapi_properties:
-                continue
+        try:
+            version_validator = fastjsonschema.compile(openapi_spec)
+        except fastjsonschema.JsonSchemaDefinitionException:
+            logger.exception(f"Failed to process {spec_kind} {version}")
+            continue
+        except AttributeError as err:
+            logger.error(
+                f"Probably encountered an empty `properties` block for {spec_kind} {version} (err: {err})"
+            )
+            raise
 
-            openapi_spec = openapi_properties.get("spec")
+        resource_version_key = f"{resource_type_name}:{version}"
+        _SCHEMA_VALIDATORS[resource_version_key] = version_validator
 
-            try:
-                validators.append((version, fastjsonschema.compile(openapi_spec)))
-            except fastjsonschema.JsonSchemaDefinitionException:
-                logger.exception(f"Failed to process {spec_kind} {version}")
-                pass
-            except AttributeError as err:
+
+def _load_validators_from_files(clear_existing: bool = False):
+    if clear_existing:
+        _SCHEMA_VALIDATORS.clear()
+
+    for resource_type, schema_file in CRD_MAP.items():
+        if not schema_file.exists():
+            logger.error(
+                f"Failed to load {resource_type} schema from file '{schema_file}'"
+            )
+            continue
+
+        with schema_file.open() as crd_content:
+            parsed = yaml.load(crd_content, Loader=yaml.Loader)
+            if not parsed:
                 logger.error(
-                    f"Probably encountered an empty `properties` block for {spec_kind} {version} (err: {err})"
+                    f"Failed to parse {resource_type} schema content from file '{schema_file}'"
                 )
-                raise
+                continue
 
-        return validators
-
-
-_load_validators()
+            load_validator(
+                resource_type_name=resource_type.__qualname__, resource_schema=parsed
+            )

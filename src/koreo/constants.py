@@ -1,5 +1,7 @@
 PREFIX = "koreo.dev"
 
+DEFAULT_API_VERSION = "v1beta1"
+
 ACTIVE_LABEL = f"{PREFIX}/active"
 
 LAST_APPLIED_ANNOTATION = f"{PREFIX}/last-applied-configuration"
