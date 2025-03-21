@@ -40,12 +40,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: pdm-project/setup-pdm@v4
         with:
           python-version: "3.13"
 
-      - name: Install PDM
-        run: pipx install pdm
+      - name: Install dependencies
+        run: pdm install
 
       - name: Build package
         run: pdm build
