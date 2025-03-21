@@ -24,12 +24,16 @@ license = {text = "Apache-2.0"}
 [project.urls]
 Homepage = "https://koreo.dev"
 
-[project.optional-dependencies]
-dev = [
-    "black==25.1.0",
+[dependency-groups]
+test = [
     "pytest==8.3.5",
     "pytest-cov==6.0.0",
 ]
+tooling = [
+    "ruff==0.11.2",
+    "pyright==1.1.397",
+]
+all = ["koreo-core[test,tooling]"]
 
 [build-system]
 requires = ["pdm-backend"]
