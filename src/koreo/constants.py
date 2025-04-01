@@ -1,4 +1,6 @@
-PREFIX = "koreo.dev"
+API_GROUP = "koreo.dev"
+
+PREFIX = API_GROUP
 
 DEFAULT_API_VERSION = "v1beta1"
 
