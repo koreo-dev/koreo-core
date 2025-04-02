@@ -90,7 +90,7 @@ async def prepare_resource_function(
                 message=message,
                 location=_location(cache_key, "spec.apiConfig"),
             )
-        case (resource_api, resource_id, own_resource, readonly, delete_if_present):
+        case (resource_api, resource_id, own_resource, readonly, delete_if_exists):
             used_vars.update(extract_argument_structure(resource_id.ast))
 
     match _prepare_resource_template(cel_env=env, spec=spec, readonly=readonly):
