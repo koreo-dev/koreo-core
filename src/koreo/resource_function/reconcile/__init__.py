@@ -197,7 +197,7 @@ async def reconcile_krm_resource(
     if not is_unwrapped_ok(api_resource):
         return ReconcileResult(result=api_resource, resource_id=resource_id)
 
-    if crud_config.delete_if_present:
+    if crud_config.delete_if_exists:
         if not api_resource:
             return ReconcileResult(
                 result={},
