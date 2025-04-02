@@ -161,7 +161,7 @@ async def prepare_resource_function(
                 resource_id=resource_id,
                 own_resource=own_resource,
                 readonly=readonly,
-                delete_if_present=delete_if_present,
+                delete_if_exists=delete_if_exists,
                 resource_template=resource_template,
                 overlays=overlays,
                 create=create,
@@ -201,7 +201,7 @@ def _prepare_api_config(
     namespaced = spec.get("namespaced", True)
     owned = spec.get("owned", True)
     readonly = spec.get("readonly", False)
-    delete_if_present = spec.get("deleteIfPresent", False)
+    delete_if_exists = spec.get("deleteIfExists", False)
 
     resource_id_cel = {"name": name}
 
@@ -231,7 +231,7 @@ def _prepare_api_config(
         namespaced=namespaced,
         asyncio=True,
     )
-    return (resource_api, resource_id, owned, readonly, delete_if_present)
+    return (resource_api, resource_id, owned, readonly, delete_if_exists)
 
 
 def _prepare_resource_template(
