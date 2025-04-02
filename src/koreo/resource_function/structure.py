@@ -62,6 +62,7 @@ class CRUDConfig(NamedTuple):
     resource_id: celpy.Runner
     own_resource: bool
     readonly: bool
+    delete_if_present: bool
 
     resource_template: InlineResourceTemplate | ResourceTemplateRef
     overlays: UnwrappedOutcome[Sequence[InlineOverlay | ValueFunctionOverlay]]

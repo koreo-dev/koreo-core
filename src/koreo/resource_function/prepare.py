@@ -90,7 +90,7 @@ async def prepare_resource_function(
                 message=message,
                 location=_location(cache_key, "spec.apiConfig"),
             )
-        case (resource_api, resource_id, own_resource, readonly):
+        case (resource_api, resource_id, own_resource, readonly, delete_if_present):
             used_vars.update(extract_argument_structure(resource_id.ast))
 
     match _prepare_resource_template(cel_env=env, spec=spec, readonly=readonly):
@@ -161,6 +161,7 @@ async def prepare_resource_function(
                 resource_id=resource_id,
                 own_resource=own_resource,
                 readonly=readonly,
+                delete_if_present=delete_if_present,
                 resource_template=resource_template,
                 overlays=overlays,
                 create=create,
@@ -184,7 +185,7 @@ def _location(cache_key: str, extra: str | None = None) -> str:
 
 def _prepare_api_config(
     cel_env: celpy.Environment, spec: dict
-) -> tuple[type[APIObject], celpy.celpy.Runner, bool, bool] | PermFail:
+) -> tuple[type[APIObject], celpy.celpy.Runner, bool, bool, bool] | PermFail:
     api_version = spec.get("apiVersion")
     kind = spec.get("kind")
     name = spec.get("name")
@@ -200,6 +201,7 @@ def _prepare_api_config(
     namespaced = spec.get("namespaced", True)
     owned = spec.get("owned", True)
     readonly = spec.get("readonly", False)
+    delete_if_present = spec.get("deleteIfPresent", False)
 
     resource_id_cel = {"name": name}
 
@@ -229,7 +231,7 @@ def _prepare_api_config(
         namespaced=namespaced,
         asyncio=True,
     )
-    return (resource_api, resource_id, owned, readonly)
+    return (resource_api, resource_id, owned, readonly, delete_if_present)
 
 
 def _prepare_resource_template(
@@ -280,7 +282,9 @@ def _prepare_resource_template(
 INPUTS_NAME_PATTERN = re.compile(r"inputs.(?P<name>[^.[]+)?\[?.*")
 
 
-def _prepare_overlays(cel_env: celpy.Environment, spec: list[dict] | None) -> (
+def _prepare_overlays(
+    cel_env: celpy.Environment, spec: list[dict] | None
+) -> (
     None
     | tuple[
         UnwrappedOutcome[

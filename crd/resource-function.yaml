@@ -137,6 +137,10 @@ spec:
                       type: boolean
                       nullable: false
                       default: false
+                    deleteIfExists:
+                      type: boolean
+                      nullable: false
+                      default: false
                     name:
                       type: string
                       nullable: false
