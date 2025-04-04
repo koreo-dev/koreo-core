@@ -197,6 +197,22 @@ async def reconcile_krm_resource(
     if not is_unwrapped_ok(api_resource):
         return ReconcileResult(result=api_resource, resource_id=resource_id)
 
+    if crud_config.delete_if_exists:
+        if not api_resource:
+            return ReconcileResult(
+                result={},
+                resource_id=resource_id,
+            )
+
+        await api_resource.delete()
+        return ReconcileResult(
+            result=Retry(
+                message=f"Deleting {full_resource_name}.",
+                delay=DEFAULT_LOAD_RETRY_DELAY,
+            ),
+            resource_id=resource_id,
+        )
+
     if not api_resource and (crud_config.readonly or not crud_config.create.enabled):
         # This is where we used virtual, but I think ValueFunction replaces that?
         # TODO: Return None or return base?
