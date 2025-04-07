@@ -1,0 +1,33 @@
+name: Publish Dev Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      dev-tag:
+        description: "Dev tag for the package (e.g., 1.0.0.dev1)"
+        required: true
+
+jobs:
+  publish-dev:
+    name: Publish Dev Tag to PyPI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pdm install --prod
+
+      - name: Build package
+        run: pdm build
+
+      - name: Publish to PyPI (Pre-Release)
+        env:
+          PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: pdm publish --username __token__ --password "$PYPI_TOKEN" --pre --version "${{ github.event.inputs.dev-tag }}"
