@@ -1,6 +1,6 @@
 [project]
 name = "koreo-core"
-version = "0.1.4"
+version = "0.1.6"
 description = "Type-safe and testable KRM Templates and Workflows."
 authors = [
     {name = "Robert Kluin", email = "robert.kluin@realkinetic.com"},
