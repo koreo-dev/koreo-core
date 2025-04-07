@@ -1262,3 +1262,44 @@ class TestBase64Decode(unittest.TestCase):
 
         with self.assertRaises(celpy.CELEvalError):
             program.evaluate(inputs)
+
+
+class TestReplace(unittest.TestCase):
+    def test_replace_basic(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = '"hello world".replace("world", "there")'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+
+        self.assertEqual(result, "hello there")
+
+    def test_replace_multiple(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = '"ababab".replace("ab", "cd")'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+
+        self.assertEqual(result, "cdcdcd")
+
+    def test_replace_no_match(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = '"abc".replace("x", "y")'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+
+        self.assertEqual(result, "abc")
