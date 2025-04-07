@@ -358,9 +358,27 @@ def _b64encode(value: celtypes.Value) -> celtypes.StringType | celpy.CELEvalErro
 
 def _b64decode(value: celtypes.Value) -> celtypes.StringType | celpy.CELEvalError:
     try:
-        return celtypes.StringType(base64.b64decode(value))
+        return celtypes.StringType(base64.b64decode(value).decode("utf-8"))
     except Exception as err:
         return celpy.CELEvalError(f"Base64 Encoding error {err}")
+
+
+def _sort_by_key(
+    arr: celtypes.ListType, key: celtypes.StringType
+) -> celtypes.ListType | celpy.CELEvalError:
+    try:
+        return celtypes.ListType(sorted(arr, key=lambda x: x[key]))
+    except Exception as err:
+        return celpy.CELEvalError(f"Sort by key error {err}")
+
+
+def _replace(
+    value: celtypes.StringType, old: celtypes.StringType, new: celtypes.StringType
+) -> celtypes.StringType | celpy.CELEvalError:
+    try:
+        return celtypes.StringType(value.replace(old, new))
+    except Exception as err:
+        return celpy.CELEvalError(f"Replace error {err}")
 
 
 koreo_function_annotations: dict[str, celpy.Annotation] = {
@@ -382,6 +400,8 @@ koreo_function_annotations: dict[str, celpy.Annotation] = {
     "from_json": celtypes.FunctionType,
     "b64encode": celtypes.FunctionType,
     "b64decode": celtypes.FunctionType,
+    "sort_by_key": celtypes.FunctionType,
+    "replace": celtypes.FunctionType,
 }
 
 koreo_cel_functions: dict[str, celpy.CELFunction] = {
@@ -403,4 +423,6 @@ koreo_cel_functions: dict[str, celpy.CELFunction] = {
     "from_json": _from_json,
     "b64encode": _b64encode,
     "b64decode": _b64decode,
+    "sort_by_key": _sort_by_key,
+    "replace": _replace,
 }

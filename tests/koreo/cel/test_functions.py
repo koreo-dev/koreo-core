@@ -1262,3 +1262,71 @@ class TestBase64Decode(unittest.TestCase):
 
         with self.assertRaises(celpy.CELEvalError):
             program.evaluate(inputs)
+
+
+class TestSortByKey(unittest.TestCase):
+    def test_sort_by_key_basic(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = '[{"a": 2}, {"a": 1}].sort_by_key("a")'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+
+        self.assertEqual(result, [{"a": 1}, {"a": 2}])
+
+    def test_sort_by_key_invalid_key(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = '[{"a": 2}].sort_by_key("b")'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        with self.assertRaises(celpy.CELEvalError):
+            program.evaluate(inputs)
+
+
+class TestReplace(unittest.TestCase):
+    def test_replace_basic(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = '"hello world".replace("world", "there")'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+
+        self.assertEqual(result, "hello there")
+
+    def test_replace_multiple(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = '"ababab".replace("ab", "cd")'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+
+        self.assertEqual(result, "cdcdcd")
+
+    def test_replace_no_match(self):
+        cel_env = celpy.Environment(annotations=koreo_function_annotations)
+
+        test_cel_expression = '"abc".replace("x", "y")'
+        inputs = {}
+
+        compiled = cel_env.compile(test_cel_expression)
+        program = cel_env.program(compiled, functions=koreo_cel_functions)
+
+        result = program.evaluate(inputs)
+
+        self.assertEqual(result, "abc")
