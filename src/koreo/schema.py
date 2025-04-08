@@ -18,11 +18,11 @@ from koreo.workflow.structure import Workflow
 CRD_ROOT = pathlib.Path(__file__).parent.parent.parent.joinpath("crd")
 
 CRD_MAP = {
-    FunctionTest: CRD_ROOT.joinpath("function-test.yaml"),
-    ResourceFunction: CRD_ROOT.joinpath("resource-function.yaml"),
-    ResourceTemplate: CRD_ROOT.joinpath("resource-template.yaml"),
-    ValueFunction: CRD_ROOT.joinpath("value-function.yaml"),
-    Workflow: CRD_ROOT.joinpath("workflow.yaml"),
+    FunctionTest: "function-test.yaml",
+    ResourceFunction: "resource-function.yaml",
+    ResourceTemplate: "resource-template.yaml",
+    ValueFunction: "value-function.yaml",
+    Workflow: "workflow.yaml",
 }
 
 _SCHEMA_VALIDATORS = {}
@@ -59,7 +59,7 @@ def validate(
 
 def _get_validator(resource_type: type, version: str | None = None):
     if not _SCHEMA_VALIDATORS:
-        _load_validators_from_files()
+        load_validators_from_files()
 
     if not version:
         version = DEFAULT_API_VERSION
@@ -118,22 +118,26 @@ def load_validator(resource_type_name: str, resource_schema: dict):
         _SCHEMA_VALIDATORS[resource_version_key] = version_validator
 
 
-def _load_validators_from_files(clear_existing: bool = False):
+def load_validators_from_files(clear_existing: bool = False, path: str = ""):
+    if not path:
+        path = CRD_ROOT
+
     if clear_existing:
         _SCHEMA_VALIDATORS.clear()
 
     for resource_type, schema_file in CRD_MAP.items():
-        if not schema_file.exists():
+        full_path = path.joinpath(schema_file)
+        if not full_path.exists():
             logger.error(
                 f"Failed to load {resource_type} schema from file '{schema_file}'"
             )
             continue
 
-        with schema_file.open() as crd_content:
+        with full_path.open() as crd_content:
             parsed = yaml.load(crd_content, Loader=yaml.Loader)
             if not parsed:
                 logger.error(
-                    f"Failed to parse {resource_type} schema content from file '{schema_file}'"
+                    f"Failed to parse {resource_type} schema content from file '{full_path}'"
                 )
                 continue
 
