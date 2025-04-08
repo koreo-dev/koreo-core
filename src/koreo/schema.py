@@ -118,10 +118,7 @@ def load_validator(resource_type_name: str, resource_schema: dict):
         _SCHEMA_VALIDATORS[resource_version_key] = version_validator
 
 
-def load_validators_from_files(clear_existing: bool = False, path: str = ""):
-    if not path:
-        path = CRD_ROOT
-
+def load_validators_from_files(clear_existing: bool = False, path: str = CRD_ROOT):
     if clear_existing:
         _SCHEMA_VALIDATORS.clear()
 
