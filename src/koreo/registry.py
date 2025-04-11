@@ -24,9 +24,10 @@ class ResourceEvent[T](NamedTuple):
 type RegistryQueue = asyncio.Queue[ResourceEvent | Kill]
 
 
-def register[
-    T
-](registerer: Resource[T], queue: RegistryQueue | None = None,) -> RegistryQueue:
+def register[T](
+    registerer: Resource[T],
+    queue: RegistryQueue | None = None,
+) -> RegistryQueue:
     registerer_key = _resource_key(registerer)
 
     if registerer_key in _SUBSCRIPTION_QUEUES:
@@ -40,7 +41,7 @@ def register[
     event_time = time.monotonic()
     notify_subscribers(notifier=registerer, event_time=event_time)
 
-    logger.info(f"Registering {registerer}")
+    logger.debug(f"Registering {registerer}")
 
     return queue
 
@@ -57,7 +58,7 @@ def subscribe(subscriber: Resource, resource: Resource):
     _RESOURCE_SUBSCRIBERS[resource_key].add(subscriber_key)
     _SUBSCRIBER_RESOURCES[subscriber_key].add(resource_key)
 
-    logger.info(f"{subscriber} subscribing to {resource}")
+    logger.debug(f"{subscriber} subscribing to {resource}")
 
 
 def subscribe_only_to(subscriber: Resource, resources: Sequence[Resource]):
@@ -76,7 +77,7 @@ def subscribe_only_to(subscriber: Resource, resources: Sequence[Resource]):
 
     _SUBSCRIBER_RESOURCES[subscriber_key] = new
 
-    logger.info(f"{subscriber} subscribing to {resources}")
+    logger.debug(f"{subscriber} subscribing to {resources}")
 
 
 def unsubscribe(unsubscriber: Resource, resource: Resource):
@@ -91,7 +92,7 @@ def notify_subscribers(notifier: Resource, event_time: float):
     resource_key = _resource_key(notifier)
     subscribers = _RESOURCE_SUBSCRIBERS[resource_key]
     if not subscribers:
-        logger.info(f"{notifier} has no subscribers")
+        logger.debug(f"{notifier} has no subscribers")
         return
 
     active_subscribers = [
@@ -101,10 +102,10 @@ def notify_subscribers(notifier: Resource, event_time: float):
     ]
 
     if not active_subscribers:
-        logger.info(f"{notifier} has no active subscribers")
+        logger.debug(f"{notifier} has no active subscribers")
         return
 
-    logger.info(f"{notifier}:{event_time} notifying to {subscribers}")
+    logger.debug(f"{notifier}:{event_time} notifying to {subscribers}")
 
     for subscriber in active_subscribers:
         try:
