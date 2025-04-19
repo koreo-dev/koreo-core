@@ -669,14 +669,18 @@ async def _create_api_resource(
 
 
 def _forced_overlay(resource_api: type[APIObject], name: str, namespace: str | None):
-    # TODO: Make sure None doesn't break this, eg when creating Namespaces
+    # Only include namespace when the resource API is namespaced
+    metadata: dict[str, object] = {"name": name}
+    if namespace is not None:
+        metadata["namespace"] = namespace
+
     forced_overlay = celpy.json_to_cel(
         {
             "apiVersion": resource_api.version,
             "kind": resource_api.kind,
-            "metadata": {"name": name, "namespace": namespace},
+            "metadata": metadata
         }
-    )
+   )
 
     # Perhaps this could occur with some corrupt name config?
     if not isinstance(forced_overlay, celtypes.MapType):
