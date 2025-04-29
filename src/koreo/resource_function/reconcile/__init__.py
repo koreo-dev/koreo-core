@@ -460,6 +460,8 @@ async def _construct_resource_template(
                     return err
                 case celtypes.MapType() as materialized:
                     pass
+                case None:
+                    materialized = celtypes.MapType()
                 case _ as bad_type:
                     return PermFail(
                         message=f"Expected mapping, but received {type(bad_type)} for `spec.resource`",
@@ -670,7 +672,7 @@ async def _create_api_resource(
 
 def _forced_overlay(resource_api: type[APIObject], name: str, namespace: str | None):
     # Only include namespace when the resource API is namespaced
-    metadata: dict[str, object] = {"name": name}
+    metadata: dict[str, str] = {"name": name}
     if namespace is not None:
         metadata["namespace"] = namespace
 
@@ -678,9 +680,9 @@ def _forced_overlay(resource_api: type[APIObject], name: str, namespace: str | N
         {
             "apiVersion": resource_api.version,
             "kind": resource_api.kind,
-            "metadata": metadata
+            "metadata": metadata,
         }
-   )
+    )
 
     # Perhaps this could occur with some corrupt name config?
     if not isinstance(forced_overlay, celtypes.MapType):

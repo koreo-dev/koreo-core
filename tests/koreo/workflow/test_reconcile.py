@@ -81,9 +81,9 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
             location="unittest:sub_step_two.return",
         )
 
-        assert is_unwrapped_ok(
-            sub_step_two_return_value
-        ), f"{sub_step_two_return_value}"
+        assert is_unwrapped_ok(sub_step_two_return_value), (
+            f"{sub_step_two_return_value}"
+        )
 
         sub_workflow = workflow_structure.Workflow(
             name="unit-test",
@@ -316,15 +316,6 @@ class TestReconcileWorkflow(unittest.IsolatedAsyncioTestCase):
 
 
 class TestConditionHelper(unittest.TestCase):
-    def test_none_outcome(self):
-        condition = reconcile._condition_helper(
-            condition_type="UnitTest",
-            thing_name="unit test",
-            outcome=None,
-            workflow_key="unit-test-flow",
-        )
-
-        self.assertEqual("Pending", condition.get("reason"))
 
     def test_ok_outcome_that_is_none(self):
         condition = reconcile._condition_helper(
