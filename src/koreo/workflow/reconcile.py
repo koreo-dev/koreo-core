@@ -424,7 +424,6 @@ async def _reconcile_ref_switch(
     inputs: celtypes.Value,
     location: str,
 ):
-
     # This gives the switch-on expression access to direct outcomes through
     # `steps`, but also to the step's `inputs`. In addition to possible
     # convenience, this gives the switch access to the iterated values from a
@@ -681,14 +680,6 @@ def _condition_helper(
     status = "True"
     location = workflow_key
 
-    if outcome is None:
-        return Condition(
-            type=condition_type,
-            reason=reason,
-            message=message,
-            status=status,
-            location=location,
-        )
 
     match outcome:
         case result.DepSkip(message=skip_message, location=location):

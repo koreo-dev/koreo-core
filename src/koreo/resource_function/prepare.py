@@ -93,7 +93,7 @@ async def prepare_resource_function(
         case (resource_api, resource_id, own_resource, readonly, delete_if_exists):
             used_vars.update(extract_argument_structure(resource_id.ast))
 
-    match _prepare_resource_template(cel_env=env, spec=spec, readonly=readonly):
+    match _prepare_resource_template(cel_env=env, spec=spec):
         case PermFail() as err:
             return err
 
@@ -235,7 +235,7 @@ def _prepare_api_config(
 
 
 def _prepare_resource_template(
-    cel_env: celpy.Environment, spec: dict, readonly: bool
+    cel_env: celpy.Environment, spec: dict
 ) -> structure.InlineResourceTemplate | structure.ResourceTemplateRef | PermFail:
     match spec:
         case {"resource": resource_template}:
@@ -245,13 +245,7 @@ def _prepare_resource_template(
                 case PermFail() as err:
                     return err
                 case None:
-                    if readonly:
-                        return structure.InlineResourceTemplate()
-
-                    return PermFail(
-                        message=f"Empty resource template ({resource_template})",
-                        location="spec.resource",
-                    )
+                    return structure.InlineResourceTemplate()
                 case celpy.Runner() as template_expression:
                     return structure.InlineResourceTemplate(
                         template=template_expression
