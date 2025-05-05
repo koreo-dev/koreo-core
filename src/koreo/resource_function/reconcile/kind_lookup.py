@@ -15,7 +15,10 @@ _lookup_locks: dict[str, asyncio.Event] = {}
 async def get_plural_kind(
     api: kr8s.asyncio.Api, kind: str, api_version: str
 ) -> str | None:
-    lookup_kind = f"{kind}.{api_version}"
+    if api_version == "v1":
+        lookup_kind = f"{kind}"
+    else:
+        lookup_kind = f"{kind}.{api_version}"
 
     if lookup_kind in _plural_map:
         return _plural_map[lookup_kind]
