@@ -3,7 +3,7 @@ import logging
 
 import kr8s.asyncio
 
-logger = logging.getLogger("koreo.controller.resource")
+logger = logging.getLogger("koreo.resource_function.reconcile")
 
 LOOKUP_TIMEOUT = 15
 
@@ -46,9 +46,7 @@ async def get_plural_kind(
                     break
                 except ValueError:
                     del _lookup_locks[lookup_kind]
-                    logger.exception(
-                        f"Failed to find Kind (`{lookup_kind}`) information. Can not start controller!"
-                    )
+                    logger.error(f"Failed to find Kind (`{lookup_kind}`) information.")
                     return None
         except asyncio.TimeoutError:
             continue
