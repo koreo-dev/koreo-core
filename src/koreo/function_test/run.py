@@ -52,6 +52,9 @@ class MockApi:
     def namespace(self):
         return "FAKE-NAMESPACE"
 
+    async def lookup_kind(self, kind: str):
+        return (None, kind.lower(), None)
+
     async def async_get(self, *args, **kwargs):
         if self._current_resource:
             # TODO: This should probably be loaded and built from the Function,
@@ -499,7 +502,7 @@ def _validate_outcome_match(
                     match = _validate_match(expected.data, actual)
                     test_pass = match.match
                     if not test_pass:
-                        message = f"Mismatch at {" -> ".join(match.differences)}"
+                        message = f"Mismatch at {' -> '.join(match.differences)}"
             elif expected is None:
                 test_pass = result.is_unwrapped_ok(actual)
                 if not test_pass:

@@ -30,6 +30,8 @@ from koreo.result import PermFail, Retry, UnwrappedOutcome, is_unwrapped_ok
 from koreo.value_function.reconcile import reconcile_value_function
 
 from koreo.resource_function import structure
+
+from .kind_lookup import get_plural_kind
 from .validate import validate_match
 
 
@@ -174,6 +176,31 @@ async def reconcile_krm_resource(
                     location=f"spec.apiConfig.name",
                 )
             )
+
+    # TODO: Would we rather do this at prepare time? Or, perhaps there should
+    # be some other process that ensures we lookup the plurals in advance when
+    # the resource function is loaded?
+    if crud_config.resource_api.plural == structure.PLURAL_LOOKUP_NEEDED:
+        kind = crud_config.resource_api.kind
+
+        plural = await get_plural_kind(
+            api=api,
+            kind=kind,
+            api_version=crud_config.resource_api.version,
+        )
+
+        if not plural:
+            message = (
+                f"Dynamic kind-plural lookup failed for '{kind}'. Set plural "
+                "explicitly in apiConfig."
+            )
+            logger.warning(message)
+            return ReconcileResult(
+                result=PermFail(message=message, location=f"spec.apiConfig.plural")
+            )
+
+        crud_config.resource_api.endpoint = plural
+        crud_config.resource_api.plural = plural
 
     resource_id = {
         "apiVersion": crud_config.resource_api.version,
@@ -656,8 +683,25 @@ async def _create_api_resource(
 
     try:
         await new_resource.create()
+    except kr8s.ServerError as err:
+        if err.response and err.response.status_code == 409:
+            return Retry(
+                message=f"Waiting on competing creation of {full_resource_name}.",
+                delay=create.delay,
+                location="spec.create(contention)",
+            )
+
+        # TODO: Review possible error codes and determine which should retry
+
+        logger.error(f"K8s API Server error: {err.status}")
+        return PermFail(
+            message=f"Error creating {full_resource_name}: {err.status}",
+            location="spec.create",
+        )
+
     except Exception as err:
         # TODO: Probably need to catch timeouts and retry here.
+        logger.exception(f"Unhandled error calling create: {err}")
         return PermFail(
             message=f"Error creating {full_resource_name}: {err}",
             location="spec.create",
