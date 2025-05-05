@@ -30,6 +30,8 @@ from koreo.result import PermFail, Retry, UnwrappedOutcome, is_unwrapped_ok
 from koreo.value_function.reconcile import reconcile_value_function
 
 from koreo.resource_function import structure
+
+from .kind_lookup import get_plural_kind
 from .validate import validate_match
 
 
@@ -174,6 +176,34 @@ async def reconcile_krm_resource(
                     location=f"spec.apiConfig.name",
                 )
             )
+
+    # TODO: Would we rather do this at prepare time? Or, perhaps there should
+    # be some other process that ensures we lookup the plurals in advance when
+    # the resource function is loaded?
+    if crud_config.resource_api.plural == structure.PLURAL_LOOKUP_NEEDED:
+        kind = crud_config.resource_api.kind
+
+        plural = await get_plural_kind(
+            api=api,
+            kind=kind,
+            api_version=crud_config.resource_api.version,
+        )
+
+        if not plural:
+            if kind.endswith("y"):
+                plural = f"{kind[:-1]}ies"
+            elif kind.endswith("s"):
+                plural = f"{kind}es"
+            else:
+                plural = f"{kind}s"
+
+            logger.warning(
+                f"Dynamic kind-plural lookup failed for '{kind}', attempting "
+                f"to use {plural}. You should set plural explicitly in apiConfig."
+            )
+
+        crud_config.resource_api.endpoint = plural
+        crud_config.resource_api.plural = plural
 
     resource_id = {
         "apiVersion": crud_config.resource_api.version,

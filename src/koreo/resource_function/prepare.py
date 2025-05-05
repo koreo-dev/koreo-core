@@ -196,7 +196,7 @@ def _prepare_api_config(
 
     plural = spec.get("plural")
     if not plural:
-        plural = f"{kind.lower()}s"
+        plural = structure.PLURAL_LOOKUP_NEEDED
 
     namespaced = spec.get("namespaced", True)
     owned = spec.get("owned", True)
