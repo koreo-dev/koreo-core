@@ -191,8 +191,8 @@ async def reconcile_krm_resource(
 
         if not plural:
             message = (
-                f"Dynamic kind-plural lookup failed for '{kind}', attempting "
-                f"to use {plural}. You should set plural explicitly in apiConfig."
+                f"Dynamic kind-plural lookup failed for '{kind}'. Set plural "
+                "explicitly in apiConfig."
             )
             logger.warning(message)
             return ReconcileResult(
