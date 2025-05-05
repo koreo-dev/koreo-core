@@ -53,7 +53,7 @@ class MockApi:
         return "FAKE-NAMESPACE"
 
     async def lookup_kind(self, kind: str):
-        return kind.lower()
+        return (None, kind.lower(), None)
 
     async def async_get(self, *args, **kwargs):
         if self._current_resource:
