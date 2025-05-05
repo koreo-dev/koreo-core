@@ -190,13 +190,6 @@ async def reconcile_krm_resource(
         )
 
         if not plural:
-            if kind.endswith("y"):
-                plural = f"{kind[:-1]}ies"
-            elif kind.endswith("s"):
-                plural = f"{kind}es"
-            else:
-                plural = f"{kind}s"
-
             message = (
                 f"Dynamic kind-plural lookup failed for '{kind}', attempting "
                 f"to use {plural}. You should set plural explicitly in apiConfig."
