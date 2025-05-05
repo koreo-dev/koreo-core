@@ -686,8 +686,25 @@ async def _create_api_resource(
 
     try:
         await new_resource.create()
+    except kr8s.ServerError as err:
+        if err.response and err.response.status_code == 409:
+            return Retry(
+                message=f"Waiting on competing creation of {full_resource_name}.",
+                delay=create.delay,
+                location="spec.create(contention)",
+            )
+
+        # TODO: Review possible error codes and determine which should retry
+
+        logger.error(f"K8s API Server error: {err.status}")
+        return PermFail(
+            message=f"Error creating {full_resource_name}: {err.status}",
+            location="spec.create",
+        )
+
     except Exception as err:
         # TODO: Probably need to catch timeouts and retry here.
+        logger.exception(f"Unhandled error calling create: {err}")
         return PermFail(
             message=f"Error creating {full_resource_name}: {err}",
             location="spec.create",
