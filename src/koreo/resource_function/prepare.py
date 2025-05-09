@@ -10,6 +10,7 @@ import kr8s
 import celpy
 
 from koreo import cache
+from koreo import constants
 from koreo import registry
 from koreo import schema
 from koreo.cel.functions import koreo_function_annotations
@@ -38,10 +39,6 @@ logging.getLogger("NameContainer").setLevel(logging.WARNING)
 logging.getLogger("Evaluator").setLevel(logging.WARNING)
 logging.getLogger("evaluation").setLevel(logging.WARNING)
 logging.getLogger("celtypes").setLevel(logging.WARNING)
-
-DEFAULT_CREATE_DELAY = 30
-DEFAULT_DELETE_DELAY = 15
-DEFAULT_PATCH_DELAY = 30
 
 
 async def prepare_resource_function(
@@ -185,7 +182,7 @@ def _location(cache_key: str, extra: str | None = None) -> str:
 
 def _prepare_api_config(
     cel_env: celpy.Environment, spec: dict
-) -> tuple[type[APIObject], celpy.celpy.Runner, bool, bool, bool] | PermFail:
+) -> tuple[type[APIObject], celpy.Runner, bool, bool, bool] | PermFail:
     api_version = spec.get("apiVersion")
     kind = spec.get("kind")
     name = spec.get("name")
@@ -196,7 +193,7 @@ def _prepare_api_config(
 
     plural = spec.get("plural")
     if not plural:
-        plural = structure.PLURAL_LOOKUP_NEEDED
+        plural = constants.PLURAL_LOOKUP_NEEDED
 
     namespaced = spec.get("namespaced", True)
     owned = spec.get("owned", True)
@@ -433,13 +430,13 @@ def _prepare_create(
     cel_env: celpy.Environment, spec: dict | None
 ) -> structure.Create | PermFail:
     if not spec:
-        return structure.Create(enabled=True, delay=DEFAULT_CREATE_DELAY)
+        return structure.Create(enabled=True, delay=constants.DEFAULT_CREATE_DELAY)
 
     enabled = spec.get("enabled", True)
     if not enabled:
         return structure.Create(enabled=False)
 
-    delay = spec.get("delay", DEFAULT_CREATE_DELAY)
+    delay = spec.get("delay", constants.DEFAULT_CREATE_DELAY)
 
     overlay_spec = spec.get("overlay")
     match prepare_overlay_expression(
@@ -461,7 +458,7 @@ def _prepare_create(
 def _prepare_update(spec: dict | None) -> structure.Update | PermFail:
     match spec:
         case None:
-            return structure.UpdatePatch(delay=DEFAULT_PATCH_DELAY)
+            return structure.UpdatePatch(delay=constants.DEFAULT_PATCH_DELAY)
         case {"patch": {"delay": delay}}:
             return structure.UpdatePatch(delay=delay)
         case {"recreate": {"delay": delay}}:
