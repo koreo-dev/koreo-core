@@ -24,6 +24,7 @@ from koreo.constants import (
     DEFAULT_LOAD_RETRY_DELAY,
     KOREO_DIRECTIVE_KEYS,
     LAST_APPLIED_ANNOTATION,
+    PLURAL_LOOKUP_NEEDED,
 )
 from koreo.resource_template.structure import ResourceTemplate
 from koreo.result import PermFail, Retry, UnwrappedOutcome, is_unwrapped_ok
@@ -180,7 +181,7 @@ async def reconcile_krm_resource(
     # TODO: Would we rather do this at prepare time? Or, perhaps there should
     # be some other process that ensures we lookup the plurals in advance when
     # the resource function is loaded?
-    if crud_config.resource_api.plural == structure.PLURAL_LOOKUP_NEEDED:
+    if crud_config.resource_api.plural == PLURAL_LOOKUP_NEEDED:
         kind = crud_config.resource_api.kind
 
         plural = await get_plural_kind(

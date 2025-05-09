@@ -57,9 +57,6 @@ class DeleteDestroy(NamedTuple):
     force: bool = False
 
 
-PLURAL_LOOKUP_NEEDED = "+++missing plural+++"
-
-
 class CRUDConfig(NamedTuple):
     resource_api: type[APIObject]
     resource_id: celpy.Runner
