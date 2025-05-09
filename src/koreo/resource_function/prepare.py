@@ -221,13 +221,20 @@ def _prepare_api_config(
             # Just needed to set name
             pass
 
-    resource_api = kr8s.objects.new_class(
-        version=api_version,
-        kind=kind,
-        plural=plural,
-        namespaced=namespaced,
-        asyncio=True,
-    )
+    try:
+        resource_api = kr8s.objects.get_class(
+            version=api_version,
+            kind=kind,
+            _asyncio=True,
+        )
+    except KeyError:
+        resource_api = kr8s.objects.new_class(
+            version=api_version,
+            kind=kind,
+            plural=plural,
+            namespaced=namespaced,
+            asyncio=True,
+        )
     return (resource_api, resource_id, owned, readonly, delete_if_exists)
 
 
