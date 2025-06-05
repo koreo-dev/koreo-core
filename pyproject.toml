@@ -1,6 +1,6 @@
 [project]
 name = "koreo-core"
-version = "0.1.11"
+version = "0.1.12"
 description = "Type-safe and testable KRM Templates and Workflows."
 authors = [
     {name = "Robert Kluin", email = "robert.kluin@realkinetic.com"},
@@ -9,9 +9,9 @@ authors = [
 ]
 
 dependencies = [
-    "cel-python==0.2.0",
+    "cel-python==0.3.0",
     "PyYAML==6.0.2",
-    "kr8s==0.20.6",
+    "kr8s==0.20.7",
     "fastjsonschema==2.21.1",
 ]
 
@@ -24,12 +24,12 @@ Homepage = "https://koreo.dev"
 
 [dependency-groups]
 test = [
-    "pytest==8.3.5",
-    "pytest-cov==6.0.0",
+    "pytest==8.4.0",
+    "pytest-cov==6.1.1",
 ]
 tooling = [
-    "ruff==0.11.2",
-    "pyright==1.1.397",
+    "ruff==0.11.12",
+    "pyright==1.1.401",
 ]
 all = ["koreo-core[test,tooling]"]
 
