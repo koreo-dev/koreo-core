@@ -1,6 +1,6 @@
 [project]
 name = "koreo-core"
-version = "0.1.12"
+version = "0.1.13"
 description = "Type-safe and testable KRM Templates and Workflows."
 authors = [
     {name = "Robert Kluin", email = "robert.kluin@realkinetic.com"},
@@ -39,6 +39,10 @@ build-backend = "pdm.backend"
 
 [tool.pdm]
 distribution = true
+
+[tool.pdm.build]
+package-dir = "src"
+includes = ["src/koreo/**/*", "crd/*.yaml"]
 
 [tool.pytest.ini_options]
 pythonpath = "src"
