@@ -40,6 +40,10 @@ build-backend = "pdm.backend"
 [tool.pdm]
 distribution = true
 
+[tool.pdm.build]
+package-dir = "src"
+includes = ["src/koreo/**/*", "crd/*.yaml"]
+
 [tool.pytest.ini_options]
 pythonpath = "src"
 addopts = [
