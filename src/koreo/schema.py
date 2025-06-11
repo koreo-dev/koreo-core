@@ -1,7 +1,6 @@
-import importlib
+from importlib import resources
 from typing import Any
 import logging
-import pathlib
 
 logger = logging.getLogger("koreo.schema")
 
@@ -17,12 +16,12 @@ from koreo.value_function.structure import ValueFunction
 from koreo.workflow.structure import Workflow
 
 
-KIND_CRD_MAP = {
-    "FunctionTest": FunctionTest,
-    "ResourceFunction": ResourceFunction,
-    "ResourceTemplate": ResourceTemplate,
-    "ValueFunction": ValueFunction,
-    "Workflow": Workflow,
+NAME_CRD_MAP = {
+    "functiontests.koreo.dev": FunctionTest,
+    "resourcefunctions.koreo.dev": ResourceFunction,
+    "resourcetemplates.koreo.dev": ResourceTemplate,
+    "valuefunctions.koreo.dev": ValueFunction,
+    "workflows.koreo.dev": Workflow,
 }
 _SCHEMA_VALIDATORS = {}
 
@@ -117,69 +116,32 @@ def load_validator(resource_type_name: str, resource_schema: dict):
         _SCHEMA_VALIDATORS[resource_version_key] = version_validator
 
 
-def load_validators_from_files(clear_existing: bool = False, path: str = None):
+def load_validators_from_files(clear_existing: bool = False):
+    path = resources.path("koreo")
+
     if clear_existing:
         _SCHEMA_VALIDATORS.clear()
 
-    crd_path = pathlib.Path(path) if path else None
+    with path as module_path:
+        koreo_root = module_path.parent.parent
+        crd_dir = koreo_root.joinpath("crd")
 
-    if crd_path:
-        # Use the pathlib.Path directly - no context manager needed
-        _process_crd_directory(crd_path)
-    else:
-        import koreo
-        
-        # First try to find CRD files at project root (typical during development)
-        koreo_path = pathlib.Path(koreo.__file__).parent
-        project_root = koreo_path.parent.parent  # go up from src/koreo to project root
-        crd_dir = project_root / "crd"
-        
-        if crd_dir.exists():
-            _process_crd_directory(crd_dir)
-        else:
-            # Fallback to package resources if CRDs are bundled
-            try:
-                with importlib.resources.path(koreo, "crd") as resource_crd_dir:
-                    _process_crd_directory(resource_crd_dir)
-            except (FileNotFoundError, ModuleNotFoundError):
-                logger.warning("No CRD files found - schema validation will be unavailable")
+        for resource in crd_dir.iterdir():
+            with resource.open() as crd_content:
+                parsed = yaml.load_all(crd_content, Loader=yaml.Loader)
 
-
-def _process_crd_directory(crd_dir):
-    for resource_file in crd_dir.iterdir():
-        if not resource_file.suffix == ".yaml":
-            continue
-
-        try:
-            with resource_file.open() as resource_data:
-                parsed = yaml.load(resource_data, Loader=yaml.SafeLoader)
                 if not parsed:
-                    logger.error(f"Failed to parse CRD file '{resource_file.name}'")
                     continue
 
-                # CRD files have kind: CustomResourceDefinition
-                # The actual resource kind is in spec.names.kind
-                if parsed.get("kind") != "CustomResourceDefinition":
-                    logger.warning(
-                        f"Expected CustomResourceDefinition, got '{parsed.get('kind')}' in file '{resource_file.name}'"
+                for chunk in parsed:
+                    if chunk.get("kind") != "CustomResourceDefinition":
+                        continue
+
+                    chunk_kind = NAME_CRD_MAP.get(chunk.get("metadata", {}).get("name"))
+                    if not chunk_kind:
+                        continue
+
+                    load_validator(
+                        resource_type_name=chunk_kind.__qualname__,
+                        resource_schema=chunk,
                     )
-                    continue
-
-                spec = parsed.get("spec", {})
-                names = spec.get("names", {})
-                resource_kind = names.get("kind")
-
-                if not resource_kind or resource_kind not in KIND_CRD_MAP:
-                    logger.warning(
-                        f"Unknown resource kind '{resource_kind}' in file '{resource_file.name}'"
-                    )
-                    continue
-
-                resource_type = KIND_CRD_MAP[resource_kind]
-                load_validator(
-                    resource_type_name=resource_type.__qualname__,
-                    resource_schema=parsed,
-                )
-        except Exception as e:
-            logger.error(f"Failed to load CRD file '{resource_file.name}': {e}")
-            continue
