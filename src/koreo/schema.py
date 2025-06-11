@@ -15,7 +15,7 @@ from koreo.result import PermFail
 from koreo.value_function.structure import ValueFunction
 from koreo.workflow.structure import Workflow
 
-CRD_ROOT = pathlib.Path(__file__).parent.parent.parent.joinpath("crd")
+CRD_ROOT = pathlib.Path(__file__).parent.joinpath("crd")
 
 CRD_MAP = {
     FunctionTest: "function-test.yaml",
