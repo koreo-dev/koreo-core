@@ -1,6 +1,6 @@
+from importlib import resources
 from typing import Any
 import logging
-import pathlib
 
 logger = logging.getLogger("koreo.schema")
 
@@ -15,16 +15,14 @@ from koreo.result import PermFail
 from koreo.value_function.structure import ValueFunction
 from koreo.workflow.structure import Workflow
 
-CRD_ROOT = pathlib.Path(__file__).parent.parent.parent.joinpath("crd")
 
-CRD_MAP = {
-    FunctionTest: "function-test.yaml",
-    ResourceFunction: "resource-function.yaml",
-    ResourceTemplate: "resource-template.yaml",
-    ValueFunction: "value-function.yaml",
-    Workflow: "workflow.yaml",
+NAME_CRD_MAP = {
+    "functiontests.koreo.dev": FunctionTest,
+    "resourcefunctions.koreo.dev": ResourceFunction,
+    "resourcetemplates.koreo.dev": ResourceTemplate,
+    "valuefunctions.koreo.dev": ValueFunction,
+    "workflows.koreo.dev": Workflow,
 }
-
 _SCHEMA_VALIDATORS = {}
 
 
@@ -118,26 +116,32 @@ def load_validator(resource_type_name: str, resource_schema: dict):
         _SCHEMA_VALIDATORS[resource_version_key] = version_validator
 
 
-def load_validators_from_files(clear_existing: bool = False, path: str = CRD_ROOT):
+def load_validators_from_files(clear_existing: bool = False):
+    path = resources.path("koreo")
+
     if clear_existing:
         _SCHEMA_VALIDATORS.clear()
 
-    for resource_type, schema_file in CRD_MAP.items():
-        full_path = path.joinpath(schema_file)
-        if not full_path.exists():
-            logger.error(
-                f"Failed to load {resource_type} schema from file '{schema_file}'"
-            )
-            continue
+    with path as module_path:
+        koreo_root = module_path.parent.parent
+        crd_dir = koreo_root.joinpath("crd")
 
-        with full_path.open() as crd_content:
-            parsed = yaml.load(crd_content, Loader=yaml.Loader)
-            if not parsed:
-                logger.error(
-                    f"Failed to parse {resource_type} schema content from file '{full_path}'"
-                )
-                continue
+        for resource in crd_dir.iterdir():
+            with resource.open() as crd_content:
+                parsed = yaml.load_all(crd_content, Loader=yaml.Loader)
 
-            load_validator(
-                resource_type_name=resource_type.__qualname__, resource_schema=parsed
-            )
+                if not parsed:
+                    continue
+
+                for chunk in parsed:
+                    if chunk.get("kind") != "CustomResourceDefinition":
+                        continue
+
+                    chunk_kind = NAME_CRD_MAP.get(chunk.get("metadata", {}).get("name"))
+                    if not chunk_kind:
+                        continue
+
+                    load_validator(
+                        resource_type_name=chunk_kind.__qualname__,
+                        resource_schema=chunk,
+                    )
