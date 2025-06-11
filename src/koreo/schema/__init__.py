@@ -1,6 +1,7 @@
-from typing import Any
+from importlib import resources
 import logging
-import pathlib
+from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger("koreo.schema")
 
@@ -15,14 +16,13 @@ from koreo.result import PermFail
 from koreo.value_function.structure import ValueFunction
 from koreo.workflow.structure import Workflow
 
-CRD_ROOT = pathlib.Path(__file__).parent.parent.parent.joinpath("crd")
 
-CRD_MAP = {
-    FunctionTest: "function-test.yaml",
-    ResourceFunction: "resource-function.yaml",
-    ResourceTemplate: "resource-template.yaml",
-    ValueFunction: "value-function.yaml",
-    Workflow: "workflow.yaml",
+NAME_CRD_MAP = {
+    "functiontests.koreo.dev": FunctionTest,
+    "resourcefunctions.koreo.dev": ResourceFunction,
+    "resourcetemplates.koreo.dev": ResourceTemplate,
+    "valuefunctions.koreo.dev": ValueFunction,
+    "workflows.koreo.dev": Workflow,
 }
 
 _SCHEMA_VALIDATORS = {}
@@ -59,7 +59,7 @@ def validate(
 
 def _get_validator(resource_type: type, version: str | None = None):
     if not _SCHEMA_VALIDATORS:
-        load_validators_from_files()
+        load_bundled_schemas()
 
     if not version:
         version = DEFAULT_API_VERSION
@@ -118,26 +118,41 @@ def load_validator(resource_type_name: str, resource_schema: dict):
         _SCHEMA_VALIDATORS[resource_version_key] = version_validator
 
 
-def load_validators_from_files(clear_existing: bool = False, path: str = CRD_ROOT):
+def load_validators_from_path(from_path: Path, clear_existing: bool = False):
     if clear_existing:
         _SCHEMA_VALIDATORS.clear()
 
-    for resource_type, schema_file in CRD_MAP.items():
-        full_path = path.joinpath(schema_file)
-        if not full_path.exists():
-            logger.error(
-                f"Failed to load {resource_type} schema from file '{schema_file}'"
-            )
-            continue
+    for resource in from_path.glob("*.yaml"):
+        with resource.open() as crd_content:
+            parsed = yaml.load_all(crd_content, Loader=yaml.SafeLoader)
 
-        with full_path.open() as crd_content:
-            parsed = yaml.load(crd_content, Loader=yaml.Loader)
             if not parsed:
-                logger.error(
-                    f"Failed to parse {resource_type} schema content from file '{full_path}'"
-                )
                 continue
 
-            load_validator(
-                resource_type_name=resource_type.__qualname__, resource_schema=parsed
-            )
+            for chunk in parsed:
+                chunk_kind = chunk.get("kind")
+                if not chunk_kind or chunk_kind != "CustomResourceDefinition":
+                    continue
+
+                chunk_metadata = chunk.get("metadata")
+                if not chunk_metadata:
+                    continue
+
+                chunk_resource = NAME_CRD_MAP.get(chunk_metadata.get("name"))
+                if not chunk_resource:
+                    continue
+
+                load_validator(
+                    resource_type_name=chunk_resource.__qualname__,
+                    resource_schema=chunk,
+                )
+
+
+def load_bundled_schemas(clear_existing: bool = False):
+    if clear_existing:
+        _SCHEMA_VALIDATORS.clear()
+
+    schema_module_resources = resources.path("koreo", "schema")
+
+    with schema_module_resources as schema_path:
+        load_validators_from_path(from_path=schema_path, clear_existing=clear_existing)
