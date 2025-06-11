@@ -1,6 +1,7 @@
 from typing import Any
 import logging
 import pathlib
+from importlib import resources
 
 logger = logging.getLogger("koreo.schema")
 
@@ -118,26 +119,26 @@ def load_validator(resource_type_name: str, resource_schema: dict):
         _SCHEMA_VALIDATORS[resource_version_key] = version_validator
 
 
-def load_validators_from_files(clear_existing: bool = False, path: str = CRD_ROOT):
+def load_validators_from_files(clear_existing: bool = False, path: str = None):
     if clear_existing:
         _SCHEMA_VALIDATORS.clear()
 
     for resource_type, schema_file in CRD_MAP.items():
-        full_path = path.joinpath(schema_file)
-        if not full_path.exists():
-            logger.error(
-                f"Failed to load {resource_type} schema from file '{schema_file}'"
-            )
-            continue
-
-        with full_path.open() as crd_content:
+        try:
+            # Use importlib.resources to access CRD files from package
+            crd_content = resources.files().joinpath('crd', schema_file).read_text()
             parsed = yaml.load(crd_content, Loader=yaml.Loader)
             if not parsed:
                 logger.error(
-                    f"Failed to parse {resource_type} schema content from file '{full_path}'"
+                    f"Failed to parse {resource_type} schema content from file '{schema_file}'"
                 )
                 continue
 
             load_validator(
                 resource_type_name=resource_type.__qualname__, resource_schema=parsed
             )
+        except FileNotFoundError:
+            logger.error(
+                f"Failed to load {resource_type} schema from file '{schema_file}'"
+            )
+            continue

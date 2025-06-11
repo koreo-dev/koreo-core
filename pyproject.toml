@@ -42,7 +42,7 @@ distribution = true
 
 [tool.pdm.build]
 package-dir = "src"
-includes = ["src/koreo/**/*"]
+includes = ["src/koreo/**/*", "crd/*.yaml"]
 
 [tool.pytest.ini_options]
 pythonpath = "src"
