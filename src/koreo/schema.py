@@ -1,7 +1,7 @@
+import importlib
 from typing import Any
 import logging
 import pathlib
-from importlib import resources
 
 logger = logging.getLogger("koreo.schema")
 
@@ -17,14 +17,13 @@ from koreo.value_function.structure import ValueFunction
 from koreo.workflow.structure import Workflow
 
 
-CRD_MAP = {
-    FunctionTest: "function-test.yaml",
-    ResourceFunction: "resource-function.yaml",
-    ResourceTemplate: "resource-template.yaml",
-    ValueFunction: "value-function.yaml",
-    Workflow: "workflow.yaml",
+KIND_CRD_MAP = {
+    "FunctionTest": FunctionTest,
+    "ResourceFunction": ResourceFunction,
+    "ResourceTemplate": ResourceTemplate,
+    "ValueFunction": ValueFunction,
+    "Workflow": Workflow,
 }
-
 _SCHEMA_VALIDATORS = {}
 
 
@@ -122,22 +121,65 @@ def load_validators_from_files(clear_existing: bool = False, path: str = None):
     if clear_existing:
         _SCHEMA_VALIDATORS.clear()
 
-    for resource_type, schema_file in CRD_MAP.items():
-        try:
-            # Use importlib.resources to access CRD files from package
-            crd_content = resources.files().joinpath("crd", schema_file).read_text()
-            parsed = yaml.load(crd_content, Loader=yaml.Loader)
-            if not parsed:
-                logger.error(
-                    f"Failed to parse {resource_type} schema content from file '{schema_file}'"
-                )
-                continue
+    crd_path = pathlib.Path(path) if path else None
 
-            load_validator(
-                resource_type_name=resource_type.__qualname__, resource_schema=parsed
-            )
-        except FileNotFoundError:
-            logger.error(
-                f"Failed to load {resource_type} schema from file '{schema_file}'"
-            )
+    if crd_path:
+        # Use the pathlib.Path directly - no context manager needed
+        _process_crd_directory(crd_path)
+    else:
+        import koreo
+        
+        # First try to find CRD files at project root (typical during development)
+        koreo_path = pathlib.Path(koreo.__file__).parent
+        project_root = koreo_path.parent.parent  # go up from src/koreo to project root
+        crd_dir = project_root / "crd"
+        
+        if crd_dir.exists():
+            _process_crd_directory(crd_dir)
+        else:
+            # Fallback to package resources if CRDs are bundled
+            try:
+                with importlib.resources.path(koreo, "crd") as resource_crd_dir:
+                    _process_crd_directory(resource_crd_dir)
+            except (FileNotFoundError, ModuleNotFoundError):
+                logger.warning("No CRD files found - schema validation will be unavailable")
+
+
+def _process_crd_directory(crd_dir):
+    for resource_file in crd_dir.iterdir():
+        if not resource_file.suffix == ".yaml":
+            continue
+
+        try:
+            with resource_file.open() as resource_data:
+                parsed = yaml.load(resource_data, Loader=yaml.SafeLoader)
+                if not parsed:
+                    logger.error(f"Failed to parse CRD file '{resource_file.name}'")
+                    continue
+
+                # CRD files have kind: CustomResourceDefinition
+                # The actual resource kind is in spec.names.kind
+                if parsed.get("kind") != "CustomResourceDefinition":
+                    logger.warning(
+                        f"Expected CustomResourceDefinition, got '{parsed.get('kind')}' in file '{resource_file.name}'"
+                    )
+                    continue
+
+                spec = parsed.get("spec", {})
+                names = spec.get("names", {})
+                resource_kind = names.get("kind")
+
+                if not resource_kind or resource_kind not in KIND_CRD_MAP:
+                    logger.warning(
+                        f"Unknown resource kind '{resource_kind}' in file '{resource_file.name}'"
+                    )
+                    continue
+
+                resource_type = KIND_CRD_MAP[resource_kind]
+                load_validator(
+                    resource_type_name=resource_type.__qualname__,
+                    resource_schema=parsed,
+                )
+        except Exception as e:
+            logger.error(f"Failed to load CRD file '{resource_file.name}': {e}")
             continue
