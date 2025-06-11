@@ -16,7 +16,6 @@ from koreo.result import PermFail
 from koreo.value_function.structure import ValueFunction
 from koreo.workflow.structure import Workflow
 
-CRD_ROOT = pathlib.Path(__file__).parent.joinpath("crd")
 
 CRD_MAP = {
     FunctionTest: "function-test.yaml",
@@ -126,7 +125,7 @@ def load_validators_from_files(clear_existing: bool = False, path: str = None):
     for resource_type, schema_file in CRD_MAP.items():
         try:
             # Use importlib.resources to access CRD files from package
-            crd_content = resources.files().joinpath('crd', schema_file).read_text()
+            crd_content = resources.files().joinpath("crd", schema_file).read_text()
             parsed = yaml.load(crd_content, Loader=yaml.Loader)
             if not parsed:
                 logger.error(
