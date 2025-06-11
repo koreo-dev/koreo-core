@@ -42,7 +42,8 @@ distribution = true
 
 [tool.pdm.build]
 package-dir = "src"
-includes = ["src/koreo/**/*", "crd/*.yaml"]
+source-includes = ["crd"]
+wheel-data = {"crd" = "crd"}
 
 [tool.pytest.ini_options]
 pythonpath = "src"
