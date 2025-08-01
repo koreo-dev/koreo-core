@@ -583,7 +583,7 @@ def _load_logic_switch(
                 location=f"{location}.cases[{idx}].default",
             )
 
-        resources, logic = _load_logic(
+        logic_resources, logic = _load_logic(
             logic_ref=case_spec, location=f"{location}[{idx}]"
         )
 
@@ -600,8 +600,8 @@ def _load_logic_switch(
         if is_default:
             default_logic = logic
 
-        if resources:
-            resources.update(resources)
+        if logic_resources:
+            resources.update(logic_resources)
 
     functions_ready = unwrapped_combine(logic_map.values())
     if is_error(functions_ready):
