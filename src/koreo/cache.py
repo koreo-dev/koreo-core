@@ -21,11 +21,9 @@ type PreparerFn[T] = Callable[
 def get_resource_from_cache(
     resource_class: type[T], cache_key: str
 ) -> UnwrappedOutcome[T] | None:
-    resource_class_name = resource_class.__qualname__
-    if not __CACHE.get(resource_class_name):
-        __CACHE[resource_class_name] = {}
+    resource_key = registry.Resource(resource_type=resource_class, name=cache_key)
 
-    cached = __CACHE[resource_class_name].get(cache_key)
+    cached = __CACHE.get(resource_key)
 
     if cached:
         return cached.resource
@@ -44,11 +42,9 @@ class __CachedResource[T](NamedTuple):
 def get_resource_system_data_from_cache(
     resource_class: type[T], cache_key: str
 ) -> __CachedResource[T] | None:
-    resource_class_name = resource_class.__qualname__
-    if not __CACHE.get(resource_class_name):
-        __CACHE[resource_class_name] = {}
+    resource_key = registry.Resource(resource_type=resource_class, name=cache_key)
 
-    return __CACHE[resource_class_name].get(cache_key)
+    return __CACHE.get(resource_key)
 
 
 async def prepare_and_cache(
@@ -62,12 +58,9 @@ async def prepare_and_cache(
 
     cache_key = resource_metadata.resource_name
 
-    resource_class_name = resource_class.__qualname__
+    resource_key = registry.Resource(resource_type=resource_class, name=cache_key)
 
-    if not __CACHE.get(resource_class_name):
-        __CACHE[resource_class_name] = {}
-
-    cached = __CACHE[resource_class_name].get(cache_key)
+    cached = __CACHE.get(resource_key)
 
     if cached and cached.resource_version == resource_metadata.resource_version:
         return cached.resource
@@ -84,7 +77,7 @@ async def prepare_and_cache(
         prepared_resource = preparer_outcome
         subscriptions = None
 
-    __CACHE[resource_class_name][cache_key] = __CachedResource[T](
+    __CACHE[resource_key] = __CachedResource[T](
         spec=spec,
         resource=prepared_resource,
         resource_version=resource_metadata.resource_version,
@@ -92,7 +85,7 @@ async def prepare_and_cache(
         system_data=_system_data,
     )
     logger.debug(
-        f"Updating {resource_class_name} cache for {cache_key} ({resource_metadata.resource_version})."
+        f"Updating {resource_class.__qualname__} cache for {cache_key} ({resource_metadata.resource_version})."
     )
 
     await _handle_notifications(
@@ -122,22 +115,20 @@ async def delete_resource_from_cache(
 async def delete_from_cache(
     resource_class: type[T], cache_key: str, version: str | None = None
 ) -> None:
-    resource_class_name = resource_class.__qualname__
-    if not __CACHE.get(resource_class_name):
-        return None
+    resource_key = registry.Resource(resource_type=resource_class, name=cache_key)
 
-    cached = __CACHE[resource_class_name].get(cache_key)
+    cached = __CACHE.get(resource_key)
     if not cached:
         return None
 
     if version and version != cached.resource_version:
         logger.debug(
-            f"Skip deleting {cache_key} from {resource_class_name} cache due to version mismatch ({version} != {cached.resource_version})."
+            f"Skip deleting {cache_key} from {resource_class.__qualname__} cache due to version mismatch ({version} != {cached.resource_version})."
         )
         return None
 
     deleted_at = time.monotonic()
-    del __CACHE[resource_class_name][cache_key]
+    del __CACHE[resource_key]
 
     resource = registry.Resource(resource_type=resource_class, name=cache_key)
     queue = registry.kill_resource(resource=resource)
@@ -157,7 +148,7 @@ async def delete_from_cache(
                 except asyncio.TimeoutError:
                     pass
 
-    logger.debug(f"Deleted {cache_key} from {resource_class_name} cache.")
+    logger.debug(f"Deleted {cache_key} from {resource_class.__qualname__} cache.")
 
     return None
 
@@ -242,12 +233,9 @@ async def _reprepare_and_update_cache(
     preparer: PreparerFn[T],
     cache_key: str,
 ) -> None:
-    resource_class_name = resource_class.__qualname__
+    resource_key = registry.Resource(resource_type=resource_class, name=cache_key)
 
-    if not __CACHE.get(resource_class_name):
-        return
-
-    cached = __CACHE[resource_class_name].get(cache_key)
+    cached = __CACHE.get(resource_key)
     if not cached:
         return
 
@@ -261,12 +249,12 @@ async def _reprepare_and_update_cache(
         prepared_resource = preparer_outcome
         subscriptions = None
 
-    __CACHE[resource_class_name][cache_key] = cached._replace(
+    __CACHE[resource_key] = cached._replace(
         resource=prepared_resource, prepared_at=prepare_started_at
     )
 
     logger.debug(
-        f"Repreparing {cache_key} ({cached.resource_version}) in {resource_class_name} cache."
+        f"Repreparing {cache_key} ({cached.resource_version}) in {resource_class.__qualname__} cache."
     )
 
     resource = registry.Resource(resource_type=resource_class, name=cache_key)
@@ -294,7 +282,7 @@ def _deletor(resource):
     return do_delete
 
 
-__CACHE: dict[str, dict[str, __CachedResource]] = {}
+__CACHE: dict[registry.Resource, __CachedResource] = {}
 
 
 class __ResourceMetadata(NamedTuple):

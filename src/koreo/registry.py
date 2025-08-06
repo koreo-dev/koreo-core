@@ -28,15 +28,13 @@ def register[T](
     registerer: Resource[T],
     queue: RegistryQueue | None = None,
 ) -> RegistryQueue:
-    registerer_key = _resource_key(registerer)
-
-    if registerer_key in _SUBSCRIPTION_QUEUES:
-        return _SUBSCRIPTION_QUEUES[registerer_key]
+    if registerer in _SUBSCRIPTION_QUEUES:
+        return _SUBSCRIPTION_QUEUES[registerer]
 
     if not queue:
         queue = asyncio.LifoQueue[ResourceEvent | Kill]()
 
-    _SUBSCRIPTION_QUEUES[registerer_key] = queue
+    _SUBSCRIPTION_QUEUES[registerer] = queue
 
     event_time = time.monotonic()
     notify_subscribers(notifier=registerer, event_time=event_time)
@@ -50,47 +48,39 @@ class SubscriptionCycle(Exception): ...
 
 
 def subscribe(subscriber: Resource, resource: Resource):
-    subscriber_key = _resource_key(subscriber)
-    resource_key = _resource_key(resource)
+    _check_for_cycles(subscriber, (resource,))
 
-    _check_for_cycles(subscriber_key, (resource_key,))
-
-    _RESOURCE_SUBSCRIBERS[resource_key].add(subscriber_key)
-    _SUBSCRIBER_RESOURCES[subscriber_key].add(resource_key)
+    _RESOURCE_SUBSCRIBERS[resource].add(subscriber)
+    _SUBSCRIBER_RESOURCES[subscriber].add(resource)
 
     logger.debug(f"{subscriber} subscribing to {resource}")
 
 
 def subscribe_only_to(subscriber: Resource, resources: Sequence[Resource]):
-    subscriber_key = _resource_key(subscriber)
+    _check_for_cycles(subscriber, resources)
 
-    new = set(_resource_key(subscribe_to) for subscribe_to in resources)
-    _check_for_cycles(subscriber_key, list(new))
+    current = _SUBSCRIBER_RESOURCES[subscriber]
 
-    current = _SUBSCRIBER_RESOURCES[subscriber_key]
+    new = set(resources)
 
-    for resource_key in new - current:
-        _RESOURCE_SUBSCRIBERS[resource_key].add(subscriber_key)
+    for resource in new - current:
+        _RESOURCE_SUBSCRIBERS[resource].add(subscriber)
 
-    for resource_key in current - new:
-        _RESOURCE_SUBSCRIBERS[resource_key].remove(subscriber_key)
+    for resource in current - new:
+        _RESOURCE_SUBSCRIBERS[resource].remove(subscriber)
 
-    _SUBSCRIBER_RESOURCES[subscriber_key] = new
+    _SUBSCRIBER_RESOURCES[subscriber] = new
 
     logger.debug(f"{subscriber} subscribing to {resources}")
 
 
 def unsubscribe(unsubscriber: Resource, resource: Resource):
-    unsubscriber_key = _resource_key(unsubscriber)
-    resource_key = _resource_key(resource)
-
-    _RESOURCE_SUBSCRIBERS[resource_key].remove(unsubscriber_key)
-    _SUBSCRIBER_RESOURCES[unsubscriber_key].remove(resource_key)
+    _RESOURCE_SUBSCRIBERS[resource].remove(unsubscriber)
+    _SUBSCRIBER_RESOURCES[unsubscriber].remove(resource)
 
 
 def notify_subscribers(notifier: Resource, event_time: float):
-    resource_key = _resource_key(notifier)
-    subscribers = _RESOURCE_SUBSCRIBERS[resource_key]
+    subscribers = _RESOURCE_SUBSCRIBERS[notifier]
     if not subscribers:
         logger.debug(f"{notifier} has no subscribers")
         return
@@ -123,31 +113,30 @@ def notify_subscribers(notifier: Resource, event_time: float):
 
 
 def get_subscribers(resource: Resource):
-    resource_key = _resource_key(resource)
+    return _RESOURCE_SUBSCRIBERS[resource]
 
-    return _RESOURCE_SUBSCRIBERS[resource_key]
+
+def get_subscriptions(resource: Resource):
+    return _SUBSCRIBER_RESOURCES[resource]
 
 
 def kill_resource(resource: Resource) -> RegistryQueue | None:
-    resource_key = _resource_key(resource)
-    if resource_key not in _SUBSCRIPTION_QUEUES:
+    if resource not in _SUBSCRIPTION_QUEUES:
         return None
 
-    _kill_resource(resource_key)
+    _kill_resource(resource)
 
 
 def deregister(deregisterer: Resource, deregistered_at: float):
-    deregisterer_key = _resource_key(deregisterer)
-
     # This resource is no longer following any resources.
     subscribe_only_to(subscriber=deregisterer, resources=[])
 
     # Remove this resource's subscription queue
-    if deregisterer_key in _SUBSCRIPTION_QUEUES:
-        queue = _kill_resource(resource_key=deregisterer_key)
+    if deregisterer in _SUBSCRIPTION_QUEUES:
+        queue = _kill_resource(resource=deregisterer)
         assert queue  # Just for the type-checker
 
-        del _SUBSCRIPTION_QUEUES[deregisterer_key]
+        del _SUBSCRIPTION_QUEUES[deregisterer]
 
         # This is to prevent blocking anything waiting for this resource to do
         # something.
@@ -162,22 +151,8 @@ def deregister(deregisterer: Resource, deregistered_at: float):
     notify_subscribers(notifier=deregisterer, event_time=deregistered_at)
 
 
-class _ResourceKey(NamedTuple):
-    resource_type: str
-    name: str
-    namespace: str | None = None
-
-
-def _resource_key(resource: Resource) -> _ResourceKey:
-    return _ResourceKey(
-        resource_type=resource.resource_type.__qualname__,
-        name=resource.name,
-        namespace=resource.namespace,
-    )
-
-
-def _kill_resource(resource_key: _ResourceKey) -> RegistryQueue | None:
-    queue = _SUBSCRIPTION_QUEUES[resource_key]
+def _kill_resource(resource: Resource) -> RegistryQueue | None:
+    queue = _SUBSCRIPTION_QUEUES[resource]
     try:
         queue.put_nowait(Kill())
 
@@ -192,41 +167,26 @@ def _kill_resource(resource_key: _ResourceKey) -> RegistryQueue | None:
     return queue
 
 
-def _check_for_cycles(
-    subscriber_key: _ResourceKey, resource_keys: Sequence[_ResourceKey]
-):
+def _check_for_cycles(subscriber: Resource, resources: Sequence[Resource]):
     # Simple, inefficient cycle detection. This is a simple brute-force check,
     # which hopefully given the problem space is sufficient.
-    checked: set[_ResourceKey] = set()
-    to_check: set[_ResourceKey] = set(resource_keys)
-    while True:
-        if not to_check:
-            break
+    to_check: set[Resource] = set(resources)
+    while to_check:
+        if subscriber in to_check:
+            raise SubscriptionCycle(f"Detected subscription cycle due to {subscriber}")
 
-        if subscriber_key in to_check:
-            raise SubscriptionCycle(
-                f"Detected subscription cycle due to {subscriber_key}"
-            )
-
-        checked.update(to_check)
-
-        next_check_set = set[_ResourceKey]()
-        for check_resource_key in to_check:
-            if check_resource_key not in _SUBSCRIBER_RESOURCES:
+        next_check_set = set[Resource]()
+        for check_resource in to_check:
+            if check_resource not in _SUBSCRIBER_RESOURCES:
                 continue
 
-            check_resource_subscriptions = _SUBSCRIBER_RESOURCES[check_resource_key]
-            next_check_set.update(check_resource_subscriptions)
+            next_check_set.update(_SUBSCRIBER_RESOURCES[check_resource])
         to_check = next_check_set
 
 
-_RESOURCE_SUBSCRIBERS: defaultdict[_ResourceKey, set[_ResourceKey]] = defaultdict(
-    set[_ResourceKey]
-)
-_SUBSCRIBER_RESOURCES: defaultdict[_ResourceKey, set[_ResourceKey]] = defaultdict(
-    set[_ResourceKey]
-)
-_SUBSCRIPTION_QUEUES: dict[_ResourceKey, RegistryQueue] = {}
+_RESOURCE_SUBSCRIBERS: defaultdict[Resource, set[Resource]] = defaultdict(set[Resource])
+_SUBSCRIBER_RESOURCES: defaultdict[Resource, set[Resource]] = defaultdict(set[Resource])
+_SUBSCRIPTION_QUEUES: dict[Resource, RegistryQueue] = {}
 
 
 def _reset_registries():
