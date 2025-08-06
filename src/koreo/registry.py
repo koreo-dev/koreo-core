@@ -128,6 +128,12 @@ def get_subscribers(resource: Resource):
     return _RESOURCE_SUBSCRIBERS[resource_key]
 
 
+def get_subscriptions(resource: Resource):
+    resource_key = _resource_key(resource)
+
+    return _SUBSCRIBER_RESOURCES[resource_key]
+
+
 def kill_resource(resource: Resource) -> RegistryQueue | None:
     resource_key = _resource_key(resource)
     if resource_key not in _SUBSCRIPTION_QUEUES:
