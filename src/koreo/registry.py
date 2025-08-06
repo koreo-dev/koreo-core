@@ -175,12 +175,13 @@ def _check_for_cycles(subscriber: Resource, resources: Sequence[Resource]):
         if subscriber in to_check:
             raise SubscriptionCycle(f"Detected subscription cycle due to {subscriber}")
 
-        to_check = {
-            used_resource
-            for check_resource in to_check
-            for used_resource in _SUBSCRIBER_RESOURCES[check_resource]
-            if check_resource in _SUBSCRIBER_RESOURCES
-        }
+        next_check_set = set[Resource]()
+        for check_resource in to_check:
+            if check_resource not in _SUBSCRIBER_RESOURCES:
+                continue
+
+            next_check_set.update(_SUBSCRIBER_RESOURCES[check_resource])
+        to_check = next_check_set
 
 
 _RESOURCE_SUBSCRIBERS: defaultdict[Resource, set[Resource]] = defaultdict(set[Resource])
