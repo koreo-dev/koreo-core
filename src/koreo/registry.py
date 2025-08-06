@@ -171,10 +171,7 @@ def _check_for_cycles(subscriber: Resource, resources: Sequence[Resource]):
     # Simple, inefficient cycle detection. This is a simple brute-force check,
     # which hopefully given the problem space is sufficient.
     to_check: set[Resource] = set(resources)
-    while True:
-        if not to_check:
-            break
-
+    while to_check:
         if subscriber in to_check:
             raise SubscriptionCycle(f"Detected subscription cycle due to {subscriber}")
 
