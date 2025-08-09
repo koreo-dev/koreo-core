@@ -1,4 +1,5 @@
 from typing import NamedTuple
+import copy
 import time
 
 from koreo import cache
@@ -52,8 +53,20 @@ def list_resources():
                 resource_version=cached_resource.resource_version,
                 prepared_ago_seconds=prepared_ago_seconds,
                 resource_status=_get_resource_status_for_type(cached_resource.resource),
-                subscriptions=list(subscriptions),
-                subscribers=list(subscribers),
+                subscriptions=[
+                    copy.replace(
+                        subscription,
+                        resource_type=subscription.resource_type.__qualname__,
+                    )
+                    for subscription in subscriptions
+                ],
+                subscribers=[
+                    copy.replace(
+                        subscriber,
+                        resource_type=subscriber.resource_type.__qualname__,
+                    )
+                    for subscriber in subscribers
+                ],
             )
         )
 
