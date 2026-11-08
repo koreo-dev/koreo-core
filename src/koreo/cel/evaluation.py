@@ -34,7 +34,7 @@ def evaluate(
             location=tree,
         )
 
-    except:
+    except Exception:
         msg = f"Unknown failure evaluating `{location}`."
         logger.exception(msg)
         return PermFail(msg)
@@ -102,7 +102,7 @@ def evaluate_overlay(
             location=tree,
         )
 
-    except:
+    except Exception:
         msg = f"Unknown failure evaluating `{location}`."
         logger.exception(msg)
         return PermFail(msg)
